@@ -21,8 +21,8 @@ object WorkstealingBuild extends Build {
     packageBin in Compile,
     packageBin in Test
   ) map {
-    (dp, jar, testjar, pbc, pbt) => // -XX:+UseConcMarkSweepGC  -XX:-DoEscapeAnalysis -XX:MaxTenuringThreshold=12
-    val javacommand = "java -Xmx2048m -Xms2048m -XX:+UseCondCardMark -verbose:gc -XX:+PrintGCDetails -server -cp %s:%s:%s".format(
+    (dp, jar, testjar, pbc, pbt) => // -XX:+UseConcMarkSweepGC  -XX:-DoEscapeAnalysis -XX:MaxTenuringThreshold=12 -verbose:gc -XX:+PrintGCDetails 
+    val javacommand = "java -Xmx2048m -Xms2048m -XX:+UseCondCardMark -server -cp %s:%s:%s".format(
       dp.map(_.data).mkString(":"),
       jar,
       testjar

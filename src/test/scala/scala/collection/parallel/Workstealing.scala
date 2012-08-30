@@ -8,6 +8,21 @@ import collection._
 
 
 
+trait StatisticsBenchmark extends testing.Benchmark {
+  protected def printStatistics(name: String, measurements: Seq[Long]) {
+    val avg = (measurements.sum.toDouble / measurements.length)
+    val stdev = math.sqrt(measurements.map(x => (x - avg) * (x - avg)).sum / (measurements.length - 1))
+
+    println(name)
+    println(" min:   " + measurements.min)
+    println(" max:   " + measurements.max)
+    println(" med:   " + measurements.sorted.apply(measurements.length / 2))
+    println(" avg:   " + avg.toLong)
+    println(" stdev: " + stdev)
+  }
+}
+
+
 object Utils {
 
   def getUnsafe(): Unsafe = {
@@ -91,7 +106,7 @@ object AdvLoop extends testing.Benchmark {
 }
 
 
-object EqualLoadLoop extends testing.Benchmark {
+object EqualLoadLoop extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
   val par = sys.props("par").toInt
@@ -122,10 +137,19 @@ object EqualLoadLoop extends testing.Benchmark {
     workers.map(_.result).sum
   }
 
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+
 }
 
 
-object StealLoop extends testing.Benchmark {
+object StealLoop extends StatisticsBenchmark {
 
   final class Ptr(val level: Int)(@volatile var child: Node) {
     def casChild(ov: Node, nv: Node) = unsafe.compareAndSwapObject(this, Ptr.CHILD_OFFSET, ov, nv)
@@ -166,25 +190,18 @@ object StealLoop extends testing.Benchmark {
       }
     }
 
-    /** Whether stealer should go left at this level. */
-    def chooseAsStealer(index: Int, total: Int): Boolean = {
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else false
-    }
-
-    /** Whether victim should go left at this level. */
-    def chooseAsVictim(index: Int, total: Int): Boolean = {
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else true
+    def treeSize: Int = {
+      if (child.isLeaf) 1
+      else 1 + child.left.treeSize + child.right.treeSize
     }
 
     def choosePtrAsStealer(index: Int, total: Int): Ptr = {
-      if (chooseAsStealer(index, total)) child.left
+      if (strategy.chooseAsStealer(index, total, this)) child.left
       else child.right
     }
 
     def choosePtrAsVictim(index: Int, total: Int): Ptr = {
-      if (chooseAsVictim(index, total)) child.left
+      if (strategy.chooseAsVictim(index, total, this)) child.left
       else child.right
     }
 
@@ -195,7 +212,134 @@ object StealLoop extends testing.Benchmark {
   }
 
   type T = Int
-  type Owner = Thread
+  type Owner = Worker
+
+  trait Strategy {
+
+   /** Returns true if the worker labeled with `index` with a total of
+    *  `total` workers should go left at level `level`.
+    *  Returns false otherwise.
+    */
+    def choose(index: Int, total: Int, tree: Ptr): Boolean
+
+    /** Whether stealer should go left at this level. */
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean
+
+    /** Whether victim should go left at this level. */
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean
+
+  }
+
+  object AssignTop extends Strategy {
+
+    /** Returns true iff the level of the tree is such that: 2^level < total */
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    /** Returns true iff the worker should first go left at this level of the tree top. */
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        chooseInTreeTop(index, level)
+      } else random.nextBoolean
+    }
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
+      else false
+    }
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
+      else true
+    }
+
+  }
+
+  object AssignTopLeaf extends Strategy {
+
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level) && tree.child.isLeaf) {
+        chooseInTreeTop(index, level)
+      } else random.nextBoolean
+    }
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
+      else false
+    }
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
+      else true
+    }
+
+  }
+
+  object Assign extends Strategy {
+
+    private def log2(x: Int) = {
+      var v = x
+      var r = -1
+      while (v != 0) {
+        r += 1
+        v = v >>> 1
+      }
+      r
+    }
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
+      val levelmod = tree.level % log2(total)
+      ((index >> levelmod) & 0x1) == 0
+    }
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = choose(index, total, tree)
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = choose(index, total, tree)
+
+  }
+
+  object RandomWalk extends Strategy {
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = false
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = true
+
+  }
+
+  object RandomAll extends Strategy {
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+
+  }
+
+  object Predefined extends Strategy {
+
+    def choose(index: Int, total: Int, tree: Ptr): Boolean = true
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = false
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = true
+
+  }
+
+  val strategies = List(AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
 
   final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, @volatile var progress: Int, val step: Int, val until: Int) {
     /*
@@ -210,6 +354,11 @@ object StealLoop extends testing.Benchmark {
 
     @volatile var owner: Owner = null
     @volatile var result: Option[T] = None
+    var padding0: Int = 0 // <-- war story
+    var padding1: Int = 0
+    var padding2: Int = 0
+    var padding3: Int = 0
+    var padding4: Int = 0
 
     final def casProgress(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Node.PROGRESS_OFFSET, ov, nv)
     final def casOwner(ov: Owner, nv: Owner) = unsafe.compareAndSwapObject(this, Node.OWNER_OFFSET, ov, nv)
@@ -249,7 +398,7 @@ object StealLoop extends testing.Benchmark {
     }
 
     def toString(lev: Int): String = {
-      "Node(%s: %d, %d, %d, %d)".format(owner, start, progress, step, until) + (if (!isLeaf) {
+      "[%.2f%%] Node(%s)(%d, %d, %d, %d)".format((progress - start).toDouble / size * 100, if (owner == null) "none" else "worker " + owner.index, start, progress, step, until) + (if (!isLeaf) {
         "\n" + left.toString(lev + 1) + right.toString(lev + 1)
       } else "\n")
     }
@@ -260,28 +409,14 @@ object StealLoop extends testing.Benchmark {
     @static val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("owner"))
   }
 
-  val unsafe = Utils.getUnsafe()
   def random = scala.concurrent.forkjoin.ThreadLocalRandom.current
+  val unsafe = Utils.getUnsafe()
+
   val size = sys.props("size").toInt
   val block = sys.props("block").toInt
   val par = sys.props("par").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
-
-  /** Returns true iff the level of the tree is such that: 2^level < total */
-  final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-
-  /** Returns true iff the worker should first go left at this level of the tree top. */
-  final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
-
-  /** Returns true if the worker labeled with `index` with a total of
-   *  `total` workers should go left at level `level`.
-   *  Returns false otherwise.
-   */
-  final def choose(index: Int, total: Int, level: Int): Boolean = {
-    if (isTreeTop(total, level)) {
-      chooseInTreeTop(index, level)
-    } else random.nextBoolean
-  }
+  val strategy: Strategy = strategies(sys.props("strategy"))
 
   private def quickloop(start: Int, limit: Int): Int = {
     var i = start
@@ -336,7 +471,7 @@ object StealLoop extends testing.Benchmark {
         }
       } else {
         // descend deeper
-        if (choose(index, total, root.level)) {
+        if (strategy.choose(index, total, tree)) {
           val ln = findWork(node.left)
           if (ln != null) ln else findWork(node.right)
         } else {
@@ -364,8 +499,9 @@ object StealLoop extends testing.Benchmark {
     }
   }
 
-  var repetition = 0
   var root: Ptr = _
+  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
+  val treesizes = collection.mutable.ArrayBuffer[Int]()
 
   def run() {
     root = new Ptr(0)(null)
@@ -377,11 +513,34 @@ object StealLoop extends testing.Benchmark {
     for (w <- workers) w.join()
   }
 
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+    val stabletimes = times.drop(5)
+
+    println("...::: Last tree :::...")
+    val balance = root.balance
+    println(root.toString(0))
+    println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
+    println("total: " + balance.foldLeft(0)(_ + _._2))
+    println()
+
+    println("...::: Statistics :::...")
+    println("strategy: " + strategy.getClass.getSimpleName)
+    for ((workerindex, diffs) <- imbalance.toList.sortBy(_._1).headOption) printStatistics("<worker " + workerindex + " imbalance>", diffs.map(_.toLong).toList)
+    printStatistics("<Tree size>", treesizes.map(_.toLong).toList)
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", stabletimes)
+
+    times
+  }
+
   override def setUp() {
     if (inspectgc) {
       println("run starting...")
       Thread.sleep(500)
     }
+
+    root = null
   }
 
   override def tearDown() {
@@ -389,14 +548,13 @@ object StealLoop extends testing.Benchmark {
       Thread.sleep(500)
       println("run completed...")
     }
-    repetition += 1
-    if (repetition == 15) {
-      val balance = root.balance
-      println(root.toString(0))
-      println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("work balance:\n", "\n", ""))
-      println("total: " + balance.foldLeft(0)(_ + _._2))
+
+    val balance = root.balance
+    val workmean = size / par
+    for ((w, workdone) <- balance; if w != null) {
+      imbalance(w.index) += math.abs(workmean - workdone)
     }
-    root = null
+    treesizes += root.treeSize
   }
 
 }
