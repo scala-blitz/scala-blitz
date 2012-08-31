@@ -195,16 +195,6 @@ object StealLoop extends StatisticsBenchmark {
       else 1 + child.left.treeSize + child.right.treeSize
     }
 
-    def choosePtrAsStealer(index: Int, total: Int): Ptr = {
-      if (strategy.chooseAsStealer(index, total, this)) child.left
-      else child.right
-    }
-
-    def choosePtrAsVictim(index: Int, total: Int): Ptr = {
-      if (strategy.chooseAsVictim(index, total, this)) child.left
-      else child.right
-    }
-
   }
 
   object Ptr {
@@ -216,21 +206,57 @@ object StealLoop extends StatisticsBenchmark {
 
   trait Strategy {
 
+    /** Finds work in the tree for the given worker, which is one out of `total` workers.
+     *  This search may include stealing work.
+     */
+    def findWork(worker: Worker, tree: Ptr): Ptr
+
    /** Returns true if the worker labeled with `index` with a total of
     *  `total` workers should go left at level `level`.
     *  Returns false otherwise.
     */
     def choose(index: Int, total: Int, tree: Ptr): Boolean
 
-    /** Whether stealer should go left at this level. */
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean
+    /** Which node the stealer takes at this level. */
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr
 
-    /** Whether victim should go left at this level. */
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean
+    /** Which node the victim takes at this level. */
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr
 
   }
 
-  object AssignTop extends Strategy {
+  trait FindFirstStrategy extends Strategy {
+
+    def findWork(worker: Worker, tree: Ptr): Ptr = {
+      val index = worker.index
+      val total = worker.total
+      val node = tree.child
+      if (node.isLeaf) {
+        if (node.completed) null // no further expansions
+        else {
+          // more work
+          if (node.tryOwn(worker)) tree
+          else if (node.trySteal()) {
+            val subnode = chooseAsStealer(index, total, tree)
+            if (subnode.child.tryOwn(worker)) subnode
+            else findWork(worker, tree)
+          } else findWork(worker, tree)
+        }
+      } else {
+        // descend deeper
+        if (choose(index, total, tree)) {
+          val ln = findWork(worker, node.left)
+          if (ln != null) ln else findWork(worker, node.right)
+        } else {
+          val rn = findWork(worker, node.right)
+          if (rn != null) rn else findWork(worker, node.left)
+        }
+      }
+    }
+
+  }
+
+  object AssignTop extends FindFirstStrategy {
 
     /** Returns true iff the level of the tree is such that: 2^level < total */
     final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
@@ -245,21 +271,25 @@ object StealLoop extends StatisticsBenchmark {
       } else random.nextBoolean
     }
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = {
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
       val level = tree.level
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else false
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
     }
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = {
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
       val level = tree.level
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else true
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
     }
 
   }
 
-  object AssignTopLeaf extends Strategy {
+  object AssignTopLeaf extends FindFirstStrategy {
 
     final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
     
@@ -272,21 +302,25 @@ object StealLoop extends StatisticsBenchmark {
       } else random.nextBoolean
     }
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = {
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
       val level = tree.level
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else false
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
     }
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = {
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
       val level = tree.level
-      if (isTreeTop(total, level)) chooseInTreeTop(index, level)
-      else true
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
     }
 
   }
 
-  object Assign extends Strategy {
+  object Assign extends FindFirstStrategy {
 
     private def log2(x: Int) = {
       var v = x
@@ -303,43 +337,79 @@ object StealLoop extends StatisticsBenchmark {
       ((index >> levelmod) & 0x1) == 0
     }
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = choose(index, total, tree)
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = choose(index, total, tree)
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
 
   }
 
-  object RandomWalk extends Strategy {
+  object RandomWalk extends FindFirstStrategy {
 
     def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = false
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = true
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
 
   }
 
-  object RandomAll extends Strategy {
+  object RandomAll extends FindFirstStrategy {
 
     def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = if (random.nextBoolean) tree.child.left else tree.child.right
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = if (random.nextBoolean) tree.child.left else tree.child.right
 
   }
 
-  object Predefined extends Strategy {
+  object Predefined extends FindFirstStrategy {
 
     def choose(index: Int, total: Int, tree: Ptr): Boolean = true
 
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Boolean = false
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
 
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Boolean = true
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
 
   }
 
-  val strategies = List(AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
+  object FindMax extends Strategy {
+
+    @tailrec def findWork(worker: Worker, tree: Ptr) = {
+      def search(current: Ptr): Ptr = if (current.child.isLeaf) current else {
+        val left = search(current.child.left)
+        val rght = search(current.child.right)
+        val leftwork = left.child.workRemaining
+        val rghtwork = rght.child.workRemaining
+        if (leftwork > rghtwork) left else rght
+      }
+
+      val max = search(tree)
+      if (max.child.workRemaining > 0) {
+        if (max.child.tryOwn(worker)) max
+        else if (max.child.trySteal()) {
+          val subnode = chooseAsStealer(worker.index, worker.total, max)
+          if (subnode.child.tryOwn(worker)) subnode
+          else findWork(worker, tree)
+        } else findWork(worker, tree)
+      } else null
+    }
+
+    def choose(index: Int, total: Int, tree: Ptr) = sys.error("never called")
+
+    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
+
+    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
+
+  }
+
+  val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
 
   final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, @volatile var progress: Int, val step: Int, val until: Int) {
     /*
@@ -368,6 +438,8 @@ object StealLoop extends StatisticsBenchmark {
     def completed = /*READ*/progress == until
 
     def stolen = /*READ*/progress < 0
+
+    def workRemaining = until - /*READ*/progress
 
     def isLeaf = left eq null
 
@@ -456,38 +528,13 @@ object StealLoop extends StatisticsBenchmark {
   class Worker(val root: Ptr, val index: Int, val total: Int) extends Thread {
     setName("Worker: " + index)
 
-    def findWork(tree: Ptr): Ptr = {
-      val node = tree.child
-      if (node.isLeaf) {
-        if (node.completed) null // no further expansions
-        else {
-          // more work
-          if (node.tryOwn(this)) tree
-          else if (node.trySteal()) {
-            val subnode = tree.choosePtrAsStealer(index, total)
-            if (subnode.child.tryOwn(this)) subnode
-            else findWork(tree)
-          } else findWork(tree)
-        }
-      } else {
-        // descend deeper
-        if (strategy.choose(index, total, tree)) {
-          val ln = findWork(node.left)
-          if (ln != null) ln else findWork(node.right)
-        } else {
-          val rn = findWork(node.right)
-          if (rn != null) rn else findWork(node.left)
-        }
-      }
-    }
-
     @tailrec override final def run() {
-      val leaf = findWork(root)
+      val leaf = strategy.findWork(this, root)
       if (leaf != null) {
         @tailrec def workAndDescend(leaf: Ptr) {
           val nosteals = workloop(leaf)
           if (!nosteals) {
-            val subnode = leaf.choosePtrAsVictim(index, total)
+            val subnode = strategy.chooseAsVictim(index, total, leaf)
             if (subnode.child.tryOwn(this)) workAndDescend(subnode)
           }
         }
