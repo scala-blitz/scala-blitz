@@ -39,12 +39,9 @@ object Utils {
 }
 
 
-object Loop extends testing.Benchmark {
+trait Workloads {
 
-  val size = sys.props("size").toInt
-  var result = 0
-
-  private def quickloop(start: Int, limit: Int): Int = {
+  private def uniform(start: Int, limit: Int) = {
     var i = start
     var sum = 0
     while (i < limit) {
@@ -54,15 +51,148 @@ object Loop extends testing.Benchmark {
     sum
   }
 
+  private def uniform2(start: Int, limit: Int) = {
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val x = i * i
+      sum += x
+      i += 1
+    }
+    sum
+  }
+
+  private def uniform3(start: Int, limit: Int) = {
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val x = i * i * i * i * i * i * i * i
+      sum += x
+      i += 1
+    }
+    sum
+  }
+
+  private def uniform4(start: Int, limit: Int) = {
+    def calc(n: Int): Int = {
+      var i = 0
+      var sum = 0.0f
+      var numerator = 1.0f
+      var denominator = 1.0f
+      while (i < 50000) {
+        sum += numerator / denominator
+        i += 1
+        numerator *= n
+        denominator *= i
+      }
+      sum.toInt
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val x = calc(i)
+      sum += x
+      i += 1
+    }
+    sum
+  }
+
+  private def uniform5(start: Int, limit: Int) = {
+    def calc(n: Int): Int = {
+      var i = 0
+      var sum = 0.0f
+      var numerator = 1.0f
+      var denominator = 1.0f
+      while (i < 5000000) {
+        sum += numerator / denominator
+        i += 1
+        numerator *= n
+        denominator *= i
+      }
+      sum.toInt
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val x = calc(i)
+      sum += x
+      i += 1
+    }
+    sum
+  }
+
+  private def triangle(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val amountOfWork = 0 + n / 100000000
+      var sum = 0
+      var i = 0
+      while (i < amountOfWork) {
+        sum += i
+        i += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      sum += work(i)
+      i += 1
+    }
+    sum
+  }
+
+  private def triangle2(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val amountOfWork = 0 + n / 1000000
+      var sum = 0
+      var i = 0
+      while (i < amountOfWork) {
+        sum += i
+        i += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      sum += work(i)
+      i += 1
+    }
+    sum
+  }
+
+  final def quickloop(start: Int, limit: Int, nmax: Int) = triangle2(start, limit, nmax)
+
+}
+
+
+object Loop extends StatisticsBenchmark with Workloads {
+
+  val size = sys.props("size").toInt
+  var result = 0
+
   def run() {
-    var sum = quickloop(0, size)
+    val sum = quickloop(0, size, size)
     result = sum
+  }
+  
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
   }
   
 }
 
 
-object AdvLoop extends testing.Benchmark {
+object AdvLoop extends StatisticsBenchmark with Workloads {
 
   final class Work(var from: Int, val step: Int, val until: Int) {
     final def CAS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Work.FROM_OFFSET, ov, nv)
@@ -78,16 +208,6 @@ object AdvLoop extends testing.Benchmark {
   var result = 0
   var work: Work = null
 
-  private def quickloop(start: Int, limit: Int): Int = {
-    var i = start
-    var sum = 0
-    while (i < limit) {
-      sum += i
-      i += 1
-    }
-    sum
-  }
-
   def run() {
     work = new Work(0, block, size)
     var sum = 0
@@ -97,7 +217,7 @@ object AdvLoop extends testing.Benchmark {
       val nextFrom = work.from + work.step
       if (currFrom < work.until) {
         work.from = nextFrom
-        sum += quickloop(currFrom, nextFrom)
+        sum += quickloop(currFrom, nextFrom, size)
       } else looping = false
     }
     result = sum
@@ -106,32 +226,22 @@ object AdvLoop extends testing.Benchmark {
 }
 
 
-object EqualLoadLoop extends StatisticsBenchmark {
+object StaticChunkingLoop extends StatisticsBenchmark with Workloads {
 
   val size = sys.props("size").toInt
   val par = sys.props("par").toInt
 
-  def quickloop(start: Int, limit: Int) = {
-    var i = start
-    var sum = 0
-    while (i < limit) {
-      sum += i
-      i += 1
-    }
-    sum
-  }
-
-  final class Worker extends Thread {
+  final class Worker(val idx: Int) extends Thread {
     @volatile var result = 0
     override def run() {
       var i = 0
-      val until = size / par
-      result = quickloop(0, until)
+      val total = size / par
+      result = quickloop(idx * total, (idx + 1) * total, size)
     }
   }
 
   def run() {
-    val workers = for (_ <- 0 until par) yield new Worker
+    val workers = for (idx <- 0 until par) yield new Worker(idx)
     for (w <- workers) w.start()
     for (w <- workers) w.join()
     workers.map(_.result).sum
@@ -149,7 +259,58 @@ object EqualLoadLoop extends StatisticsBenchmark {
 }
 
 
-object StealLoop extends StatisticsBenchmark {
+object BlockedSelfSchedulingLoop extends StatisticsBenchmark with Workloads {
+
+  final class Work(@volatile var from: Int, val step: Int, val until: Int) {
+    final def CAS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Work.FROM_OFFSET, ov, nv)
+  }
+
+  object Work {
+    @static val FROM_OFFSET = unsafe.objectFieldOffset(classOf[BlockedSelfSchedulingLoop.Work].getDeclaredField("from"))
+  }
+
+  val unsafe = Utils.getUnsafe()
+  val size = sys.props("size").toInt
+  val block = sys.props("block").toInt
+  val par = sys.props("par").toInt
+  var work: Work = null
+
+  final class Worker extends Thread {
+    @volatile var result = 0
+    override def run() {
+      var sum = 0
+      var looping = true
+      while (looping) {
+        val currFrom = work.from
+        val nextFrom = work.from + work.step
+        if (currFrom < work.until) {
+          if (work.CAS(currFrom, nextFrom)) sum += quickloop(currFrom, nextFrom, size)
+        } else looping = false
+        result = sum
+      }
+    }
+  }
+
+  def run() {
+    work = new Work(0, block, size)
+    val workers = for (i <- 0 until par) yield new Worker
+    for (w <- workers) w.start()
+    for (w <- workers) w.join()
+  }
+
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+  
+}
+
+
+object StealLoop extends StatisticsBenchmark with Workloads {
 
   final class Ptr(val level: Int)(@volatile var child: Node) {
     def casChild(ov: Node, nv: Node) = unsafe.compareAndSwapObject(this, Ptr.CHILD_OFFSET, ov, nv)
@@ -470,7 +631,7 @@ object StealLoop extends StatisticsBenchmark {
     }
 
     def toString(lev: Int): String = {
-      "[%.2f%%] Node(%s)(%d, %d, %d, %d)".format((progress - start).toDouble / size * 100, if (owner == null) "none" else "worker " + owner.index, start, progress, step, until) + (if (!isLeaf) {
+      "[%.2f%%] Node(%s)(%d, %d, %d, %d)(res = %s)".format((progress - start).toDouble / size * 100, if (owner == null) "none" else "worker " + owner.index, start, progress, step, until, result) + (if (!isLeaf) {
         "\n" + left.toString(lev + 1) + right.toString(lev + 1)
       } else "\n")
     }
@@ -490,16 +651,6 @@ object StealLoop extends StatisticsBenchmark {
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
   val strategy: Strategy = strategies(sys.props("strategy"))
 
-  private def quickloop(start: Int, limit: Int): Int = {
-    var i = start
-    var sum = 0
-    while (i < limit) {
-      sum += i
-      i += 1
-    }
-    sum
-  }
-
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
    */
@@ -511,7 +662,7 @@ object StealLoop extends StatisticsBenchmark {
       val currprog = /*READ*/work.progress
       var nextprog = math.min(currprog + work.step, work.until)
       if (currprog < work.until && currprog >= 0) {
-        if (work.casProgress(currprog, nextprog)) sum += quickloop(currprog, nextprog)
+        if (work.casProgress(currprog, nextprog)) sum += quickloop(currprog, nextprog, size)
       } else looping = false
     }
     if (work.completed) {
