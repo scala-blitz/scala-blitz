@@ -145,12 +145,14 @@ trait Workloads {
   }
 
   private def triangle2(start: Int, limit: Int, nmax: Int) = {
+    // don't let your JIT apply some crazy optimization here
+    // which will slow down everything - use multiplication!!!
     def work(n: Int): Int = {
-      val amountOfWork = 0 + n / 1000000
-      var sum = 0
-      var j = 0
+      val amountOfWork = 1 + n / 1000000
+      var sum = 1
+      var j = 1
       while (j < amountOfWork) {
-        sum += j
+        sum *= j
         j += 1
       }
       sum
@@ -159,7 +161,8 @@ trait Workloads {
     var i = start
     var sum = 0
     while (i < limit) {
-      sum += work(i)
+      val res = work(i)
+      sum += res
       i += 1
     }
     sum
@@ -295,7 +298,7 @@ object BlockedSelfSchedulingLoop extends StatisticsBenchmark with Workloads {
       var looping = true
       while (looping) {
         val currFrom = work.from
-        val nextFrom = work.from + work.step
+        val nextFrom = math.min(work.until, work.from + work.step)
         if (currFrom < work.until) {
           if (work.CAS(currFrom, nextFrom)) sum += quickloop(currFrom, nextFrom, size)
         } else looping = false
@@ -363,6 +366,8 @@ object StealLoop extends StatisticsBenchmark with Workloads {
         }
       }
     }
+
+    def reduce(op: (T, T) => T): T = if (child.isLeaf) child.result.get else op(child.result.get, op(child.left.reduce(op), child.right.reduce(op)))
 
     def treeSize: Int = {
       if (child.isLeaf) 1
@@ -703,7 +708,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       // help expansion if necessary
       if (tree.child.isLeaf) tree.expand()
       tree.child.result = Some(sum)
-      val work = tree.child
+      //val work = tree.child
       //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
       false
     } else sys.error("unreachable: " + work.progress + ", " + work.until)
@@ -751,6 +756,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     println("...::: Last tree :::...")
     val balance = root.balance
     println(root.toString(0))
+    println("result: " + root.reduce(_ + _))
     println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
