@@ -148,10 +148,10 @@ trait Workloads {
     def work(n: Int): Int = {
       val amountOfWork = 0 + n / 1000000
       var sum = 0
-      var i = 0
-      while (i < amountOfWork) {
-        sum += i
-        i += 1
+      var j = 0
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
       }
       sum
     }
@@ -166,6 +166,19 @@ trait Workloads {
   }
 
   final def quickloop(start: Int, limit: Int, nmax: Int) = triangle2(start, limit, nmax)
+
+  protected val items = new Array[Int](sys.props("size").toInt)
+
+  private def uniformCheck(start: Int, limit: Int, nmax: Int) = {
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      items(i) += 1
+      sum += 1
+      i += 1
+    }
+    sum
+  }
 
 }
 
@@ -342,7 +355,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     def toString(l: Int): String = "\t" * level + "Ptr" + level + " -> " + child.toString(l)
 
     def balance: collection.immutable.HashMap[Owner, Int] = {
-      val here = collection.immutable.HashMap(child.owner -> (child.progress - child.start))
+      val here = collection.immutable.HashMap(child.owner -> (child.positiveProgress - child.start))
       if (child.isLeaf) here
       else Seq(here, child.left.balance, child.right.balance).foldLeft(collection.immutable.HashMap[Owner, Int]()) {
         case (a, b) => a.merged(b) {
@@ -604,6 +617,12 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
     def isLeaf = left eq null
 
+    def positiveProgress = {
+      val p = /*READ*/progress
+      if (p >= 0) p
+      else -(p) - 1
+    }
+
     @tailrec def tryOwn(thiz: Owner): Boolean = {
       val currowner = /*READ*/owner
       if (currowner != null) false
@@ -625,13 +644,24 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       val rnode = new Node(null, null, rptr)(p + firsthalf, p + firsthalf, step, until)
       lptr.writeChild(lnode)
       rptr.writeChild(rnode)
-      val nnode = new Node(lptr, rptr, parent)(start, p, step, until)
+      val nnode = new Node(lptr, rptr, parent)(start, stolenP, step, until)
       nnode.owner = this.owner
       nnode
     }
 
+    def nodeString: String = "[%.2f%%] Node(%s)(%d, %d, %d, %d)(res = %s) #%d".format(
+      (positiveProgress - start).toDouble / size * 100,
+      if (owner == null) "none" else "worker " + owner.index,
+      start,
+      progress,
+      step,
+      until,
+      result,
+      System.identityHashCode(this)
+    )
+
     def toString(lev: Int): String = {
-      "[%.2f%%] Node(%s)(%d, %d, %d, %d)(res = %s)".format((progress - start).toDouble / size * 100, if (owner == null) "none" else "worker " + owner.index, start, progress, step, until, result) + (if (!isLeaf) {
+       nodeString + (if (!isLeaf) {
         "\n" + left.toString(lev + 1) + right.toString(lev + 1)
       } else "\n")
     }
@@ -667,11 +697,14 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     }
     if (work.completed) {
       work.result = Some(sum)
+      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
       true
     } else if (work.stolen) {
       // help expansion if necessary
       if (tree.child.isLeaf) tree.expand()
       tree.child.result = Some(sum)
+      val work = tree.child
+      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
       false
     } else sys.error("unreachable: " + work.progress + ", " + work.until)
   }
@@ -739,6 +772,15 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     }
 
     root = null
+
+    // debugging
+    if (debugging) {
+      var i = 0
+      while (i < size) {
+        items(i) = 0
+        i += 1
+      }
+    }
   }
 
   override def tearDown() {
@@ -753,7 +795,17 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       imbalance(w.index) += math.abs(workmean - workdone)
     }
     treesizes += root.treeSize
+
+    // debugging
+    if (debugging) {
+      assert(items.forall(_ == 1), "Each item processed: " + items.indexWhere(_ != 1) + ", " + items.find(_ != 1) + ": " + items.toSeq + "\n" + root.toString(0))
+      println()
+      println("-----------------------------------------------------------")
+      println()
+    }
   }
+
+  var debugging = false
 
 }
 
