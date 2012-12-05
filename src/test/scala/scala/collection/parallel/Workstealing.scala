@@ -188,6 +188,189 @@ trait Workloads {
     sum
   }
 
+  private def parabola(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n / 2500
+      val amountOfWork = 1 + factor * factor
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def parabola2(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n / 50
+      val amountOfWork = 1 + factor * factor
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def parabola3(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n
+      val amountOfWork = 1 + factor * factor
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def parabola4(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n
+      val amountOfWork = 1 + 500 * factor * factor
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def exp(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n / 1000
+      val amountOfWork = 1 + math.pow(2.0, factor)
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def exp2(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n
+      val amountOfWork = 1 + math.pow(1.2, factor)
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def exp3(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val factor = n
+      val amountOfWork = 1 + math.pow(2.0, factor)
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  private def invtriangle(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val amountOfWork = nmax - n
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
   final def quickloop(start: Int, limit: Int, nmax: Int) = {
     //uniform(start, limit)
     //uniform2(start, limit)
@@ -196,7 +379,15 @@ trait Workloads {
     //uniform5(start, limit)
     //triangle(start, limit, nmax)
     //triangle2(start, limit, nmax)
-    triangle3(start, limit, nmax)
+    //triangle3(start, limit, nmax)
+    //parabola(start, limit, nmax)
+    //parabola2(start, limit, nmax)
+    //parabola3(start, limit, nmax)
+    //parabola4(start, limit, nmax)
+    //exp(start, limit, nmax)
+    //exp2(start, limit, nmax)
+    //exp3(start, limit, nmax)
+    invtriangle(start, limit, nmax)
   }
 
   protected val items = new Array[Int](sys.props("size").toInt)
@@ -734,7 +925,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
         // update step
         incCount = (incCount + 1) % incFreq
-        if (incCount == 0) work.step = math.min(10240, currstep * 2)
+        if (incCount == 0) work.step = math.min(1024, currstep * 2)
       } else looping = false
     }
     if (work.completed) {
