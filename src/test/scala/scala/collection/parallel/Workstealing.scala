@@ -125,14 +125,14 @@ trait Workloads {
 
   private def triangle(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
-      val amountOfWork = 0 + n / 100000000
-      var sum = 0
-      var i = 0
-      while (i < amountOfWork) {
-        sum += i
-        i += 1
+      val amountOfWork = 1 + n / 1000000
+      var tmp = 1
+      var j = 1
+      while (j < amountOfWork) {
+        tmp += j
+        j += 1
       }
-      sum
+      tmp
     }
 
     var i = start
@@ -145,14 +145,12 @@ trait Workloads {
   }
 
   private def triangle2(start: Int, limit: Int, nmax: Int) = {
-    // don't let your JIT apply some crazy optimization here
-    // which will slow down everything - use multiplication!!!
     def work(n: Int): Int = {
-      val amountOfWork = 1 + n / 1000000
+      val amountOfWork = 1 + n / 1000
       var sum = 1
       var j = 1
       while (j < amountOfWork) {
-        sum *= j
+        sum += j
         j += 1
       }
       sum
@@ -168,7 +166,38 @@ trait Workloads {
     sum
   }
 
-  final def quickloop(start: Int, limit: Int, nmax: Int) = triangle2(start, limit, nmax)
+  private def triangle3(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val amountOfWork = 1 + n
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
+  final def quickloop(start: Int, limit: Int, nmax: Int) = {
+    //uniform(start, limit)
+    //uniform2(start, limit)
+    //uniform3(start, limit)
+    //uniform4(start, limit)
+    //uniform5(start, limit)
+    //triangle(start, limit, nmax)
+    //triangle2(start, limit, nmax)
+    triangle3(start, limit, nmax)
+  }
 
   protected val items = new Array[Int](sys.props("size").toInt)
 
@@ -220,7 +249,7 @@ object AdvLoop extends StatisticsBenchmark with Workloads {
 
   val unsafe = Utils.getUnsafe()
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val block = sys.props("step").toInt
   var result = 0
   var work: Work = null
 
@@ -287,7 +316,7 @@ object BlockedSelfSchedulingLoop extends StatisticsBenchmark with Workloads {
 
   val unsafe = Utils.getUnsafe()
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val block = sys.props("step").toInt
   val par = sys.props("par").toInt
   var work: Work = null
 
@@ -590,7 +619,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
 
-  final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, @volatile var progress: Int, val step: Int, val until: Int) {
+  final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, @volatile var progress: Int, @volatile var step: Int, val until: Int) {
     /*
      * progress: start -> x1 -> ... -> xn -> until
      *                                    -> -(xn + 1)
@@ -645,8 +674,8 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       val secondhalf = remaining - firsthalf
       val lptr = new Ptr(parent.level + 1)(null)
       val rptr = new Ptr(parent.level + 1)(null)
-      val lnode = new Node(null, null, lptr)(p, p, step, p + firsthalf)
-      val rnode = new Node(null, null, rptr)(p + firsthalf, p + firsthalf, step, until)
+      val lnode = new Node(null, null, lptr)(p, p, initialStep, p + firsthalf)
+      val rnode = new Node(null, null, rptr)(p + firsthalf, p + firsthalf, initialStep, until)
       lptr.writeChild(lnode)
       rptr.writeChild(rnode)
       val nnode = new Node(lptr, rptr, parent)(start, stolenP, step, until)
@@ -681,7 +710,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   val unsafe = Utils.getUnsafe()
 
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val initialStep = sys.props("step").toInt
   val par = sys.props("par").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
   val strategy: Strategy = strategies(sys.props("strategy"))
@@ -692,12 +721,20 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   def workloop(tree: Ptr): Boolean = {
     val work = tree.child
     var sum = 0
+    var incCount = 0
+    val incFreq = 2
     var looping = true
     while (looping) {
       val currprog = /*READ*/work.progress
-      var nextprog = math.min(currprog + work.step, work.until)
+      val currstep = /*READ*/work.step
+      var nextprog = math.min(currprog + currstep, work.until)
       if (currprog < work.until && currprog >= 0) {
+        // do some work
         if (work.casProgress(currprog, nextprog)) sum += quickloop(currprog, nextprog, size)
+
+        // update step
+        incCount = (incCount + 1) % incFreq
+        if (incCount == 0) work.step = math.min(10240, currstep * 2)
       } else looping = false
     }
     if (work.completed) {
@@ -741,7 +778,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
   def run() {
     root = new Ptr(0)(null)
-    val work = new Node(null, null, root)(0, 0, block, size)
+    val work = new Node(null, null, root)(0, 0, initialStep, size)
     root.writeChild(work)
 
     val workers = for (i <- 0 until par) yield new Worker(root, i, par)
