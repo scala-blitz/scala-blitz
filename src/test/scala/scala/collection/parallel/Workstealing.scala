@@ -192,13 +192,13 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       val child_t0 = /*READ*/child
       if (!child_t0.isLeaf) true else { // already expanded
         // first set progress to -progress
-        val progress_t1 = /*READ*/child_t0.progress
-        if (progress_t1 == child_t0.until) false // already completed
+        val range_t1 = /*READ*/child_t0.range
+        if (Node.completed(range_t1)) false // already completed
         else {
-          if (progress_t1 >= 0) {
-            if (child_t0.casProgress(progress_t1, -(progress_t1 + 1))) expand() // marked stolen - now move on to node creation
+          if (!Node.stolen(range_t1)) {
+            if (child_t0.casRange(range_t1, Node.markStolen(range_t1))) expand() // marked stolen - now move on to node creation
             else expand() // wasn't marked stolen and failed marking stolen - retry
-          } else { // marked stolen
+          } else { // already marked stolen
             // node effectively immutable (except for `result`) - expand it
             val expanded = child_t0.newExpanded
             if (casChild(child_t0, expanded)) true // try to replace with expansion
@@ -211,7 +211,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     def toString(l: Int): String = "\t" * level + "Ptr" + level + " -> " + child.toString(l)
 
     def balance: collection.immutable.HashMap[Owner, Int] = {
-      val here = collection.immutable.HashMap(child.owner -> (child.positiveProgress - child.start))
+      val here = collection.immutable.HashMap(child.owner -> (Node.positiveProgress(child.range) - child.start + child.end - Node.until(child.range)))
       if (child.isLeaf) here
       else Seq(here, child.left.balance, child.right.balance).foldLeft(collection.immutable.HashMap[Owner, Int]()) {
         case (a, b) => a.merged(b) {
@@ -220,7 +220,17 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       }
     }
 
-    def reduce(op: (T, T) => T): T = if (child.isLeaf) child.result.get else op(child.result.get, op(child.left.reduce(op), child.right.reduce(op)))
+    def reduce(op: (T, T) => T): T = if (child.isLeaf) {
+      child.result match {
+        case (Some(lsum), Some(rsum)) => op(lsum, rsum)
+      }
+    } else {
+      val leftres = child.left.reduce(op)
+      val rightres = child.right.reduce(op)
+      child.result match {
+        case (Some(lsum), Some(rsum)) => op(op(op(lsum, leftres), rightres), rsum)
+      }
+    }
 
     def treeSize: Int = {
       if (child.isLeaf) 1
@@ -264,7 +274,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       val total = worker.total
       val node = tree.child
       if (node.isLeaf) {
-        if (node.completed) null // no further expansions
+        if (Node.completed(node.range)) null // no further expansions
         else {
           // more work
           if (node.tryOwn(worker)) tree
@@ -443,7 +453,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
 
-  final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, @volatile var progress: Int, @volatile var step: Int, val until: Int) {
+  final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int) {
     /*
      * progress: start -> x1 -> ... -> xn -> until
      *                                    -> -(xn + 1)
@@ -455,30 +465,25 @@ object StealLoop extends StatisticsBenchmark with Workloads {
      */
 
     @volatile var owner: Owner = null
-    @volatile var result: Option[T] = None
+    @volatile var result: (Option[T], Option[T]) = (None, None)
     var padding0: Int = 0 // <-- war story
     var padding1: Int = 0
     var padding2: Int = 0
     var padding3: Int = 0
-    var padding4: Int = 0
+    //var padding4: Int = 0
 
-    final def casProgress(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Node.PROGRESS_OFFSET, ov, nv)
+    final def casRange(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, Node.RANGE_OFFSET, ov, nv)
     final def casOwner(ov: Owner, nv: Owner) = unsafe.compareAndSwapObject(this, Node.OWNER_OFFSET, ov, nv)
 
-    def nonEmpty = (until - start) > 0
-
-    def completed = /*READ*/progress == until
-
-    def stolen = /*READ*/progress < 0
-
-    def workRemaining = until - /*READ*/progress
+    def nonEmpty = (end - start) > 0
 
     def isLeaf = left eq null
 
-    def positiveProgress = {
-      val p = /*READ*/progress
-      if (p >= 0) p
-      else -(p) - 1
+    def workRemaining = {
+      val r = /*READ*/range
+      val p = Node.progress(r)
+      val u = Node.until(r)
+      u - p
     }
 
     @tailrec def tryOwn(thiz: Owner): Boolean = {
@@ -491,29 +496,31 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     def trySteal(): Boolean = parent.expand()
 
     def newExpanded: Node = {
-      val stolenP = /*READ*/progress
-      val p = -(stolenP) - 1
-      val remaining = until - p
+      val r = /*READ*/range
+      val p = Node.positiveProgress(r)
+      val u = Node.until(r)
+      val remaining = u - p
       val firsthalf = remaining / 2
       val secondhalf = remaining - firsthalf
       val lptr = new Ptr(parent.level + 1)(null)
       val rptr = new Ptr(parent.level + 1)(null)
-      val lnode = new Node(null, null, lptr)(p, p, initialStep, p + firsthalf)
-      val rnode = new Node(null, null, rptr)(p + firsthalf, p + firsthalf, initialStep, until)
+      val lnode = new Node(null, null, lptr)(p, p + firsthalf, Node.range(p, p + firsthalf), initialStep)
+      val rnode = new Node(null, null, rptr)(p + firsthalf, u, Node.range(p + firsthalf, u), initialStep)
       lptr.writeChild(lnode)
       rptr.writeChild(rnode)
-      val nnode = new Node(lptr, rptr, parent)(start, stolenP, step, until)
+      val nnode = new Node(lptr, rptr, parent)(start, end, r, step)
       nnode.owner = this.owner
       nnode
     }
 
-    def nodeString: String = "[%.2f%%] Node(%s)(%d, %d, %d, %d)(res = %s) #%d".format(
-      (positiveProgress - start).toDouble / size * 100,
+    def nodeString: String = "[%.2f%%] Node(%s)(%d, %d, %d, %d, %d)(res = %s) #%d".format(
+      (Node.positiveProgress(range) - start + end - Node.until(range)).toDouble / size * 100,
       if (owner == null) "none" else "worker " + owner.index,
       start,
-      progress,
+      end,
+      Node.progress(range),
+      Node.until(range),
       step,
-      until,
       result,
       System.identityHashCode(this)
     )
@@ -526,8 +533,39 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   }
 
   object Node {
-    @static val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("progress"))
+    @static val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("range"))
     @static val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("owner"))
+
+    def range(p: Int, u: Int): Long = (p.toLong << 32) | u
+
+    def stolen(r: Long): Boolean = progress(r) < 0
+
+    def progress(r: Long): Int = {
+      ((r & 0xffffffff00000000L) >>> 32).toInt
+    }
+
+    def until(r: Long): Int = {
+      (r & 0x00000000ffffffffL).toInt
+    }
+
+    def completed(r: Long): Boolean = {
+      val p = progress(r)
+      val u = until(r)
+      p == u
+    }
+
+    def positiveProgress(r: Long): Int = {
+      val p = progress(r)
+      if (p >= 0) p
+      else -(p) - 1
+    }
+
+    def markStolen(r: Long): Long = {
+      val p = progress(r)
+      val u = until(r)
+      val stolenp = -p - 1
+      range(stolenp, u)
+    }
   }
 
   def random = scala.concurrent.forkjoin.ThreadLocalRandom.current
@@ -538,24 +576,38 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   val par = sys.props("par").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
   val strategy: Strategy = strategies(sys.props("strategy"))
-  var maxStep = sys.props.getOrElse("maxStep", "256").toInt
+  var maxStep = sys.props.getOrElse("maxStep", "1024").toInt
 
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
    */
   def workloop(tree: Ptr): Boolean = {
     val work = tree.child
-    var sum = 0
+    var lsum = 0
+    var rsum = 0
     var incCount = 0
     val incFreq = 2
     var looping = true
     while (looping) {
-      val currprog = /*READ*/work.progress
       val currstep = /*READ*/work.step
-      var nextprog = math.min(currprog + currstep, work.until)
-      if (currprog < work.until && currprog >= 0) {
-        // do some work
-        if (work.casProgress(currprog, nextprog)) sum += kernel(currprog, nextprog, size)
+      val currrange = /*READ*/work.range
+      val p = Node.progress(currrange)
+      val u = Node.until(currrange)
+
+      if (!Node.stolen(currrange) && !Node.completed(currrange)) {
+        if (random.nextBoolean) {
+          val newp = math.min(u, p + currstep)
+          val newrange = Node.range(newp, u)
+
+          // do some work on the left
+          if (work.casRange(currrange, newrange)) lsum = lsum + kernel(p, newp, size)
+        } else {
+          val newu = math.max(p, u - currstep)
+          val newrange = Node.range(p, newu)
+
+          // do some work on the right
+          if (work.casRange(currrange, newrange)) rsum = kernel(newu, u, size) + rsum
+        }
 
         // update step
         incCount = (incCount + 1) % incFreq
@@ -563,18 +615,18 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       } else looping = false
     }
 
-    if (work.completed) {
-      work.result = Some(sum)
+    if (Node.completed(work.range)) {
+      work.result = (Some(lsum), Some(rsum))
       //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
       true
-    } else if (work.stolen) {
+    } else if (Node.stolen(work.range)) {
       // help expansion if necessary
       if (tree.child.isLeaf) tree.expand()
-      tree.child.result = Some(sum)
+      tree.child.result = (Some(lsum), Some(rsum))
       //val work = tree.child
       //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
       false
-    } else sys.error("unreachable: " + work.progress + ", " + work.until)
+    } else sys.error("unreachable: " + Node.progress(work.range) + ", " + Node.until(work.range))
   }
   
   class Worker(val root: Ptr, val index: Int, val total: Int) extends Thread {
@@ -604,7 +656,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
   def run() {
     root = new Ptr(0)(null)
-    val work = new Node(null, null, root)(0, 0, initialStep, size)
+    val work = new Node(null, null, root)(0, size, Node.range(0, size), initialStep)
     root.writeChild(work)
 
     val workers = for (i <- 0 until par) yield new Worker(root, i, par)
