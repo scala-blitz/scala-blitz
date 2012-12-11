@@ -223,12 +223,14 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     def reduce(op: (T, T) => T): T = if (child.isLeaf) {
       child.result match {
         case (Some(lsum), Some(rsum)) => op(lsum, rsum)
+        case (_, _) => sys.error("unreachable?")
       }
     } else {
       val leftres = child.left.reduce(op)
       val rightres = child.right.reduce(op)
       child.result match {
         case (Some(lsum), Some(rsum)) => op(op(op(lsum, leftres), rightres), rsum)
+        case (_, _) => sys.error("unreachable?")
       }
     }
 
