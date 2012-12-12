@@ -611,7 +611,7 @@ trait Workloads {
   }
 
   final def kernel(start: Int, limit: Int, nmax: Int) = {
-    //uniform(start, limit, nmax)
+    uniform(start, limit, nmax)
     //uniform2(start, limit, nmax)
     //uniform3(start, limit, nmax)
     //uniform4(start, limit, nmax)
@@ -637,7 +637,7 @@ trait Workloads {
     //step(start, limit, nmax)
     //step2(start, limit, nmax)
     //step3(start, limit, nmax)
-    step4(start, limit, nmax)
+    //step4(start, limit, nmax)
   }
 
   protected val items = new Array[Int](sys.props("size").toInt)
