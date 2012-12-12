@@ -41,12 +41,17 @@ object Utils {
 
 object Loop extends StatisticsBenchmark with Workloads {
 
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
   val size = sys.props("size").toInt
   var result = 0
 
   def run() {
-    val sum = kernel(0, size, size)
-    result = sum
+    var i = 0
+    while (i < repeats) {
+      val sum = kernel(0, size, size)
+      result = sum
+      i += 1
+    }
   }
   
   override def runBenchmark(noTimes: Int): List[Long] = {
@@ -200,7 +205,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
             else expand() // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
-            val expanded = child_t0.newExpanded
+            val expanded = child_t0.newExpanded(this)
             if (casChild(child_t0, expanded)) true // try to replace with expansion
             else expand() // failure (spurious or due to another expand) - retry
           }
@@ -274,7 +279,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
         else {
           // more work
           if (node.tryOwn(worker)) tree
-          else if (node.trySteal()) {
+          else if (node.trySteal(tree)) {
             val subnode = chooseAsStealer(index, total, tree)
             if (subnode.child.tryOwn(worker)) subnode
             else findWork(worker, tree)
@@ -431,7 +436,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       val max = search(tree)
       if (max.child.workRemaining > 0) {
         if (max.child.tryOwn(worker)) max
-        else if (max.child.trySteal()) {
+        else if (max.child.trySteal(max)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)
           if (subnode.child.tryOwn(worker)) subnode
           else findWork(worker, tree)
@@ -449,7 +454,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
 
-  final class Node(val left: Ptr, val right: Ptr, val parent: Ptr)(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int) {
+  final class Node(val left: Ptr, val right: Ptr)(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int) {
     /*
      * progress: start -> x1 -> ... -> xn -> until
      *                                    -> -(xn + 1)
@@ -468,7 +473,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     @volatile var result: Option[T] = null
     var padding0: Int = 0 // <-- war story
     var padding1: Int = 0
-    //var padding2: Int = 0
+    var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
 
@@ -494,22 +499,20 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       else tryOwn(thiz)
     }
 
-    def trySteal(): Boolean = parent.expand()
+    def trySteal(parent: Ptr): Boolean = parent.expand()
 
-    def newExpanded: Node = {
+    def newExpanded(parent: Ptr): Node = {
       val r = /*READ*/range
       val p = Node.positiveProgress(r)
       val u = Node.until(r)
       val remaining = u - p
       val firsthalf = remaining / 2
       val secondhalf = remaining - firsthalf
-      val lptr = new Ptr(parent, parent.level + 1)(null)
-      val rptr = new Ptr(parent, parent.level + 1)(null)
-      val lnode = new Node(null, null, lptr)(p, p + firsthalf, Node.range(p, p + firsthalf), initialStep)
-      val rnode = new Node(null, null, rptr)(p + firsthalf, u, Node.range(p + firsthalf, u), initialStep)
-      lptr.writeChild(lnode)
-      rptr.writeChild(rnode)
-      val nnode = new Node(lptr, rptr, parent)(start, end, r, step)
+      val lnode = new Node(null, null)(p, p + firsthalf, Node.range(p, p + firsthalf), initialStep)
+      val rnode = new Node(null, null)(p + firsthalf, u, Node.range(p + firsthalf, u), initialStep)
+      val lptr = new Ptr(parent, parent.level + 1)(lnode)
+      val rptr = new Ptr(parent, parent.level + 1)(rnode)
+      val nnode = new Node(lptr, rptr)(start, end, r, step)
       nnode.owner = this.owner
       nnode
     }
@@ -580,7 +583,8 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   val par = sys.props("par").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
   val strategy: Strategy = strategies(sys.props("strategy"))
-  var maxStep = sys.props.getOrElse("maxStep", "1024").toInt
+  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
 
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
@@ -699,13 +703,9 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     def getName = "Invoker"
   }
 
-  var root: Ptr = _
+  var lastroot: Ptr = _
   val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
   val treesizes = collection.mutable.ArrayBuffer[Int]()
-
-  def run() {
-    invokeOperation()
-  }
 
   @tailrec def workUntilNoWork(w: Worker, root: Ptr) {
     val leaf = strategy.findWork(w, root)
@@ -725,22 +725,33 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   }
 
   def dispatchWork(root: Ptr) {
-    val workers = for (i <- 1 until par) yield new WorkerThread(root, i, par)
-    for (w <- workers) w.start()
+    var i = 1
+    while (i < par) {
+      val w = new WorkerThread(root, i, par)
+      w.start()
+      i += 1
+    }
   }
 
   def invokeOperation() {
-    root = new Ptr(null, 0)(null)
-    val work = new Node(null, null, root)(0, size, Node.range(0, size), initialStep)
-    root.writeChild(work)
+    // create workstealing tree
+    val work = new Node(null, null)(0, size, Node.range(0, size), initialStep)
+    val root = new Ptr(null, 0)(work)
+    work.tryOwn(Invoker)
 
+    // let other workers know there's something to do
     dispatchWork(root)
 
-    workUntilNoWork(Invoker, root)
+    // piggy-back the caller into doing work
+    if (!workloop(root)) workUntilNoWork(Invoker, root)
 
-    root.synchronized {
+    // synchronize in case there's some other worker just
+    // about to complete work
+    if (root.child.result.isEmpty) root.synchronized {
       while (root.child.result.isEmpty) root.wait()
     }
+
+    lastroot = root
   }
 
   override def runBenchmark(noTimes: Int): List[Long] = {
@@ -748,9 +759,9 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     val stabletimes = times.drop(5)
 
     println("...::: Last tree :::...")
-    val balance = root.balance
-    println(root.toString(0))
-    println("result: " + root.reduce(_ + _))
+    val balance = lastroot.balance
+    println(lastroot.toString(0))
+    println("result: " + lastroot.reduce(_ + _))
     println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
@@ -765,13 +776,21 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     times
   }
 
+  def run() {
+    var i = 0
+    while (i < repeats) {
+      invokeOperation()
+      i += 1
+    }
+  }
+
   override def setUp() {
     if (inspectgc) {
       println("run starting...")
       Thread.sleep(500)
     }
 
-    root = null
+    lastroot = null
 
     // debugging
     if (debugging) {
@@ -789,16 +808,16 @@ object StealLoop extends StatisticsBenchmark with Workloads {
       println("run completed...")
     }
 
-    val balance = root.balance
+    val balance = lastroot.balance
     val workmean = size / par
     for ((w, workdone) <- balance; if w != null) {
       imbalance(w.index) += math.abs(workmean - workdone)
     }
-    treesizes += root.treeSize
+    treesizes += lastroot.treeSize
 
     // debugging
     if (debugging) {
-      assert(items.forall(_ == 1), "Each item processed: " + items.indexWhere(_ != 1) + ", " + items.find(_ != 1) + ": " + items.toSeq + "\n" + root.toString(0))
+      assert(items.forall(_ == 1), "Each item processed: " + items.indexWhere(_ != 1) + ", " + items.find(_ != 1) + ": " + items.toSeq + "\n" + lastroot.toString(0))
       println()
       println("-----------------------------------------------------------")
       println()
