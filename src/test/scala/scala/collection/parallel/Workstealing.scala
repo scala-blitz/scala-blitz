@@ -585,6 +585,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   val strategy: Strategy = strategies(sys.props("strategy"))
   val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
   val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val incrementFrequency = 1
 
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
@@ -595,7 +596,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     var lsum = 0
     var rsum = 0
     var incCount = 0
-    val incFreq = 2
+    val incFreq = incrementFrequency
     var looping = true
     while (looping) {
       val currstep = /*READ*/work.step
@@ -724,12 +725,55 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     }
   }
 
-  def dispatchWork(root: Ptr) {
+  def dispatchWork0(root: Ptr) {
     var i = 1
     while (i < par) {
       val w = new WorkerThread(root, i, par)
       w.start()
       i += 1
+    }
+  }
+
+  def joinWork0(root: Ptr) = {
+    var r = /*READ*/root.child.result
+    if (r == null || r.isEmpty) root.synchronized {
+      r = /*READ*/root.child.result
+      while (r == null || r.isEmpty) {
+        r = /*READ*/root.child.result
+        root.wait()
+      }
+    }
+  }
+
+  import scala.concurrent.forkjoin._
+
+  val fjpool = new ForkJoinPool()
+
+  class WorkerTask(val root: Ptr, val index: Int, val total: Int) extends RecursiveAction with Worker {
+    def getName = "WorkerTask(" + index + ")"
+
+    def compute() {
+      workUntilNoWork(this, root)
+    }
+  }
+
+  def dispatchWork1(root: Ptr) {
+    var i = 1
+    while (i < par) {
+      val w = new WorkerTask(root, i, par)
+      fjpool.execute(w)
+      i += 1
+    }
+  }
+
+  def joinWork1(root: Ptr) = {
+    var r = /*READ*/root.child.result
+    if (r == null || r.isEmpty) root.synchronized {
+      r = /*READ*/root.child.result
+      while (r == null || r.isEmpty) {
+        root.wait()
+        r = /*READ*/root.child.result
+      }
     }
   }
 
@@ -740,16 +784,14 @@ object StealLoop extends StatisticsBenchmark with Workloads {
     work.tryOwn(Invoker)
 
     // let other workers know there's something to do
-    dispatchWork(root)
+    dispatchWork1(root)
 
     // piggy-back the caller into doing work
     if (!workloop(root)) workUntilNoWork(Invoker, root)
 
     // synchronize in case there's some other worker just
     // about to complete work
-    if (root.child.result.isEmpty) root.synchronized {
-      while (root.child.result.isEmpty) root.wait()
-    }
+    joinWork1(root)
 
     lastroot = root
   }
