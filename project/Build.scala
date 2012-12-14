@@ -6,6 +6,19 @@ import java.io.File
 
 
 
+object BuildSettings {
+  val buildSettings = Defaults.defaultSettings ++ Seq (
+    name := "workstealing",
+    version := "0.1",
+    scalaVersion := "2.10.0-RC3",
+    scalacOptions ++= Seq("-deprecation", "-optimise"),
+    libraryDependencies ++= Seq(
+      "org.scala-lang" % "scala-reflect" % "2.10.0-RC3"
+    )
+  )
+}
+
+
 object WorkstealingBuild extends Build {
   
   /* tasks and settings */
@@ -62,13 +75,20 @@ object WorkstealingBuild extends Build {
   
   /* projects */
   
-  lazy val storm = Project(
-    "workstealing",
+  lazy val root = Project(
+    "root",
     file("."),
-    settings = Defaults.defaultSettings ++ Seq(benchTask, javaCommandSetting, benchVerboseTask)
-  ) dependsOn (
+    settings = BuildSettings.buildSettings ++ Seq(benchTask, javaCommandSetting, benchVerboseTask)
   )
-  
+
 }
+
+
+
+
+
+
+
+
 
 

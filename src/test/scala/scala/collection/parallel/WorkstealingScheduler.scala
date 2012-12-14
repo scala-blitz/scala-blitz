@@ -8,160 +8,7 @@ import collection._
 
 
 
-object Loop extends StatisticsBenchmark {
-
-  import Workloads._
-
-  val repeats = sys.props.getOrElse("repeats", "1").toInt
-  val size = sys.props("size").toInt
-  var result = 0
-
-  def run() {
-    var i = 0
-    while (i < repeats) {
-      val sum = kernel(0, size, size)
-      result = sum
-      i += 1
-    }
-  }
-  
-  override def runBenchmark(noTimes: Int): List[Long] = {
-    val times = super.runBenchmark(noTimes)
-
-    printStatistics("<All>", times)
-    printStatistics("<Stable>", times.drop(5))
-
-    times
-  }
-  
-}
-
-
-object AdvLoop extends StatisticsBenchmark {
-
-  import Workloads._
-
-  final class Work(var from: Int, val step: Int, val until: Int) {
-    final def CAS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Work.FROM_OFFSET, ov, nv)
-  }
-
-  object Work {
-    val FROM_OFFSET = unsafe.objectFieldOffset(classOf[AdvLoop.Work].getDeclaredField("from"))
-  }
-
-  val unsafe = Utils.getUnsafe()
-  val size = sys.props("size").toInt
-  val block = sys.props("step").toInt
-  var result = 0
-  var work: Work = null
-
-  def run() {
-    work = new Work(0, block, size)
-    var sum = 0
-    var looping = true
-    while (looping) {
-      val currFrom = work.from
-      val nextFrom = work.from + work.step
-      if (currFrom < work.until) {
-        work.from = nextFrom
-        sum += kernel(currFrom, nextFrom, size)
-      } else looping = false
-    }
-    result = sum
-  }
-  
-}
-
-
-object StaticChunkingLoop extends StatisticsBenchmark {
-
-  import Workloads._
-
-  val size = sys.props("size").toInt
-  val par = sys.props("par").toInt
-
-  final class Worker(val idx: Int) extends Thread {
-    @volatile var result = 0
-    override def run() {
-      var i = 0
-      val total = size / par
-      result = kernel(idx * total, (idx + 1) * total, size)
-    }
-  }
-
-  def run() {
-    val workers = for (idx <- 0 until par) yield new Worker(idx)
-    for (w <- workers) w.start()
-    for (w <- workers) w.join()
-    workers.map(_.result).sum
-  }
-
-  override def runBenchmark(noTimes: Int): List[Long] = {
-    val times = super.runBenchmark(noTimes)
-
-    printStatistics("<All>", times)
-    printStatistics("<Stable>", times.drop(5))
-
-    times
-  }
-
-}
-
-
-object BlockedSelfSchedulingLoop extends StatisticsBenchmark {
-
-  import Workloads._
-
-  final class Work(@volatile var from: Int, val step: Int, val until: Int) {
-    final def CAS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Work.FROM_OFFSET, ov, nv)
-  }
-
-  object Work {
-    val FROM_OFFSET = unsafe.objectFieldOffset(classOf[BlockedSelfSchedulingLoop.Work].getDeclaredField("from"))
-  }
-
-  val unsafe = Utils.getUnsafe()
-  val size = sys.props("size").toInt
-  val block = sys.props("step").toInt
-  val par = sys.props("par").toInt
-  var work: Work = null
-
-  final class Worker extends Thread {
-    @volatile var result = 0
-    override def run() {
-      var sum = 0
-      var looping = true
-      while (looping) {
-        val currFrom = work.from
-        val nextFrom = math.min(work.until, work.from + work.step)
-        if (currFrom < work.until) {
-          if (work.CAS(currFrom, nextFrom)) sum += kernel(currFrom, nextFrom, size)
-        } else looping = false
-        result = sum
-      }
-    }
-  }
-
-  def run() {
-    work = new Work(0, block, size)
-    val workers = for (i <- 0 until par) yield new Worker
-    for (w <- workers) w.start()
-    for (w <- workers) w.join()
-  }
-
-  override def runBenchmark(noTimes: Int): List[Long] = {
-    val times = super.runBenchmark(noTimes)
-
-    printStatistics("<All>", times)
-    printStatistics("<Stable>", times.drop(5))
-
-    times
-  }
-  
-}
-
-
-object StealLoop extends StatisticsBenchmark {
+object WorkstealingScheduler extends StatisticsBenchmark {
 
   import Workloads._
 
@@ -220,7 +67,7 @@ object StealLoop extends StatisticsBenchmark {
   }
 
   object Ptr {
-    val CHILD_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Ptr].getDeclaredField("child"))
+    val CHILD_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Ptr].getDeclaredField("child"))
   }
 
   type T = Int
@@ -518,9 +365,9 @@ object StealLoop extends StatisticsBenchmark {
   }
 
   object Node {
-    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("range"))
-    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("owner"))
-    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[StealLoop.Node].getDeclaredField("result"))
+    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("range"))
+    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("owner"))
+    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("result"))
 
     def range(p: Int, u: Int): Long = (p.toLong << 32) | u
 
@@ -756,9 +603,9 @@ object StealLoop extends StatisticsBenchmark {
     }
   }
 
-  def invokeOperation() {
+  def invokeParallelOperation(progress: Int, result: Int): T = {
     // create workstealing tree
-    val work = new Node(null, null)(0, size, Node.range(0, size), initialStep)
+    val work = new Node(null, null)(progress, size, Node.range(0, size), initialStep)
     val root = new Ptr(null, 0)(work)
     work.tryOwn(Invoker)
 
@@ -773,11 +620,44 @@ object StealLoop extends StatisticsBenchmark {
     joinWork1(root)
 
     lastroot = root
+
+    result + root.child.result.get
   }
+
+  def invokeOperation(): T = {
+    val sz = size
+    val op = registerOp()
+
+    val (progress, result) = interruptibleKernel(op.request, 32, sz)
+
+    if (op.request) invokeParallelOperation(progress, result)
+    else result
+  }
+
+  def registerOp(): Op = {
+    val op = new Op
+    wakeupCall.synchronized {
+      wakeupCall.globop = op
+      wakeupCall.notify()
+    }
+    op
+  }
+
+  final class Op {
+    @volatile var request: Boolean = false
+  }
+
+  final class WakeupCall {
+    var globop: Op = null
+  }
+
+  val wakeupCall = new WakeupCall
 
   override def runBenchmark(noTimes: Int): List[Long] = {
     val times = super.runBenchmark(noTimes)
     val stabletimes = times.drop(5)
+
+    if (lastroot == null) return times
 
     println("...::: Last tree :::...")
     val balance = lastroot.balance
@@ -829,6 +709,8 @@ object StealLoop extends StatisticsBenchmark {
       println("run completed...")
     }
 
+    if (lastroot == null) return
+
     val balance = lastroot.balance
     val workmean = size / par
     for ((w, workdone) <- balance; if w != null) {
@@ -848,17 +730,6 @@ object StealLoop extends StatisticsBenchmark {
   var debugging = false
 
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

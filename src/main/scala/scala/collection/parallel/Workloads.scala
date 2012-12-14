@@ -2,13 +2,72 @@ package scala.collection.parallel
 
 
 
+import language.experimental.macros
+import reflect.macros._
 
 
 
-trait Workloads {
+object Workloads {
+
+  final def kernel(start: Int, limit: Int, nmax: Int) = macro kernel_impl
+
+  final def kernel_impl(c: Context)(start: c.Expr[Int], limit: c.Expr[Int], nmax: c.Expr[Int]): c.Expr[Int] = {
+    import c.universe._
+
+    reify {
+      uniform(start.splice, limit.splice, nmax.splice)
+    }
+
+    //uniform2(start, limit, nmax)
+    //uniform3(start, limit, nmax)
+    //uniform4(start, limit, nmax)
+    //uniform5(start, limit, nmax)
+    //triangle(start, limit, nmax)
+    //triangle2(start, limit, nmax)
+    //triangle3(start, limit, nmax)
+    //parabola(start, limit, nmax)
+    //parabola2(start, limit, nmax)
+    //parabola3(start, limit, nmax)
+    //parabola4(start, limit, nmax)
+    //parabola5(start, limit, nmax)
+    //exp(start, limit, nmax)
+    //exp2(start, limit, nmax)
+    //exp3(start, limit, nmax)
+    //invtriangle(start, limit, nmax)
+    //invtriangle2(start, limit, nmax)
+    //hill(start, limit, nmax)
+    //hill2(start, limit, nmax)
+    //valley(start, limit, nmax)
+    //gaussian(start, limit, nmax)
+    //randif(start, limit, nmax)
+    //step(start, limit, nmax)
+    //step2(start, limit, nmax)
+    //step3(start, limit, nmax)
+    //step4(start, limit, nmax)
+  }
+
+  def interruptibleKernel(request: Boolean, intfreq: Int, size: Int): (Int, Int) = macro interruptibleKernel_impl
+
+  def interruptibleKernel_impl(c: Context)(request: c.Expr[Boolean], intfreq: c.Expr[Int], size: c.Expr[Int]): c.Expr[(Int, Int)] = {
+    import c.universe._
+
+    reify {
+      var i = 0
+      var sum = 0
+      while (i < size.splice && !request.splice) {
+        var next = i + intfreq.splice
+        if (next > size.splice) next = size.splice
+        while (i < next) {
+          sum += i
+          i += 1
+        }
+      }
+      (i, sum)
+    }
+  }
 
   /* 150000000 */
-  private def uniform(start: Int, limit: Int, nmax: Int) = {
+  final def uniform(start: Int, limit: Int, nmax: Int) = {
     var i = start
     var sum = 0
     while (i < limit) {
@@ -610,37 +669,7 @@ trait Workloads {
     sum
   }
 
-  final def kernel(start: Int, limit: Int, nmax: Int) = {
-    uniform(start, limit, nmax)
-    //uniform2(start, limit, nmax)
-    //uniform3(start, limit, nmax)
-    //uniform4(start, limit, nmax)
-    //uniform5(start, limit, nmax)
-    //triangle(start, limit, nmax)
-    //triangle2(start, limit, nmax)
-    //triangle3(start, limit, nmax)
-    //parabola(start, limit, nmax)
-    //parabola2(start, limit, nmax)
-    //parabola3(start, limit, nmax)
-    //parabola4(start, limit, nmax)
-    //parabola5(start, limit, nmax)
-    //exp(start, limit, nmax)
-    //exp2(start, limit, nmax)
-    //exp3(start, limit, nmax)
-    //invtriangle(start, limit, nmax)
-    //invtriangle2(start, limit, nmax)
-    //hill(start, limit, nmax)
-    //hill2(start, limit, nmax)
-    //valley(start, limit, nmax)
-    //gaussian(start, limit, nmax)
-    //randif(start, limit, nmax)
-    //step(start, limit, nmax)
-    //step2(start, limit, nmax)
-    //step3(start, limit, nmax)
-    //step4(start, limit, nmax)
-  }
-
-  protected val items = new Array[Int](sys.props("size").toInt)
+  lazy val items = new Array[Int](sys.props("size").toInt)
 
   private def uniformCheck(start: Int, limit: Int, nmax: Int) = {
     var i = start
