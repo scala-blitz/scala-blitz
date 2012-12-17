@@ -8,6 +8,26 @@ import collection._
 
 
 
+object MultiplicationLoop extends StatisticsBenchmark {
+
+  import Workloads._
+
+  val size = sys.props("size").toInt
+  var result = 0
+
+  def run() {
+    var i = 1
+    var sum = 1
+    while (i < 150000000) {
+      sum *= i
+      i += 1
+    }
+    result = sum
+  }
+  
+}
+
+
 object Loop extends StatisticsBenchmark {
 
   import Workloads._
