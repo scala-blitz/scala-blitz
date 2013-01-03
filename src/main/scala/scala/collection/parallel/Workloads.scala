@@ -15,35 +15,34 @@ object Workloads {
     import c.universe._
 
     reify {
-      uniform(start.splice, limit.splice, nmax.splice)
+      //uniform(start.splice, limit.splice, nmax.splice)
+      //uniform2(start, limit, nmax)
+      //uniform3(start, limit, nmax)
+      //uniform4(start, limit, nmax)
+      //uniform5(start, limit, nmax)
+      //triangle(start, limit, nmax)
+      //triangle2(start, limit, nmax)
+      //triangle3(start, limit, nmax)
+      //parabola(start, limit, nmax)
+      //parabola2(start, limit, nmax)
+      //parabola3(start, limit, nmax)
+      //parabola4(start, limit, nmax)
+      //parabola5(start, limit, nmax)
+      //exp(start, limit, nmax)
+      //exp2(start, limit, nmax)
+      //exp3(start, limit, nmax)
+      //invtriangle(start, limit, nmax)
+      //invtriangle2(start, limit, nmax)
+      //hill(start, limit, nmax)
+      //hill2(start, limit, nmax)
+      //valley(start, limit, nmax)
+      //gaussian(start, limit, nmax)
+      //randif(start, limit, nmax)
+      //step(start, limit, nmax)
+      step2(start.splice, limit.splice, nmax.splice)
+      //step3(start, limit, nmax)
+      //step4(start, limit, nmax)
     }
-
-    //uniform2(start, limit, nmax)
-    //uniform3(start, limit, nmax)
-    //uniform4(start, limit, nmax)
-    //uniform5(start, limit, nmax)
-    //triangle(start, limit, nmax)
-    //triangle2(start, limit, nmax)
-    //triangle3(start, limit, nmax)
-    //parabola(start, limit, nmax)
-    //parabola2(start, limit, nmax)
-    //parabola3(start, limit, nmax)
-    //parabola4(start, limit, nmax)
-    //parabola5(start, limit, nmax)
-    //exp(start, limit, nmax)
-    //exp2(start, limit, nmax)
-    //exp3(start, limit, nmax)
-    //invtriangle(start, limit, nmax)
-    //invtriangle2(start, limit, nmax)
-    //hill(start, limit, nmax)
-    //hill2(start, limit, nmax)
-    //valley(start, limit, nmax)
-    //gaussian(start, limit, nmax)
-    //randif(start, limit, nmax)
-    //step(start, limit, nmax)
-    //step2(start, limit, nmax)
-    //step3(start, limit, nmax)
-    //step4(start, limit, nmax)
   }
 
   def interruptibleKernel(request: Boolean, intfreq: Int, size: Int): (Int, Int) = macro interruptibleKernel_impl
@@ -601,7 +600,7 @@ object Workloads {
   }
 
   /* 1500 */
-  private def step2(start: Int, limit: Int, nmax: Int) = {
+  final def step2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = if (n < nmax / 5) 500000 else 1
       var sum = 1

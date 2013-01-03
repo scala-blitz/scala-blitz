@@ -181,6 +181,61 @@ object BlockedSelfSchedulingLoop extends StatisticsBenchmark {
 }
 
 
+object GuidedSelfSchedulingLoop extends StatisticsBenchmark {
+
+  import Workloads._
+
+  final class Work(@volatile var from: Int, val step: Int, val until: Int) {
+    final def CAS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, Work.FROM_OFFSET, ov, nv)
+  }
+
+  object Work {
+    val FROM_OFFSET = unsafe.objectFieldOffset(classOf[BlockedSelfSchedulingLoop.Work].getDeclaredField("from"))
+  }
+
+  val unsafe = Utils.getUnsafe()
+  val size = sys.props("size").toInt
+  val block = sys.props("step").toInt
+  val par = sys.props("par").toInt
+  var work: Work = null
+
+  final class Worker extends Thread {
+    @volatile var result = 0
+    override def run() {
+      var sum = 0
+      var looping = true
+      while (looping) {
+        val currFrom = work.from
+        val left = work.until - currFrom
+        val nextStep = left / par + (if (left < par) 1 else 0)
+        val nextFrom = math.min(work.until, work.from + nextStep)
+        if (currFrom < work.until) {
+          if (work.CAS(currFrom, nextFrom)) sum += kernel(currFrom, nextFrom, size)
+        } else looping = false
+        result = sum
+      }
+    }
+  }
+
+  def run() {
+    work = new Work(0, block, size)
+    val workers = for (i <- 0 until par) yield new Worker
+    for (w <- workers) w.start()
+    for (w <- workers) w.join()
+  }
+
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+
+}
+
+
 object StealLoop extends StatisticsBenchmark {
 
   import Workloads._
