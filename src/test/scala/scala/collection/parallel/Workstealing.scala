@@ -168,9 +168,9 @@ trait Workloads {
     sum
   }
 
-  final def quickloop(start: Int, limit: Int, nmax: Int) = triangle2(start, limit, nmax)
+  final def quickloop(start: Int, limit: Int, nmax: Int) = uniform(start, limit)
 
-  protected val items = new Array[Int](sys.props("size").toInt)
+  protected lazy val items = new Array[Int](sys.props("size").toInt)
 
   private def uniformCheck(start: Int, limit: Int, nmax: Int) = {
     var i = start
@@ -220,7 +220,7 @@ object AdvLoop extends StatisticsBenchmark with Workloads {
 
   val unsafe = Utils.getUnsafe()
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val block = sys.props("step").toInt
   var result = 0
   var work: Work = null
 
@@ -287,13 +287,14 @@ object BlockedSelfSchedulingLoop extends StatisticsBenchmark with Workloads {
 
   val unsafe = Utils.getUnsafe()
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val block = sys.props("step").toInt
   val par = sys.props("par").toInt
-  var work: Work = null
+  var root: Work = null
 
   final class Worker extends Thread {
     @volatile var result = 0
     override def run() {
+      val work = root
       var sum = 0
       var looping = true
       while (looping) {
@@ -302,13 +303,13 @@ object BlockedSelfSchedulingLoop extends StatisticsBenchmark with Workloads {
         if (currFrom < work.until) {
           if (work.CAS(currFrom, nextFrom)) sum += quickloop(currFrom, nextFrom, size)
         } else looping = false
-        result = sum
       }
+      result = sum
     }
   }
 
   def run() {
-    work = new Work(0, block, size)
+    root = new Work(0, block, size)
     val workers = for (i <- 0 until par) yield new Worker
     for (w <- workers) w.start()
     for (w <- workers) w.join()
@@ -681,7 +682,7 @@ object StealLoop extends StatisticsBenchmark with Workloads {
   val unsafe = Utils.getUnsafe()
 
   val size = sys.props("size").toInt
-  val block = sys.props("block").toInt
+  val block = sys.props("step").toInt
   val par = sys.props("par").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
   val strategy: Strategy = strategies(sys.props("strategy"))
