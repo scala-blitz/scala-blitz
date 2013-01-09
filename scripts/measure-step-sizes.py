@@ -54,7 +54,7 @@ for pargroup in pargroups:
 		resblocks = namegroups[loopblocks]
 		reswstree = namegroups[loopwstree]
 		print "\\begin{tikzpicture}[scale=0.67]"
-		print "\\begin{loglogaxis}[xlabel=\\texttt{P=%d},height=5cm,width=5cm]" % (pargroups[1])
+		print "\\begin{loglogaxis}[xlabel=\\texttt{P=%d},height=5cm,width=5cm]" % (pargroup[0])
 		print "\\addplot[smooth,mark=x]"
 		print "plot coordinates {"
 		for t in sorted(resblocks, key = lambda t: t[2]):
