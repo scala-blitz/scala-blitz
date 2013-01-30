@@ -411,6 +411,9 @@ object WorkstealingScheduler extends StatisticsBenchmark {
   val strategy: Strategy = strategies(sys.props("strategy"))
   val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
   val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val starterThread = sys.props("starterThread")
+  val starterCooldown = sys.props("starterCooldown").toInt
+  val invocationMethod = sys.props("invocationMethod")
   val incrementFrequency = 1
 
   /** Returns true if completed with no stealing.
@@ -551,7 +554,7 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def dispatchWork0(root: Ptr) {
+  def dispatchWorkT(root: Ptr) {
     var i = 1
     while (i < par) {
       val w = new WorkerThread(root, i, par)
@@ -560,7 +563,7 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def joinWork0(root: Ptr) = {
+  def joinWorkT(root: Ptr) = {
     var r = /*READ*/root.child.result
     if (r == null || r.isEmpty) root.synchronized {
       r = /*READ*/root.child.result
@@ -583,7 +586,7 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def dispatchWork1(root: Ptr) {
+  def dispatchWorkFJ(root: Ptr) {
     var i = 1
     while (i < par) {
       val w = new WorkerTask(root, i, par)
@@ -592,7 +595,7 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def joinWork1(root: Ptr) = {
+  def joinWorkFJ(root: Ptr) = {
     var r = /*READ*/root.child.result
     if (r == null || r.isEmpty) root.synchronized {
       r = /*READ*/root.child.result
@@ -610,48 +613,112 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     work.tryOwn(Invoker)
 
     // let other workers know there's something to do
-    dispatchWork1(root)
+    dispatchWorkFJ(root)
 
     // piggy-back the caller into doing work
     if (!workloop(root)) workUntilNoWork(Invoker, root)
 
     // synchronize in case there's some other worker just
     // about to complete work
-    joinWork1(root)
+    joinWorkFJ(root)
 
     lastroot = root
 
     result + root.child.result.get
   }
 
-  def invokeOperation(): T = {
-    val sz = size
-    val op = registerOp()
-
-    val (progress, result) = interruptibleKernel(op.request, 32, sz)
-
-    if (op.request) invokeParallelOperation(progress, result)
-    else result
+  trait Invocation {
+    def apply(): T
   }
 
-  def registerOp(): Op = {
-    val op = new Op
-    wakeupCall.synchronized {
-      wakeupCall.globop = op
-      wakeupCall.notify()
+  val interruptibleInvoke = new Invocation {
+    def apply(): T = {
+      val sz = size
+      val op = starter.registerOp()
+
+      val (progress, result) = interruptibleKernel(op.request, 256, sz)
+
+      if (op.request) invokeParallelOperation(progress, result)
+      else result
     }
-    op
   }
 
-  final class Op {
+  val directInvoke = new Invocation {
+    def apply(): T = invokeParallelOperation(0, 0)
+  }
+
+  val invokeOperation = invocationMethod match {
+    case "interruptible" => interruptibleInvoke
+    case "direct" => directInvoke
+  }
+
+  final class Op(val next: Op) {
     @volatile var request: Boolean = false
   }
 
-  final class WakeupCall {
-    var globop: Op = null
+  abstract class StarterThread extends Thread {
+    var ops: Op = null
+    def registerOp(): Op
   }
 
-  val wakeupCall = new WakeupCall
+  final class PollingStarter(cooldown: Int) extends StarterThread {
+    private def start(op: Op) {
+      op.request = true
+    }
+
+    def registerOp(): Op = {
+      starter.synchronized {
+        val op = new Op(starter.ops)
+        starter.ops = op
+        op
+      }
+    }
+
+    @tailrec override def run() {
+      this.synchronized {
+        while (ops != null) {
+          start(ops)
+          ops = ops.next
+        }
+      }
+      Thread.sleep(0, cooldown)
+      run()
+    }
+  }
+
+  final class NotifyStarter(cooldown: Int) extends StarterThread {
+    private def start(op: Op) {
+      op.request = true
+    }
+
+    def registerOp(): Op = {
+      starter.synchronized {
+        val op = new Op(starter.ops)
+        starter.ops = op
+        starter.notifyAll()
+        op
+      }
+    }
+
+    @tailrec override def run() {
+      this.synchronized {
+        while (ops == null) this.wait()
+        while (ops != null) {
+          start(ops)
+          ops = ops.next
+        }
+      }
+      Thread.sleep(0, cooldown)
+      run()
+    }
+  }
+
+  val starter = starterThread match {
+    case "PollingStarter" => new PollingStarter(starterCooldown)
+    case "NotifyStarter" => new NotifyStarter(starterCooldown)
+  }
+  starter.setDaemon(true)
+  starter.start()
 
   override def runBenchmark(noTimes: Int): List[Long] = {
     val times = super.runBenchmark(noTimes)

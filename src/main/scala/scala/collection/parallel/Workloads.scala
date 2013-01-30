@@ -2,68 +2,12 @@ package scala.collection.parallel
 
 
 
-import language.experimental.macros
-import reflect.macros._
+import scala.language.experimental.macros
+import scala.reflect.macros._
 
 
 
 object Workloads {
-
-  final def kernel(start: Int, limit: Int, nmax: Int) = macro kernel_impl
-
-  final def kernel_impl(c: Context)(start: c.Expr[Int], limit: c.Expr[Int], nmax: c.Expr[Int]): c.Expr[Int] = {
-    import c.universe._
-
-    reify {
-      //uniform(start.splice, limit.splice, nmax.splice)
-      //uniform2(start, limit, nmax)
-      //uniform3(start, limit, nmax)
-      //uniform4(start, limit, nmax)
-      //uniform5(start, limit, nmax)
-      //triangle(start, limit, nmax)
-      //triangle2(start, limit, nmax)
-      //triangle3(start, limit, nmax)
-      //parabola(start, limit, nmax)
-      //parabola2(start, limit, nmax)
-      //parabola3(start, limit, nmax)
-      //parabola4(start, limit, nmax)
-      //parabola5(start, limit, nmax)
-      //exp(start, limit, nmax)
-      //exp2(start, limit, nmax)
-      //exp3(start, limit, nmax)
-      //invtriangle(start, limit, nmax)
-      //invtriangle2(start, limit, nmax)
-      //hill(start, limit, nmax)
-      //hill2(start, limit, nmax)
-      //valley(start, limit, nmax)
-      //gaussian(start, limit, nmax)
-      //randif(start, limit, nmax)
-      //step(start, limit, nmax)
-      step2(start.splice, limit.splice, nmax.splice)
-      //step3(start, limit, nmax)
-      //step4(start, limit, nmax)
-    }
-  }
-
-  def interruptibleKernel(request: Boolean, intfreq: Int, size: Int): (Int, Int) = macro interruptibleKernel_impl
-
-  def interruptibleKernel_impl(c: Context)(request: c.Expr[Boolean], intfreq: c.Expr[Int], size: c.Expr[Int]): c.Expr[(Int, Int)] = {
-    import c.universe._
-
-    reify {
-      var i = 0
-      var sum = 0
-      while (i < size.splice && !request.splice) {
-        var next = i + intfreq.splice
-        if (next > size.splice) next = size.splice
-        while (i < next) {
-          sum += i
-          i += 1
-        }
-      }
-      (i, sum)
-    }
-  }
 
   /* 150000000 */
   final def uniform(start: Int, limit: Int, nmax: Int) = {
@@ -77,7 +21,7 @@ object Workloads {
   }
 
   /* 150000000 */
-  private def uniform2(start: Int, limit: Int, nmax: Int) = {
+  final def uniform2(start: Int, limit: Int, nmax: Int) = {
     var i = start
     var sum = 0
     while (i < limit) {
@@ -89,7 +33,7 @@ object Workloads {
   }
 
   /* 15000000 */
-  private def uniform3(start: Int, limit: Int, nmax: Int) = {
+  final def uniform3(start: Int, limit: Int, nmax: Int) = {
     var i = start
     var sum = 0
     while (i < limit) {
@@ -101,7 +45,7 @@ object Workloads {
   }
 
   /* 1500 */
-  private def uniform4(start: Int, limit: Int, nmax: Int) = {
+  final def uniform4(start: Int, limit: Int, nmax: Int) = {
     def calc(n: Int): Int = {
       var i = 0
       var sum = 0.0f
@@ -127,7 +71,7 @@ object Workloads {
   }
 
   /* 15 */ 
-  private def uniform5(start: Int, limit: Int, nmax: Int) = {
+  final def uniform5(start: Int, limit: Int, nmax: Int) = {
     def calc(n: Int): Int = {
       var i = 0
       var sum = 0.0f
@@ -153,7 +97,7 @@ object Workloads {
   }
 
   /* 15000000 */
-  private def triangle(start: Int, limit: Int, nmax: Int) = {
+  final def triangle(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = 1 + n / 1000000
       var tmp = 1
@@ -175,7 +119,7 @@ object Workloads {
   }
 
   /* 500000 */
-  private def triangle2(start: Int, limit: Int, nmax: Int) = {
+  final def triangle2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = 1 + n / 1000
       var sum = 1
@@ -198,7 +142,7 @@ object Workloads {
   }
 
   /* 15000 */
-  private def triangle3(start: Int, limit: Int, nmax: Int) = {
+  final def triangle3(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = 1 + n
       var sum = 1
@@ -221,7 +165,7 @@ object Workloads {
   }
 
   /* 150000 */
-  private def parabola(start: Int, limit: Int, nmax: Int) = {
+  final def parabola(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n / 2500
       val amountOfWork = 1 + factor * factor
@@ -245,7 +189,7 @@ object Workloads {
   }
 
   /* 15000 */
-  private def parabola2(start: Int, limit: Int, nmax: Int) = {
+  final def parabola2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n / 50
       val amountOfWork = 1 + factor * factor
@@ -269,7 +213,7 @@ object Workloads {
   }
 
   /* 1500 */
-  private def parabola3(start: Int, limit: Int, nmax: Int) = {
+  final def parabola3(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n
       val amountOfWork = 1 + factor * factor
@@ -293,7 +237,7 @@ object Workloads {
   }
 
   /* 150 */
-  private def parabola4(start: Int, limit: Int, nmax: Int) = {
+  final def parabola4(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n
       val amountOfWork = 1 + 500 * factor * factor
@@ -317,7 +261,7 @@ object Workloads {
   }
 
   /* 15 */
-  private def parabola5(start: Int, limit: Int, nmax: Int) = {
+  final def parabola5(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n
       val amountOfWork = 1 + 100000 * factor * factor
@@ -341,7 +285,7 @@ object Workloads {
   }
 
   /* 15000 */
-  private def exp(start: Int, limit: Int, nmax: Int) = {
+  final def exp(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n / 1000
       val amountOfWork = 1 + math.pow(2.0, factor)
@@ -365,7 +309,7 @@ object Workloads {
   }
 
   /* 95 */
-  private def exp2(start: Int, limit: Int, nmax: Int) = {
+  final def exp2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n
       val amountOfWork = 1 + math.pow(1.2, factor)
@@ -389,7 +333,7 @@ object Workloads {
   }
 
   /* 25 */
-  private def exp3(start: Int, limit: Int, nmax: Int) = {
+  final def exp3(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = n
       val amountOfWork = 1 + math.pow(2.0, factor)
@@ -413,7 +357,7 @@ object Workloads {
   }
 
   /* 150 */
-  private def invtriangle(start: Int, limit: Int, nmax: Int) = {
+  final def invtriangle(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = (nmax - n) * 10000
       var sum = 1
@@ -436,7 +380,7 @@ object Workloads {
   }
 
   /* 15 */
-  private def invtriangle2(start: Int, limit: Int, nmax: Int) = {
+  final def invtriangle2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = (nmax - n) * 1000000
       var sum = 1
@@ -459,7 +403,7 @@ object Workloads {
   }
 
   /* 150 */
-  private def hill(start: Int, limit: Int, nmax: Int) = {
+  final def hill(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = 40000
       val amountOfWork = if (n < nmax / 2) n * factor else (nmax - n) * factor
@@ -483,7 +427,7 @@ object Workloads {
   }
 
   /* 15 */
-  private def hill2(start: Int, limit: Int, nmax: Int) = {
+  final def hill2(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = 4000000
       val amountOfWork = if (n < nmax / 2) n * factor else (nmax - n) * factor
@@ -507,7 +451,7 @@ object Workloads {
   }
 
   /* 15 */
-  private def valley(start: Int, limit: Int, nmax: Int) = {
+  final def valley(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val factor = 4000000
       val amountOfWork = if (n < nmax / 2) (nmax / 2 - n) * factor else (n - nmax / 2) * factor
@@ -531,7 +475,7 @@ object Workloads {
   }
 
   /* 1500 */
-  private def gaussian(start: Int, limit: Int, nmax: Int) = {
+  final def gaussian(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = math.min(100000, math.abs(30000 * scala.util.Random.nextGaussian()))
       var sum = 1
@@ -554,7 +498,7 @@ object Workloads {
   }
 
   /* 150 */
-  private def randif(start: Int, limit: Int, nmax: Int) = {
+  final def randif(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = if (math.abs(n * 0x9e3775cd) % 100 < 10) 5000000 else 1
       var sum = 1
@@ -577,9 +521,9 @@ object Workloads {
   }
 
   /* 15000 */
-  private def step(start: Int, limit: Int, nmax: Int) = {
+  final def step(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
-      val amountOfWork = if (n < nmax / 2) 1 else 25000
+      val amountOfWork = if (n < nmax * 11 / 15) 1 else 25000
       var sum = 1
       var j = 1
       while (j < amountOfWork) {
@@ -623,7 +567,7 @@ object Workloads {
   }
 
   /* 1500 */
-  private def step3(start: Int, limit: Int, nmax: Int) = {
+  final def step3(start: Int, limit: Int, nmax: Int) = {
     def work(n: Int): Int = {
       val amountOfWork = if (n < nmax * 11 / 15) 1 else 500000
       var sum = 1
@@ -645,27 +589,152 @@ object Workloads {
     sum
   }
 
-  /* 1500 */
-  private def step4(start: Int, limit: Int, nmax: Int) = {
-    def work(n: Int): Int = {
-      val amountOfWork = if (n < nmax * 6 / 15 || n > nmax * 10 / 15) 1 else 500000
-      var sum = 1
-      var j = 1
-      while (j < amountOfWork) {
-        sum += j
-        j += 1
-      }
-      sum
-    }
+  def kernel(start: Int, limit: Int, nmax: Int) = macro kernel_impl
 
-    var i = start
-    var sum = 0
-    while (i < limit) {
-      val res = work(i)
-      sum += res
-      i += 1
+  def kernel_impl(c: Context)(start: c.Expr[Int], limit: c.Expr[Int], nmax: c.Expr[Int]): c.Expr[Int] = {
+    import c.universe._
+    
+    sys.props("kernel") match {
+      case "uniform" => reify {
+        uniform(start.splice, limit.splice, nmax.splice)
+      }
+      case "uniform2" => reify {
+        uniform2(start.splice, limit.splice, nmax.splice)
+      }
+      case "uniform3" => reify {
+        uniform3(start.splice, limit.splice, nmax.splice)
+      }
+      case "uniform4" => reify {
+        uniform4(start.splice, limit.splice, nmax.splice)
+      }
+      case "uniform5" => reify {
+        uniform5(start.splice, limit.splice, nmax.splice)
+      }
+      case "triangle" => reify {
+        triangle(start.splice, limit.splice, nmax.splice)
+      }
+      case "triangle2" => reify {
+        triangle2(start.splice, limit.splice, nmax.splice)
+      }
+      case "triangle3" => reify {
+        triangle3(start.splice, limit.splice, nmax.splice)
+      }
+      case "parabola" => reify {
+        parabola(start.splice, limit.splice, nmax.splice)
+      }
+      case "parabola2" => reify {
+        parabola2(start.splice, limit.splice, nmax.splice)
+      }
+      case "parabola3" => reify {
+        parabola3(start.splice, limit.splice, nmax.splice)
+      }
+      case "parabola4" => reify {
+        parabola4(start.splice, limit.splice, nmax.splice)
+      }
+      case "parabola5" => reify {
+        parabola5(start.splice, limit.splice, nmax.splice)
+      }
+      case "exp" => reify {
+        exp(start.splice, limit.splice, nmax.splice)
+      }
+      case "exp2" => reify {
+        exp2(start.splice, limit.splice, nmax.splice)
+      }
+      case "exp3" => reify {
+        exp3(start.splice, limit.splice, nmax.splice)
+      }
+      case "invtriangle" => reify {
+        invtriangle(start.splice, limit.splice, nmax.splice)
+      }
+      case "invtriangle2" => reify {
+        invtriangle2(start.splice, limit.splice, nmax.splice)
+      }
+      case "hill" => reify {
+        hill(start.splice, limit.splice, nmax.splice)
+      }
+      case "hill2" => reify {
+        hill2(start.splice, limit.splice, nmax.splice)
+      }
+      case "valley" => reify {
+        valley(start.splice, limit.splice, nmax.splice)
+      }
+      case "gaussian" => reify {
+        gaussian(start.splice, limit.splice, nmax.splice)
+      }
+      case "randif" => reify {
+        randif(start.splice, limit.splice, nmax.splice)
+      }
+      case "step" => reify {
+        step(start.splice, limit.splice, nmax.splice)
+      }
+      case "step2" => reify {
+        step2(start.splice, limit.splice, nmax.splice)
+      }
+      case "step3" => reify {
+        step3(start.splice, limit.splice, nmax.splice)
+      }
     }
-    sum
+  }
+
+  def interruptibleKernel(request: Boolean, intfreq: Int, size: Int): (Int, Int) = macro interruptibleKernel_impl
+
+  def interruptibleKernel_impl(c: Context)(request: c.Expr[Boolean], intfreq: c.Expr[Int], size: c.Expr[Int]): c.Expr[(Int, Int)] = {
+    import c.universe._
+
+    reify {
+      var sum = 0
+      sum += 0
+      if (request.splice) (sum, 1) else {
+        sum += 1
+        sum += 2
+        if (request.splice) (sum, 3) else {
+          sum += 3
+          sum += 4
+          sum += 5
+          sum += 6
+          if (request.splice) (sum, 7) else {
+            sum += 7
+            sum += 8
+            sum += 9
+            sum += 10
+            sum += 11
+            sum += 12
+            sum += 13
+            sum += 14
+            if (request.splice) (sum, 15) else {
+              sum += 15
+              sum += 16
+              sum += 17
+              sum += 18
+              sum += 19
+              sum += 20
+              sum += 21
+              sum += 22
+              sum += 23
+              sum += 24
+              sum += 25
+              sum += 26
+              sum += 27
+              sum += 28
+              sum += 29
+              sum += 30
+              if (request.splice) (sum, 31) else {
+                var i = 31
+                while (i < size.splice && !request.splice) {
+                  var next = i + intfreq.splice
+                  if (next > size.splice) next = size.splice
+                  while (i < next) {
+                    sum += i
+                    i += 1
+                  }
+                }
+                (i, sum)
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   lazy val items = new Array[Int](sys.props("size").toInt)
@@ -682,7 +751,4 @@ object Workloads {
   }
 
 }
-
-
-
 
