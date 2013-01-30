@@ -730,7 +730,7 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     val balance = lastroot.balance
     println(lastroot.toString(0))
     println("result: " + lastroot.reduce(_ + _))
-    println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
+    //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
 
