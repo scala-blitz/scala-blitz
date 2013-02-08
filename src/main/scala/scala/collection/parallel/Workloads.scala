@@ -589,6 +589,29 @@ object Workloads {
     sum
   }
 
+  /* 1500 */
+  final def step4(start: Int, limit: Int, nmax: Int) = {
+    def work(n: Int): Int = {
+      val amountOfWork = if (n < nmax * 3 / 15 || n > nmax * 7 / 15) 1 else 500000
+      var sum = 1
+      var j = 1
+      while (j < amountOfWork) {
+        sum += j
+        j += 1
+      }
+      sum
+    }
+
+    var i = start
+    var sum = 0
+    while (i < limit) {
+      val res = work(i)
+      sum += res
+      i += 1
+    }
+    sum
+  }
+
   def kernel(start: Int, limit: Int, nmax: Int) = macro kernel_impl
 
   def kernel_impl(c: Context)(start: c.Expr[Int], limit: c.Expr[Int], nmax: c.Expr[Int]): c.Expr[Int] = {
@@ -672,6 +695,9 @@ object Workloads {
       }
       case "step3" => reify {
         step3(start.splice, limit.splice, nmax.splice)
+      }
+      case "step4" => reify {
+        step4(start.splice, limit.splice, nmax.splice)
       }
     }
   }
