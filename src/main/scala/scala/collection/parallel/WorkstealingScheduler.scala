@@ -416,10 +416,14 @@ object WorkstealingScheduler extends StatisticsBenchmark {
   val invocationMethod = sys.props("invocationMethod")
   val incrementFrequency = 1
 
+  abstract class Kernel {
+    def apply(progress: Int, nextProgress: Int, totalSize: Int): T
+  }
+
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
    */
-  def workloop(tree: Ptr): Boolean = {
+  def workloop(tree: Ptr, kernel: Kernel): Boolean = {
     // do some work
     val work = tree.child
     var lsum = 0
@@ -529,35 +533,35 @@ object WorkstealingScheduler extends StatisticsBenchmark {
   val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
   val treesizes = collection.mutable.ArrayBuffer[Int]()
 
-  @tailrec def workUntilNoWork(w: Worker, root: Ptr) {
+  @tailrec def workUntilNoWork(w: Worker, root: Ptr, kernel: Kernel) {
     val leaf = strategy.findWork(w, root)
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr) {
-        val nosteals = workloop(leaf)
+        val nosteals = workloop(leaf, kernel)
         if (!nosteals) {
           val subnode = strategy.chooseAsVictim(w.index, w.total, leaf)
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
         }
       }
       workAndDescend(leaf)
-      workUntilNoWork(w, root)
+      workUntilNoWork(w, root, kernel)
     } else {
       // no more work
     }
   }
 
-  class WorkerThread(val root: Ptr, val index: Int, val total: Int) extends Thread with Worker {
+  class WorkerThread(val root: Ptr, val index: Int, val total: Int, kernel: Kernel) extends Thread with Worker {
     setName("Worker: " + index)
 
     override final def run() {
-      workUntilNoWork(this, root)
+      workUntilNoWork(this, root, kernel)
     }
   }
 
-  def dispatchWorkT(root: Ptr) {
+  def dispatchWorkT(root: Ptr, kernel: Kernel) {
     var i = 1
     while (i < par) {
-      val w = new WorkerThread(root, i, par)
+      val w = new WorkerThread(root, i, par, kernel)
       w.start()
       i += 1
     }
@@ -578,18 +582,18 @@ object WorkstealingScheduler extends StatisticsBenchmark {
 
   val fjpool = new ForkJoinPool()
 
-  class WorkerTask(val root: Ptr, val index: Int, val total: Int) extends RecursiveAction with Worker {
+  class WorkerTask(val root: Ptr, val index: Int, val total: Int, kernel: Kernel) extends RecursiveAction with Worker {
     def getName = "WorkerTask(" + index + ")"
 
     def compute() {
-      workUntilNoWork(this, root)
+      workUntilNoWork(this, root, kernel)
     }
   }
 
-  def dispatchWorkFJ(root: Ptr) {
+  def dispatchWorkFJ(root: Ptr, kernel: Kernel) {
     var i = 1
     while (i < par) {
-      val w = new WorkerTask(root, i, par)
+      val w = new WorkerTask(root, i, par, kernel)
       fjpool.execute(w)
       i += 1
     }
@@ -606,17 +610,17 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def invokeParallelOperation(progress: Int, result: Int): T = {
+  def invokeParallelOperation(progress: Int, result: Int, kernel: Kernel): T = {
     // create workstealing tree
     val work = new Node(null, null)(progress, size, Node.range(0, size), initialStep)
     val root = new Ptr(null, 0)(work)
     work.tryOwn(Invoker)
 
     // let other workers know there's something to do
-    dispatchWorkFJ(root)
+    dispatchWorkFJ(root, kernel)
 
     // piggy-back the caller into doing work
-    if (!workloop(root)) workUntilNoWork(Invoker, root)
+    if (!workloop(root, kernel)) workUntilNoWork(Invoker, root, kernel)
 
     // synchronize in case there's some other worker just
     // about to complete work
@@ -626,99 +630,6 @@ object WorkstealingScheduler extends StatisticsBenchmark {
 
     result + root.child.result.get
   }
-
-  trait Invocation {
-    def apply(): T
-  }
-
-  val interruptibleInvoke = new Invocation {
-    def apply(): T = {
-      val sz = size
-      val op = starter.registerOp()
-
-      val (progress, result) = interruptibleKernel(op.request, 256, sz)
-
-      if (op.request) invokeParallelOperation(progress, result)
-      else result
-    }
-  }
-
-  val directInvoke = new Invocation {
-    def apply(): T = invokeParallelOperation(0, 0)
-  }
-
-  val invokeOperation = invocationMethod match {
-    case "interruptible" => interruptibleInvoke
-    case "direct" => directInvoke
-  }
-
-  final class Op(val next: Op) {
-    @volatile var request: Boolean = false
-  }
-
-  abstract class StarterThread extends Thread {
-    var ops: Op = null
-    def registerOp(): Op
-  }
-
-  final class PollingStarter(cooldown: Int) extends StarterThread {
-    private def start(op: Op) {
-      op.request = true
-    }
-
-    def registerOp(): Op = {
-      starter.synchronized {
-        val op = new Op(starter.ops)
-        starter.ops = op
-        op
-      }
-    }
-
-    @tailrec override def run() {
-      this.synchronized {
-        while (ops != null) {
-          start(ops)
-          ops = ops.next
-        }
-      }
-      Thread.sleep(0, cooldown)
-      run()
-    }
-  }
-
-  final class NotifyStarter(cooldown: Int) extends StarterThread {
-    private def start(op: Op) {
-      op.request = true
-    }
-
-    def registerOp(): Op = {
-      starter.synchronized {
-        val op = new Op(starter.ops)
-        starter.ops = op
-        starter.notifyAll()
-        op
-      }
-    }
-
-    @tailrec override def run() {
-      this.synchronized {
-        while (ops == null) this.wait()
-        while (ops != null) {
-          start(ops)
-          ops = ops.next
-        }
-      }
-      Thread.sleep(0, cooldown)
-      run()
-    }
-  }
-
-  val starter = starterThread match {
-    case "PollingStarter" => new PollingStarter(starterCooldown)
-    case "NotifyStarter" => new NotifyStarter(starterCooldown)
-  }
-  starter.setDaemon(true)
-  starter.start()
 
   override def runBenchmark(noTimes: Int): List[Long] = {
     val times = super.runBenchmark(noTimes)
@@ -745,9 +656,21 @@ object WorkstealingScheduler extends StatisticsBenchmark {
   }
 
   def run() {
+    val kernel = new Kernel {
+      def apply(p: Int, np: Int, total: Int) = {
+        var i = p
+        var sum = 0
+        while (i < np) {
+          sum += i
+          i += 1
+        }
+        sum
+      }
+    }
+
     var i = 0
     while (i < repeats) {
-      invokeOperation()
+      invokeParallelOperation(0, 0, kernel)
       i += 1
     }
   }

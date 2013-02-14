@@ -617,7 +617,7 @@ object Workloads {
   def kernel_impl(c: Context)(start: c.Expr[Int], limit: c.Expr[Int], nmax: c.Expr[Int]): c.Expr[Int] = {
     import c.universe._
     
-    sys.props("kernel") match {
+    sys.props.getOrElse("kernel", "uniform") match {
       case "uniform" => reify {
         uniform(start.splice, limit.splice, nmax.splice)
       }
