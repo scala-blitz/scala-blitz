@@ -8,366 +8,311 @@ import collection._
 
 
 
-object WorkstealingScheduler extends StatisticsBenchmark {
+final class WorkstealingScheduler {
 
-  import Workloads._
-
-  final class Ptr(val up: Ptr, val level: Int)(@volatile var child: Node) {
-    def casChild(ov: Node, nv: Node) = unsafe.compareAndSwapObject(this, Ptr.CHILD_OFFSET, ov, nv)
-    def writeChild(nv: Node) = unsafe.putObjectVolatile(this, Ptr.CHILD_OFFSET, nv)
-
-    /** Try to expand node and return true if node was expanded.
-     *  Return false if node was completed.
-     */
-    @tailrec def expand(): Boolean = {
-      val child_t0 = /*READ*/child
-      if (!child_t0.isLeaf) true else { // already expanded
-        // first set progress to -progress
-        val range_t1 = /*READ*/child_t0.range
-        if (Node.completed(range_t1)) false // already completed
-        else {
-          if (!Node.stolen(range_t1)) {
-            if (child_t0.casRange(range_t1, Node.markStolen(range_t1))) expand() // marked stolen - now move on to node creation
-            else expand() // wasn't marked stolen and failed marking stolen - retry
-          } else { // already marked stolen
-            // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
-            val expanded = child_t0.newExpanded(this)
-            if (casChild(child_t0, expanded)) true // try to replace with expansion
-            else expand() // failure (spurious or due to another expand) - retry
-          }
-        }
-      }
-    }
-
-    def toString(l: Int): String = "\t" * level + "Ptr" + level + " -> " + child.toString(l)
-
-    def balance: collection.immutable.HashMap[Owner, Int] = {
-      val here = collection.immutable.HashMap(child.owner -> (Node.positiveProgress(child.range) - child.start + child.end - Node.until(child.range)))
-      if (child.isLeaf) here
-      else Seq(here, child.left.balance, child.right.balance).foldLeft(collection.immutable.HashMap[Owner, Int]()) {
-        case (a, b) => a.merged(b) {
-          case ((ak, av), (bk, bv)) => ((ak, av + bv))
-        }
-      }
-    }
-
-    def reduce(op: (T, T) => T): T = if (child.isLeaf) {
-      op(child.lresult, child.rresult)
-    } else {
-      val leftsubres = child.left.reduce(op)
-      val rightsubres = child.right.reduce(op)
-      op(op(op(child.lresult, leftsubres), rightsubres), child.rresult)
-    }
-
-    def treeSize: Int = {
-      if (child.isLeaf) 1
-      else 1 + child.left.treeSize + child.right.treeSize
-    }
-
-  }
-
-  object Ptr {
-    val CHILD_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Ptr].getDeclaredField("child"))
-  }
-
-  type T = Int
-  type Owner = Worker
-
-  trait Strategy {
-
-    /** Finds work in the tree for the given worker, which is one out of `total` workers.
-     *  This search may include stealing work.
-     */
-    def findWork(worker: Worker, tree: Ptr): Ptr
-
-   /** Returns true if the worker labeled with `index` with a total of
-    *  `total` workers should go left at level `level`.
-    *  Returns false otherwise.
-    */
-    def choose(index: Int, total: Int, tree: Ptr): Boolean
-
-    /** Which node the stealer takes at this level. */
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr
-
-    /** Which node the victim takes at this level. */
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr
-
-  }
-
-  trait FindFirstStrategy extends Strategy {
-
-    final def findWork(worker: Worker, tree: Ptr): Ptr = {
-      val index = worker.index
-      val total = worker.total
-      val node = tree.child
-      if (node.isLeaf) {
-        if (Node.completed(node.range)) null // no further expansions
-        else {
-          // more work
-          if (node.tryOwn(worker)) tree
-          else if (node.trySteal(tree)) {
-            val subnode = chooseAsStealer(index, total, tree)
-            if (subnode.child.tryOwn(worker)) subnode
-            else findWork(worker, tree)
-          } else findWork(worker, tree)
-        }
-      } else {
-        // descend deeper
-        if (choose(index, total, tree)) {
-          val ln = findWork(worker, node.left)
-          if (ln != null) ln else findWork(worker, node.right)
-        } else {
-          val rn = findWork(worker, node.right)
-          if (rn != null) rn else findWork(worker, node.left)
-        }
-      }
-    }
-
-  }
-
-  object AssignTop extends FindFirstStrategy {
-
-    /** Returns true iff the level of the tree is such that: 2^level < total */
-    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
-    /** Returns true iff the worker should first go left at this level of the tree top. */
-    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        chooseInTreeTop(index, level)
-      } else random.nextBoolean
-    }
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.right
-    }
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.left
-    }
-
-  }
-
-  object AssignTopLeaf extends FindFirstStrategy {
-
-    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
-    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
-      val level = tree.level
-      if (isTreeTop(total, level) && tree.child.isLeaf) {
-        chooseInTreeTop(index, level)
-      } else random.nextBoolean
-    }
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.right
-    }
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.left
-    }
-
-  }
-
-  object Assign extends FindFirstStrategy {
-
-    private def log2(x: Int) = {
-      var v = x
-      var r = -1
-      while (v != 0) {
-        r += 1
-        v = v >>> 1
-      }
-      r
-    }
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = {
-      val levelmod = tree.level % log2(total)
-      ((index >> levelmod) & 0x1) == 0
-    }
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr): Ptr = {
-      if (choose(index, total, tree)) tree.child.left
-      else tree.child.right
-    }
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr): Ptr = {
-      if (choose(index, total, tree)) tree.child.left
-      else tree.child.right
-    }
-
-  }
-
-  object RandomWalk extends FindFirstStrategy {
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
-
-  }
-
-  object RandomAll extends FindFirstStrategy {
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = random.nextBoolean
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = if (random.nextBoolean) tree.child.left else tree.child.right
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = if (random.nextBoolean) tree.child.left else tree.child.right
-
-  }
-
-  object Predefined extends FindFirstStrategy {
-
-    def choose(index: Int, total: Int, tree: Ptr): Boolean = true
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
-
-  }
-
-  object FindMax extends Strategy {
-
-    @tailrec def findWork(worker: Worker, tree: Ptr) = {
-      def search(current: Ptr): Ptr = if (current.child.isLeaf) current else {
-        val left = search(current.child.left)
-        val rght = search(current.child.right)
-        val leftwork = left.child.workRemaining
-        val rghtwork = rght.child.workRemaining
-        if (leftwork > rghtwork) left else rght
-      }
-
-      val max = search(tree)
-      if (max.child.workRemaining > 0) {
-        if (max.child.tryOwn(worker)) max
-        else if (max.child.trySteal(max)) {
-          val subnode = chooseAsStealer(worker.index, worker.total, max)
-          if (subnode.child.tryOwn(worker)) subnode
-          else findWork(worker, tree)
-        } else findWork(worker, tree)
-      } else null
-    }
-
-    def choose(index: Int, total: Int, tree: Ptr) = sys.error("never called")
-
-    def chooseAsStealer(index: Int, total: Int, tree: Ptr) = tree.child.right
-
-    def chooseAsVictim(index: Int, total: Int, tree: Ptr) = tree.child.left
-
-  }
+  import WorkstealingScheduler.{Worker, Ptr, Node, Strategy}
+  import WorkstealingScheduler.{FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined}
+  import WorkstealingScheduler.{localRandom, initialStep}
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
+  val size = sys.props("size").toInt
+  val par = sys.props("par").toInt
+  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
+  val strategy: Strategy = strategies(sys.props("strategy"))
+  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val starterThread = sys.props("starterThread")
+  val starterCooldown = sys.props("starterCooldown").toInt
+  val invocationMethod = sys.props("invocationMethod")
+  val incrementFrequency = 1
 
-  final class Node(val left: Ptr, val right: Ptr)(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int) {
-    /*
-     * progress: start -> x1 -> ... -> xn -> until
-     *                                    -> -(xn + 1)
-     * x1 > start, x(i+1) > xi, until > xn
-     * 
-     * owner: null -> v, v != null
-     *
-     * lresult, rresult: null --(if owner != null)--> x
-     *
-     * result: null --(if owner != null)--> None --> Some(v)
-     */
+  def completeNode[N <: Node[N, T], T](lsum: T, rsum: T, tree: Ptr[N, T], kernel: Kernel[N, T]): Boolean = {
+    val work = tree.child
 
+    val state_t0 = work.state
+    val wasCompleted = if (state_t0 eq Node.Completed) {
+      work.lresult = lsum
+      work.rresult = rsum
+      while (work.result == null) work.casResult(null, None)
+      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
+      true
+    } else if (state_t0 eq Node.StolenOrExpanded) {
+      // help expansion if necessary
+      if (tree.child.isLeaf) tree.expand()
+      tree.child.lresult = lsum
+      tree.child.rresult = rsum
+      while (tree.child.result == null) tree.child.casResult(null, None)
+      //val work = tree.child
+      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
+      false
+    } else sys.error("unreachable: " + state_t0 + ", " + work.toString(this)(0))
+
+    // push result up as far as possible
+    pushUp(tree, kernel)
+
+    wasCompleted
+  }
+  
+  @tailrec final def pushUp[N <: Node[N, T], T](tree: Ptr[N, T], k: Kernel[N, T]) {
+    val r = /*READ*/tree.child.result
+    r match {
+      case null =>
+        // we're done, owner did not finish his work yet
+      case Some(_) =>
+        // we're done, somebody else already pushed up
+      case None =>
+        val finalresult =
+          if (tree.child.isLeaf) Some(k.combine(tree.child.lresult, tree.child.rresult))
+          else {
+            // check if result already set for children
+            val leftresult = /*READ*/tree.child.left.child.result
+            val rightresult = /*READ*/tree.child.right.child.result
+            (leftresult, rightresult) match {
+              case (Some(lr), Some(rr)) =>
+                val r = k.combine(tree.child.lresult, k.combine(lr, k.combine(rr, tree.child.rresult)))
+                Some(r)
+              case (_, _) => // we're done, some of the children did not finish yet
+                None
+            }
+          }
+
+        if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
+          // if at root, notify completion, otherwise go one level up
+          if (tree.up == null) tree.synchronized {
+            tree.notifyAll()
+          } else pushUp(tree.up, k)
+        } else pushUp(tree, k) // retry
+    }
+  }
+
+  object Invoker extends Worker {
+    def index = 0
+    def total = par
+    def getName = "Invoker"
+  }
+
+  var lastroot: Ptr[_, _] = _
+  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
+  val treesizes = collection.mutable.ArrayBuffer[Int]()
+
+  @tailrec final def workUntilNoWork[N <: Node[N, T], T](w: Worker, root: Ptr[N, T], kernel: Kernel[N, T]) {
+    val leaf = strategy.findWork[N, T](w, root)
+    if (leaf != null) {
+      @tailrec def workAndDescend(leaf: Ptr[N, T]) {
+        val nosteals = kernel.workOn(this)(leaf, size)
+        if (!nosteals) {
+          val subnode = strategy.chooseAsVictim[N, T](w.index, w.total, leaf)
+          if (subnode.child.tryOwn(w)) workAndDescend(subnode)
+        }
+      }
+      workAndDescend(leaf)
+      workUntilNoWork(w, root, kernel)
+    } else {
+      // no more work
+    }
+  }
+
+  class WorkerThread[N <: Node[N, T], T](val root: Ptr[N, T], val index: Int, val total: Int, kernel: Kernel[N, T]) extends Thread with Worker {
+    setName("Worker: " + index)
+
+    override final def run() {
+      workUntilNoWork(this, root, kernel)
+    }
+  }
+
+  def dispatchWorkT[N <: Node[N, T], T](root: Ptr[N, T], kernel: Kernel[N, T]) {
+    var i = 1
+    while (i < par) {
+      val w = new WorkerThread[N, T](root, i, par, kernel)
+      w.start()
+      i += 1
+    }
+  }
+
+  def joinWorkT[N <: Node[N, T], T](root: Ptr[N, T]) = {
+    var r = /*READ*/root.child.result
+    if (r == null || r.isEmpty) root.synchronized {
+      r = /*READ*/root.child.result
+      while (r == null || r.isEmpty) {
+        r = /*READ*/root.child.result
+        root.wait()
+      }
+    }
+  }
+
+  import scala.concurrent.forkjoin._
+
+  val fjpool = new ForkJoinPool()
+
+  class WorkerTask[N <: Node[N, T], T](val root: Ptr[N, T], val index: Int, val total: Int, kernel: Kernel[N, T]) extends RecursiveAction with Worker {
+    def getName = "WorkerTask(" + index + ")"
+
+    def compute() {
+      workUntilNoWork(this, root, kernel)
+    }
+  }
+
+  def dispatchWorkFJ[N <: Node[N, T], T](root: Ptr[N, T], kernel: Kernel[N, T]) {
+    var i = 1
+    while (i < par) {
+      val w = new WorkerTask(root, i, par, kernel)
+      fjpool.execute(w)
+      i += 1
+    }
+  }
+
+  def joinWorkFJ[N <: Node[N, T], T](root: Ptr[N, T]) = {
+    var r = /*READ*/root.child.result
+    if (r == null || r.isEmpty) root.synchronized {
+      r = /*READ*/root.child.result
+      while (r == null || r.isEmpty) {
+        root.wait()
+        r = /*READ*/root.child.result
+      }
+    }
+  }
+
+  def invokeParallelOperation[N <: Node[N, T], T](progress: Int, result: T, kernel: Kernel[N, T]): T = {
+    // create workstealing tree
+    val root = kernel.newRoot
+    val work = root.child
+    work.tryOwn(Invoker)
+
+    // let other workers know there's something to do
+    dispatchWorkFJ(root, kernel)
+
+    // piggy-back the caller into doing work
+    if (!kernel.workOn(this)(root, size)) workUntilNoWork(Invoker, root, kernel)
+
+    // synchronize in case there's some other worker just
+    // about to complete work
+    joinWorkFJ(root)
+
+    lastroot = root
+
+    kernel.combine(result, root.child.result.get)
+  }
+
+}
+
+
+object WorkstealingScheduler {
+
+  type Owner = Worker
+
+  trait Worker {
+    def index: Int
+    def total: Int
+    def getName: String
+  }
+
+  abstract class Node[N <: Node[N, T], T](val left: Ptr[N, T], val right: Ptr[N, T]) {
     @volatile var owner: Owner = null
     @volatile var lresult: T = null.asInstanceOf[T]
     @volatile var rresult: T = null.asInstanceOf[T]
     @volatile var result: Option[T] = null
-    var padding0: Int = 0 // <-- war story
-    var padding1: Int = 0
-    var padding2: Int = 0
-    //var padding3: Int = 0
-    //var padding4: Int = 0
 
-    final def casRange(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, Node.RANGE_OFFSET, ov, nv)
     final def casOwner(ov: Owner, nv: Owner) = unsafe.compareAndSwapObject(this, Node.OWNER_OFFSET, ov, nv)
     final def casResult(ov: Option[T], nv: Option[T]) = unsafe.compareAndSwapObject(this, Node.RESULT_OFFSET, ov, nv)
 
-    def nonEmpty = (end - start) > 0
+    final def isLeaf = left eq null
 
-    def isLeaf = left eq null
-
-    def workRemaining = {
-      val r = /*READ*/range
-      val p = Node.progress(r)
-      val u = Node.until(r)
-      u - p
-    }
-
-    @tailrec def tryOwn(thiz: Owner): Boolean = {
+    @tailrec final def tryOwn(thiz: Owner): Boolean = {
       val currowner = /*READ*/owner
       if (currowner != null) false
       else if (casOwner(currowner, thiz)) true
       else tryOwn(thiz)
     }
 
-    def trySteal(parent: Ptr): Boolean = parent.expand()
+    final def trySteal(parent: Ptr[N, T]): Boolean = parent.expand()
 
-    def newExpanded(parent: Ptr): Node = {
+    final def toString(ws: WorkstealingScheduler)(lev: Int): String = {
+       nodeString[N, T](ws)(this) + (if (!isLeaf) {
+        "\n" + left.toString(ws)(lev + 1) + right.toString(ws)(lev + 1)
+      } else "\n")
+    }
+
+    /* abstract members */
+
+    def workRemaining: Int
+
+    def newExpanded(parent: Ptr[N, T]): N
+
+    def state: Node.State
+
+    def steal(): Boolean
+
+  }
+
+  final class RangeNode[T](l: Ptr[RangeNode[T], T], r: Ptr[RangeNode[T], T])(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int)
+  extends Node[RangeNode[T], T](l, r) {
+    var padding0: Int = 0 // <-- war story
+    var padding1: Int = 0
+    var padding2: Int = 0
+    //var padding3: Int = 0
+    //var padding4: Int = 0
+
+    final def casRange(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, RangeNode.RANGE_OFFSET, ov, nv)
+
+    def workRemaining = {
       val r = /*READ*/range
-      val p = Node.positiveProgress(r)
-      val u = Node.until(r)
+      val p = RangeNode.progress(r)
+      val u = RangeNode.until(r)
+      u - p
+    }
+
+    def newExpanded(parent: Ptr[RangeNode[T], T]): RangeNode[T] = {
+      val r = /*READ*/range
+      val p = RangeNode.positiveProgress(r)
+      val u = RangeNode.until(r)
       val remaining = u - p
       val firsthalf = remaining / 2
       val secondhalf = remaining - firsthalf
-      val lnode = new Node(null, null)(p, p + firsthalf, Node.range(p, p + firsthalf), initialStep)
-      val rnode = new Node(null, null)(p + firsthalf, u, Node.range(p + firsthalf, u), initialStep)
-      val lptr = new Ptr(parent, parent.level + 1)(lnode)
-      val rptr = new Ptr(parent, parent.level + 1)(rnode)
-      val nnode = new Node(lptr, rptr)(start, end, r, step)
+      val lnode = new RangeNode[T](null, null)(p, p + firsthalf, RangeNode.range(p, p + firsthalf), initialStep)
+      val rnode = new RangeNode[T](null, null)(p + firsthalf, u, RangeNode.range(p + firsthalf, u), initialStep)
+      val lptr = new Ptr[RangeNode[T], T](parent, parent.level + 1)(lnode)
+      val rptr = new Ptr[RangeNode[T], T](parent, parent.level + 1)(rnode)
+      val nnode = new RangeNode(lptr, rptr)(start, end, r, step)
       nnode.owner = this.owner
       nnode
     }
 
-    def nodeString: String = "[%.2f%%] Node(%s)(%d, %d, %d, %d, %d)(lres = %s, rres = %s, res = %s) #%d".format(
-      (Node.positiveProgress(range) - start + end - Node.until(range)).toDouble / size * 100,
-      if (owner == null) "none" else "worker " + owner.index,
-      start,
-      end,
-      Node.progress(range),
-      Node.until(range),
-      step,
-      lresult,
-      rresult,
-      result,
-      System.identityHashCode(this)
-    )
-
-    def toString(lev: Int): String = {
-       nodeString + (if (!isLeaf) {
-        "\n" + left.toString(lev + 1) + right.toString(lev + 1)
-      } else "\n")
+    def state = {
+      val range_t0 = /*READ*/range
+      if (RangeNode.completed(range_t0)) Node.Completed
+      else if (RangeNode.stolen(range_t0)) Node.StolenOrExpanded
+      else Node.AvailableOrOwned
     }
+
+    def steal(): Boolean = {
+      val range_t0 = /*READ*/range
+      if (RangeNode.completed(range_t0) || RangeNode.stolen(range_t0)) false
+      else casRange(range_t0, RangeNode.markStolen(range_t0))
+    }
+
   }
 
   object Node {
-    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("range"))
-    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("owner"))
-    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[WorkstealingScheduler.Node].getDeclaredField("result"))
+    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("owner"))
+    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("result"))
+
+    sealed trait State
+
+    val Completed = new State {
+      override def toString = "Completed"
+    }
+
+    val StolenOrExpanded = new State {
+      override def toString = "StolenOrExpanded"
+    }
+
+    val AvailableOrOwned = new State {
+      override def toString = "AvailableOrOwned"
+    }
+  }
+
+  object RangeNode {
+    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[RangeNode[_]].getDeclaredField("range"))
 
     def range(p: Int, u: Int): Long = (p.toLong << 32) | u
 
@@ -401,328 +346,307 @@ object WorkstealingScheduler extends StatisticsBenchmark {
     }
   }
 
-  def random = scala.concurrent.forkjoin.ThreadLocalRandom.current
-  val unsafe = Utils.getUnsafe()
+  final class Ptr[N <: Node[N, T], T](val up: Ptr[N, T], val level: Int)(@volatile var child: N) {
+    def casChild(ov: N, nv: N) = unsafe.compareAndSwapObject(this, Ptr.CHILD_OFFSET, ov, nv)
+    def writeChild(nv: N) = unsafe.putObjectVolatile(this, Ptr.CHILD_OFFSET, nv)
 
-  val size = sys.props("size").toInt
-  val initialStep = sys.props("step").toInt
-  val par = sys.props("par").toInt
-  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
-  val strategy: Strategy = strategies(sys.props("strategy"))
-  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
-  val repeats = sys.props.getOrElse("repeats", "1").toInt
-  val starterThread = sys.props("starterThread")
-  val starterCooldown = sys.props("starterCooldown").toInt
-  val invocationMethod = sys.props("invocationMethod")
-  val incrementFrequency = 1
-
-  abstract class Kernel {
-    def apply(progress: Int, nextProgress: Int, totalSize: Int): T
-  }
-
-  /** Returns true if completed with no stealing.
-   *  Returns false if steal occurred.
-   */
-  def workloop(tree: Ptr, kernel: Kernel): Boolean = {
-    // do some work
-    val work = tree.child
-    var lsum = 0
-    var rsum = 0
-    var incCount = 0
-    val incFreq = incrementFrequency
-    var looping = true
-    while (looping) {
-      val currstep = /*READ*/work.step
-      val currrange = /*READ*/work.range
-      val p = Node.progress(currrange)
-      val u = Node.until(currrange)
-
-      if (!Node.stolen(currrange) && !Node.completed(currrange)) {
-        if (random.nextBoolean) {
-          val newp = math.min(u, p + currstep)
-          val newrange = Node.range(newp, u)
-
-          // do some work on the left
-          if (work.casRange(currrange, newrange)) lsum = lsum + kernel(p, newp, size)
-        } else {
-          val newu = math.max(p, u - currstep)
-          val newrange = Node.range(p, newu)
-
-          // do some work on the right
-          if (work.casRange(currrange, newrange)) rsum = kernel(newu, u, size) + rsum
-        }
-
-        // update step
-        incCount = (incCount + 1) % incFreq
-        if (incCount == 0) work.step = math.min(maxStep, currstep * 2)
-      } else looping = false
-    }
-
-    // complete node information
-    completeNode(lsum, rsum, tree)
-  }
-
-  def completeNode(lsum: T, rsum: T, tree: Ptr): Boolean = {
-    val work = tree.child
-
-    val wasCompleted = if (Node.completed(work.range)) {
-      work.lresult = lsum
-      work.rresult = rsum
-      while (work.result == null) work.casResult(null, None)
-      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
-      true
-    } else if (Node.stolen(work.range)) {
-      // help expansion if necessary
-      if (tree.child.isLeaf) tree.expand()
-      tree.child.lresult = lsum
-      tree.child.rresult = rsum
-      while (tree.child.result == null) tree.child.casResult(null, None)
-      //val work = tree.child
-      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
-      false
-    } else sys.error("unreachable: " + Node.progress(work.range) + ", " + Node.until(work.range))
-
-    // push result up as far as possible
-    pushUp(tree)
-
-    wasCompleted
-  }
-  
-  @tailrec def pushUp(tree: Ptr) {
-    val r = /*READ*/tree.child.result
-    r match {
-      case null => // we're done, owner did not finish his work yet
-      case Some(_) => // we're done, somebody else already pushed up
-      case None =>
-        val finalresult =
-          if (tree.child.isLeaf) Some(tree.child.lresult + tree.child.rresult)
-          else {
-            // check if result already set for children
-            val leftresult = /*READ*/tree.child.left.child.result
-            val rightresult = /*READ*/tree.child.right.child.result
-            (leftresult, rightresult) match {
-              case (Some(lr), Some(rr)) =>
-                Some(tree.child.lresult + lr + rr + tree.child.rresult)
-              case (_, _) => // we're done, some of the children did not finish yet
-                None
-            }
+    /** Try to expand node and return true if node was expanded.
+     *  Return false if node was completed.
+     */
+    @tailrec def expand(): Boolean = {
+      val child_t0 = /*READ*/child
+      if (!child_t0.isLeaf) true else { // already expanded
+        // first set progress to -progress
+        val state_t1 = child_t0.state
+        if (state_t1 eq Node.Completed) false // already completed
+        else {
+          if (state_t1 ne Node.StolenOrExpanded) {
+            if (child_t0.steal()) expand() // marked stolen - now move on to node creation
+            else expand() // wasn't marked stolen and failed marking stolen - retry
+          } else { // already marked stolen
+            // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
+            val expanded = child_t0.newExpanded(this)
+            if (casChild(child_t0, expanded)) true // try to replace with expansion
+            else expand() // failure (spurious or due to another expand) - retry
           }
-
-        if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
-          // if at root, notify completion, otherwise go one level up
-          if (tree.up == null) tree.synchronized {
-            tree.notifyAll()
-          } else pushUp(tree.up)
-        } else pushUp(tree) // retry
-    }
-  }
-
-  trait Worker {
-    def index: Int
-    def total: Int
-    def getName: String
-  }
-
-  object Invoker extends Worker {
-    def index = 0
-    def total = par
-    def getName = "Invoker"
-  }
-
-  var lastroot: Ptr = _
-  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
-  val treesizes = collection.mutable.ArrayBuffer[Int]()
-
-  @tailrec def workUntilNoWork(w: Worker, root: Ptr, kernel: Kernel) {
-    val leaf = strategy.findWork(w, root)
-    if (leaf != null) {
-      @tailrec def workAndDescend(leaf: Ptr) {
-        val nosteals = workloop(leaf, kernel)
-        if (!nosteals) {
-          val subnode = strategy.chooseAsVictim(w.index, w.total, leaf)
-          if (subnode.child.tryOwn(w)) workAndDescend(subnode)
         }
       }
-      workAndDescend(leaf)
-      workUntilNoWork(w, root, kernel)
+    }
+
+    def toString(ws: WorkstealingScheduler)(l: Int): String = "\t" * level + "Ptr" + level + " -> " + child.toString(ws)(l)
+
+    def balance: collection.immutable.HashMap[Owner, Int] = {
+      val here = collection.immutable.HashMap(child.owner -> workDone(child))
+      if (child.isLeaf) here
+      else Seq(here, child.left.balance, child.right.balance).foldLeft(collection.immutable.HashMap[Owner, Int]()) {
+        case (a, b) => a.merged(b) {
+          case ((ak, av), (bk, bv)) => ((ak, av + bv))
+        }
+      }
+    }
+
+    def workDone(n: Node[N, T]) = n match {
+      case rn: RangeNode[t] => (RangeNode.positiveProgress(rn.range) - rn.start + rn.end - RangeNode.until(rn.range))
+      case _ => 0
+    }
+
+    def reduce(op: (T, T) => T): T = if (child.isLeaf) {
+      op(child.lresult, child.rresult)
     } else {
-      // no more work
+      val leftsubres = child.left.reduce(op)
+      val rightsubres = child.right.reduce(op)
+      op(op(op(child.lresult, leftsubres), rightsubres), child.rresult)
     }
-  }
 
-  class WorkerThread(val root: Ptr, val index: Int, val total: Int, kernel: Kernel) extends Thread with Worker {
-    setName("Worker: " + index)
-
-    override final def run() {
-      workUntilNoWork(this, root, kernel)
+    def treeSize: Int = {
+      if (child.isLeaf) 1
+      else 1 + child.left.treeSize + child.right.treeSize
     }
+
   }
 
-  def dispatchWorkT(root: Ptr, kernel: Kernel) {
-    var i = 1
-    while (i < par) {
-      val w = new WorkerThread(root, i, par, kernel)
-      w.start()
-      i += 1
-    }
+  object Ptr {
+    val CHILD_OFFSET = unsafe.objectFieldOffset(classOf[Ptr[_, _]].getDeclaredField("child"))
   }
 
-  def joinWorkT(root: Ptr) = {
-    var r = /*READ*/root.child.result
-    if (r == null || r.isEmpty) root.synchronized {
-      r = /*READ*/root.child.result
-      while (r == null || r.isEmpty) {
-        r = /*READ*/root.child.result
-        root.wait()
-      }
-    }
+  abstract class Strategy {
+
+    /** Finds work in the tree for the given worker, which is one out of `total` workers.
+     *  This search may include stealing work.
+     */
+    def findWork[N <: Node[N, T], T](worker: Worker, tree: Ptr[N, T]): Ptr[N, T]
+
+   /** Returns true if the worker labeled with `index` with a total of
+    *  `total` workers should go left at level `level`.
+    *  Returns false otherwise.
+    */
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean
+
+    /** Which node the stealer takes at this level. */
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T]
+
+    /** Which node the victim takes at this level. */
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T]
+
   }
 
-  import scala.concurrent.forkjoin._
+  abstract class FindFirstStrategy extends Strategy {
 
-  val fjpool = new ForkJoinPool()
-
-  class WorkerTask(val root: Ptr, val index: Int, val total: Int, kernel: Kernel) extends RecursiveAction with Worker {
-    def getName = "WorkerTask(" + index + ")"
-
-    def compute() {
-      workUntilNoWork(this, root, kernel)
-    }
-  }
-
-  def dispatchWorkFJ(root: Ptr, kernel: Kernel) {
-    var i = 1
-    while (i < par) {
-      val w = new WorkerTask(root, i, par, kernel)
-      fjpool.execute(w)
-      i += 1
-    }
-  }
-
-  def joinWorkFJ(root: Ptr) = {
-    var r = /*READ*/root.child.result
-    if (r == null || r.isEmpty) root.synchronized {
-      r = /*READ*/root.child.result
-      while (r == null || r.isEmpty) {
-        root.wait()
-        r = /*READ*/root.child.result
-      }
-    }
-  }
-
-  def invokeParallelOperation(progress: Int, result: Int, kernel: Kernel): T = {
-    // create workstealing tree
-    val work = new Node(null, null)(progress, size, Node.range(0, size), initialStep)
-    val root = new Ptr(null, 0)(work)
-    work.tryOwn(Invoker)
-
-    // let other workers know there's something to do
-    dispatchWorkFJ(root, kernel)
-
-    // piggy-back the caller into doing work
-    if (!workloop(root, kernel)) workUntilNoWork(Invoker, root, kernel)
-
-    // synchronize in case there's some other worker just
-    // about to complete work
-    joinWorkFJ(root)
-
-    lastroot = root
-
-    result + root.child.result.get
-  }
-
-  override def runBenchmark(noTimes: Int): List[Long] = {
-    val times = super.runBenchmark(noTimes)
-    val stabletimes = times.drop(5)
-
-    if (lastroot == null) return times
-
-    println("...::: Last tree :::...")
-    val balance = lastroot.balance
-    println(lastroot.toString(0))
-    println("result: " + lastroot.reduce(_ + _))
-    //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
-    println("total: " + balance.foldLeft(0)(_ + _._2))
-    println()
-
-    println("...::: Statistics :::...")
-    println("strategy: " + strategy.getClass.getSimpleName)
-    for ((workerindex, diffs) <- imbalance.toList.sortBy(_._1).headOption) printStatistics("<worker " + workerindex + " imbalance>", diffs.map(_.toLong).toList)
-    printStatistics("<Tree size>", treesizes.map(_.toLong).toList)
-    printStatistics("<All>", times)
-    printStatistics("<Stable>", stabletimes)
-
-    times
-  }
-
-  def run() {
-    val kernel = new Kernel {
-      def apply(p: Int, np: Int, total: Int) = {
-        var i = p
-        var sum = 0
-        while (i < np) {
-          sum += i
-          i += 1
+    final def findWork[N <: Node[N, T], T](worker: Worker, tree: Ptr[N, T]): Ptr[N, T] = {
+      val index = worker.index
+      val total = worker.total
+      val node = tree.child
+      if (node.isLeaf) {
+        if (node.state eq Node.Completed) null // no further expansions
+        else {
+          // more work
+          if (node.tryOwn(worker)) tree
+          else if (node.trySteal(tree)) {
+            val subnode = chooseAsStealer(index, total, tree)
+            if (subnode.child.tryOwn(worker)) subnode
+            else findWork(worker, tree)
+          } else findWork(worker, tree)
         }
-        sum
+      } else {
+        // descend deeper
+        if (choose(index, total, tree)) {
+          val ln = findWork(worker, node.left)
+          if (ln != null) ln else findWork(worker, node.right)
+        } else {
+          val rn = findWork(worker, node.right)
+          if (rn != null) rn else findWork(worker, node.left)
+        }
       }
     }
 
-    var i = 0
-    while (i < repeats) {
-      invokeParallelOperation(0, 0, kernel)
-      i += 1
-    }
   }
 
-  override def setUp() {
-    if (inspectgc) {
-      println("run starting...")
-      Thread.sleep(500)
+  object AssignTop extends FindFirstStrategy {
+
+    /** Returns true iff the level of the tree is such that: 2^level < total */
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    /** Returns true iff the worker should first go left at this level of the tree top. */
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        chooseInTreeTop(index, level)
+      } else localRandom.nextBoolean
     }
 
-    lastroot = null
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
+    }
 
-    // debugging
-    if (debugging) {
-      var i = 0
-      while (i < size) {
-        items(i) = 0
-        i += 1
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
+    }
+
+  }
+
+  object AssignTopLeaf extends FindFirstStrategy {
+
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level) && tree.child.isLeaf) {
+        chooseInTreeTop(index, level)
+      } else localRandom.nextBoolean
+    }
+
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
+    }
+
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
+    }
+
+  }
+
+  object Assign extends FindFirstStrategy {
+
+    private def log2(x: Int) = {
+      var v = x
+      var r = -1
+      while (v != 0) {
+        r += 1
+        v = v >>> 1
       }
+      r
     }
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = {
+      val levelmod = tree.level % log2(total)
+      ((index >> levelmod) & 0x1) == 0
+    }
+
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
+
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Ptr[N, T] = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
+
   }
 
-  override def tearDown() {
-    if (inspectgc) {
-      Thread.sleep(500)
-      println("run completed...")
-    }
+  object RandomWalk extends FindFirstStrategy {
 
-    if (lastroot == null) return
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = localRandom.nextBoolean
 
-    val balance = lastroot.balance
-    val workmean = size / par
-    for ((w, workdone) <- balance; if w != null) {
-      imbalance(w.index) += math.abs(workmean - workdone)
-    }
-    treesizes += lastroot.treeSize
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.right
 
-    // debugging
-    if (debugging) {
-      assert(items.forall(_ == 1), "Each item processed: " + items.indexWhere(_ != 1) + ", " + items.find(_ != 1) + ": " + items.toSeq + "\n" + lastroot.toString(0))
-      println()
-      println("-----------------------------------------------------------")
-      println()
-    }
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.left
+
   }
 
-  var debugging = false
+  object RandomAll extends FindFirstStrategy {
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = localRandom.nextBoolean
+
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+
+  }
+
+  object Predefined extends FindFirstStrategy {
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]): Boolean = true
+
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.right
+
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.left
+
+  }
+
+  object FindMax extends Strategy {
+
+    @tailrec def findWork[N <: Node[N, T], T](worker: Worker, tree: Ptr[N, T]) = {
+      def search(current: Ptr[N, T]): Ptr[N, T] = if (current.child.isLeaf) current else {
+        val left = search(current.child.left)
+        val rght = search(current.child.right)
+        val leftwork = left.child.workRemaining
+        val rghtwork = rght.child.workRemaining
+        if (leftwork > rghtwork) left else rght
+      }
+
+      val max = search(tree)
+      if (max.child.workRemaining > 0) {
+        if (max.child.tryOwn(worker)) max
+        else if (max.child.trySteal(max)) {
+          val subnode = chooseAsStealer(worker.index, worker.total, max)
+          if (subnode.child.tryOwn(worker)) subnode
+          else findWork(worker, tree)
+        } else findWork(worker, tree)
+      } else null
+    }
+
+    def choose[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = sys.error("never called")
+
+    def chooseAsStealer[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.right
+
+    def chooseAsVictim[N <: Node[N, T], T](index: Int, total: Int, tree: Ptr[N, T]) = tree.child.left
+
+  }
+
+
+  val unsafe = Utils.getUnsafe()
+  val initialStep = sys.props("step").toInt
+
+  def localRandom = scala.concurrent.forkjoin.ThreadLocalRandom.current
+
+  def nodeString[N <: Node[N, T], T](ws: WorkstealingScheduler)(n: Node[N, T]): String = n match {
+    case rn: RangeNode[t] =>
+      import rn._
+      "[%.2f%%] RangeNode(%s)(%d, %d, %d, %d, %d)(lres = %s, rres = %s, res = %s) #%d".format(
+        (RangeNode.positiveProgress(range) - start + end - RangeNode.until(range)).toDouble / ws.size * 100,
+        if (owner == null) "none" else "worker " + owner.index,
+        start,
+        end,
+        RangeNode.progress(range),
+        RangeNode.until(range),
+        step,
+        lresult,
+        rresult,
+        result,
+        System.identityHashCode(rn)
+      )
+    case _ =>
+      "Node(%s)()(lres = %s, rres = %s, res = %s) #%d".format(
+        if (n.owner == null) "none" else "worker " + n.owner.index,
+        n.lresult,
+        n.rresult,
+        n.result,
+        System.identityHashCode(n)
+      )
+  }
 
 }
-
-
-
 
 
 

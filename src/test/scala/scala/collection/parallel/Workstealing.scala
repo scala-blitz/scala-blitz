@@ -925,7 +925,104 @@ object StealLoop extends StatisticsBenchmark {
 }
 
 
+object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
+  val ws = new WorkstealingScheduler
+
+  import ws._
+
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+    val stabletimes = times.drop(5)
+
+    if (lastroot == null) return times
+
+    println("...::: Last tree :::...")
+    val balance = lastroot.balance
+    println(lastroot.toString(ws)(0))
+    println("result: " + lastroot.asInstanceOf[WorkstealingScheduler.Ptr[_, Int]].reduce(_ + _))
+    //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
+    println("total: " + balance.foldLeft(0)(_ + _._2))
+    println()
+
+    println("...::: Statistics :::...")
+    println("strategy: " + strategy.getClass.getSimpleName)
+    for ((workerindex, diffs) <- imbalance.toList.sortBy(_._1).headOption) printStatistics("<worker " + workerindex + " imbalance>", diffs.map(_.toLong).toList)
+    printStatistics("<Tree size>", treesizes.map(_.toLong).toList)
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", stabletimes)
+
+    times
+  }
+
+  def run() {
+    val kernel = new Kernel.Range[Int] {
+      def size = ws.size
+      def zero = 0
+      def combine(a: Int, b: Int) = a + b
+      def apply(p: Int, np: Int, total: Int) = {
+        var i = p
+        var sum = 0
+        while (i < np) {
+          sum += i
+          i += 1
+        }
+        sum
+      }
+    }
+
+    var i = 0
+    while (i < repeats) {
+      ws.invokeParallelOperation(0, 0, kernel)
+      i += 1
+    }
+  }
+
+  override def setUp() {
+    if (inspectgc) {
+      println("run starting...")
+      Thread.sleep(500)
+    }
+
+    lastroot = null
+
+    // debugging
+    /*if (debugging) {
+      var i = 0
+      while (i < size) {
+        items(i) = 0
+        i += 1
+      }
+    }*/
+  }
+
+  override def tearDown() {
+    if (inspectgc) {
+      Thread.sleep(500)
+      println("run completed...")
+    }
+
+    if (lastroot == null) return
+
+    val balance = lastroot.balance
+    val workmean = size / par
+    for ((w, workdone) <- balance; if w != null) {
+      imbalance(w.index) += math.abs(workmean - workdone)
+    }
+    treesizes += lastroot.treeSize
+
+    // debugging
+    if (debugging) {
+      //assert(items.forall(_ == 1), "Each item processed: " + items.indexWhere(_ != 1) + ", " + items.find(_ != 1) + ": " + items.toSeq + "\n" + lastroot.toString(0))
+      println()
+      println("-----------------------------------------------------------")
+      println()
+    }
+  }
+
+  var debugging = false
+
+}
 
 
 
