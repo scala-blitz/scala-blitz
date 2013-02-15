@@ -240,36 +240,104 @@ object WorkstealingScheduler {
 
     def state: Node.State
 
-    def steal(): Boolean
+    def hasAdvanceRight: Boolean
+
+    def advanceLeft(step: Int): Int
+
+    def advanceRight(step: Int): Int
+
+    def nextLeft: T
+
+    def nextRight: T
+
+    def markStolen(): Boolean
 
   }
 
-  final class RangeNode[T](l: Ptr[RangeNode[T], T], r: Ptr[RangeNode[T], T])(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int)
-  extends Node[RangeNode[T], T](l, r) {
+  abstract class IndexNode[IN <: IndexNode[IN, T], T](l: Ptr[IN, T], r: Ptr[IN, T])(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int)
+  extends Node[IN, T](l, r) {
     var padding0: Int = 0 // <-- war story
-    var padding1: Int = 0
-    var padding2: Int = 0
+    //var padding1: Int = 0
+    //var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
 
-    final def casRange(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, RangeNode.RANGE_OFFSET, ov, nv)
+    final def casRange(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, IndexNode.RANGE_OFFSET, ov, nv)
 
-    def workRemaining = {
+    final def workRemaining = {
       val r = /*READ*/range
-      val p = RangeNode.progress(r)
-      val u = RangeNode.until(r)
+      val p = IndexNode.progress(r)
+      val u = IndexNode.until(r)
       u - p
+    }
+
+    final def state = {
+      val range_t0 = /*READ*/range
+      if (IndexNode.completed(range_t0)) Node.Completed
+      else if (IndexNode.stolen(range_t0)) Node.StolenOrExpanded
+      else Node.AvailableOrOwned
+    }
+
+    final def hasAdvanceRight = true
+
+    final def advanceLeft(step: Int): Int = {
+      val range_t0 = /*READ*/range
+      if (IndexNode.stolen(range_t0) || IndexNode.completed(range_t0)) -1
+      else {
+        val p = IndexNode.progress(range_t0)
+        val u = IndexNode.until(range_t0)
+        val newp = math.min(u, p + step)
+        if (casRange(range_t0, IndexNode.range(newp, u))) newp - p
+        else -1
+      }
+    }
+
+    final def advanceRight(step: Int): Int = {
+      val range_t0 = /*READ*/range
+      if (IndexNode.stolen(range_t0) || IndexNode.completed(range_t0)) -1
+      else {
+        val p = IndexNode.progress(range_t0)
+        val u = IndexNode.until(range_t0)
+        val newu = math.max(p, u - step)
+        if (casRange(range_t0, IndexNode.range(p, newu))) u - newu
+        else -1
+      }
+    }
+
+    final def markStolen(): Boolean = {
+      val range_t0 = /*READ*/range
+      if (IndexNode.completed(range_t0) || IndexNode.stolen(range_t0)) false
+      else casRange(range_t0, IndexNode.markStolen(range_t0))
+    }
+
+  }
+
+  final class RangeNode[T](l: Ptr[RangeNode[T], T], r: Ptr[RangeNode[T], T])(s: Int, e: Int, rn: Long, st: Int)
+  extends IndexNode[RangeNode[T], T](l, r)(s, e, rn, st) {
+    var lindex = start
+    var rindex = end
+
+    def nextLeft: T = {
+      val x = lindex
+      lindex += 1
+      x.asInstanceOf[T]
+    }
+
+    def nextRight: T = {
+      val x = rindex
+      rindex -= 1
+      x.asInstanceOf[T]
     }
 
     def newExpanded(parent: Ptr[RangeNode[T], T]): RangeNode[T] = {
       val r = /*READ*/range
-      val p = RangeNode.positiveProgress(r)
-      val u = RangeNode.until(r)
+      val p = IndexNode.positiveProgress(r)
+      val u = IndexNode.until(r)
       val remaining = u - p
       val firsthalf = remaining / 2
       val secondhalf = remaining - firsthalf
-      val lnode = new RangeNode[T](null, null)(p, p + firsthalf, RangeNode.range(p, p + firsthalf), initialStep)
-      val rnode = new RangeNode[T](null, null)(p + firsthalf, u, RangeNode.range(p + firsthalf, u), initialStep)
+      val lnode = new RangeNode[T](null, null)(p, p + firsthalf, IndexNode.range(p, p + firsthalf), initialStep)
+      val rnode = new RangeNode[T](null, null)(p + firsthalf, u, IndexNode.range(p + firsthalf, u), initialStep)
       val lptr = new Ptr[RangeNode[T], T](parent, parent.level + 1)(lnode)
       val rptr = new Ptr[RangeNode[T], T](parent, parent.level + 1)(rnode)
       val nnode = new RangeNode(lptr, rptr)(start, end, r, step)
@@ -277,42 +345,10 @@ object WorkstealingScheduler {
       nnode
     }
 
-    def state = {
-      val range_t0 = /*READ*/range
-      if (RangeNode.completed(range_t0)) Node.Completed
-      else if (RangeNode.stolen(range_t0)) Node.StolenOrExpanded
-      else Node.AvailableOrOwned
-    }
-
-    def steal(): Boolean = {
-      val range_t0 = /*READ*/range
-      if (RangeNode.completed(range_t0) || RangeNode.stolen(range_t0)) false
-      else casRange(range_t0, RangeNode.markStolen(range_t0))
-    }
-
   }
 
-  object Node {
-    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("owner"))
-    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("result"))
-
-    sealed trait State
-
-    val Completed = new State {
-      override def toString = "Completed"
-    }
-
-    val StolenOrExpanded = new State {
-      override def toString = "StolenOrExpanded"
-    }
-
-    val AvailableOrOwned = new State {
-      override def toString = "AvailableOrOwned"
-    }
-  }
-
-  object RangeNode {
-    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[RangeNode[_]].getDeclaredField("range"))
+  object IndexNode {
+    val RANGE_OFFSET = unsafe.objectFieldOffset(classOf[IndexNode[_, _]].getDeclaredField("range"))
 
     def range(p: Int, u: Int): Long = (p.toLong << 32) | u
 
@@ -346,6 +382,25 @@ object WorkstealingScheduler {
     }
   }
 
+  object Node {
+    val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("owner"))
+    val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("result"))
+
+    trait State
+
+    val Completed = new State {
+      override def toString = "Completed"
+    }
+
+    val StolenOrExpanded = new State {
+      override def toString = "StolenOrExpanded"
+    }
+
+    val AvailableOrOwned = new State {
+      override def toString = "AvailableOrOwned"
+    }
+  }
+
   final class Ptr[N <: Node[N, T], T](val up: Ptr[N, T], val level: Int)(@volatile var child: N) {
     def casChild(ov: N, nv: N) = unsafe.compareAndSwapObject(this, Ptr.CHILD_OFFSET, ov, nv)
     def writeChild(nv: N) = unsafe.putObjectVolatile(this, Ptr.CHILD_OFFSET, nv)
@@ -361,7 +416,7 @@ object WorkstealingScheduler {
         if (state_t1 eq Node.Completed) false // already completed
         else {
           if (state_t1 ne Node.StolenOrExpanded) {
-            if (child_t0.steal()) expand() // marked stolen - now move on to node creation
+            if (child_t0.markStolen()) expand() // marked stolen - now move on to node creation
             else expand() // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
@@ -386,7 +441,7 @@ object WorkstealingScheduler {
     }
 
     def workDone(n: Node[N, T]) = n match {
-      case rn: RangeNode[t] => (RangeNode.positiveProgress(rn.range) - rn.start + rn.end - RangeNode.until(rn.range))
+      case rn: RangeNode[t] => (IndexNode.positiveProgress(rn.range) - rn.start + rn.end - IndexNode.until(rn.range))
       case _ => 0
     }
 
@@ -624,12 +679,12 @@ object WorkstealingScheduler {
     case rn: RangeNode[t] =>
       import rn._
       "[%.2f%%] RangeNode(%s)(%d, %d, %d, %d, %d)(lres = %s, rres = %s, res = %s) #%d".format(
-        (RangeNode.positiveProgress(range) - start + end - RangeNode.until(range)).toDouble / ws.size * 100,
+        (IndexNode.positiveProgress(range) - start + end - IndexNode.until(range)).toDouble / ws.size * 100,
         if (owner == null) "none" else "worker " + owner.index,
         start,
         end,
-        RangeNode.progress(range),
-        RangeNode.until(range),
+        IndexNode.progress(range),
+        IndexNode.until(range),
         step,
         lresult,
         rresult,
