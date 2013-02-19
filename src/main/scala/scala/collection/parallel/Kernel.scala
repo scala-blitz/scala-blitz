@@ -16,21 +16,14 @@ abstract class Kernel[N <: WorkstealingScheduler.Node[N, T, R], T, R] {
 
   /** Processes the specified chunk.
    */
-  def apply(progress: Int, nextProgress: Int, totalSize: Int): R
+  def apply(node: N, chunkSize: Int): R
 
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
    *
    *  May be overridden in subclass to specialize for better performance.
    */
-  def workOn(ws: WorkstealingScheduler)(tree: WorkstealingScheduler.Ptr[N, T, R], size: Int): Boolean
-
-  /** Returns the root of a fresh workstealing tree.
-   */
-  def newRoot: WorkstealingScheduler.Ptr[N, T, R]
-
-  /** Problem size. */
-  def size: Int
+  def workOn(ws: WorkstealingScheduler)(tree: WorkstealingScheduler.Ptr[N, T, R]): Boolean
 
 }
 
@@ -40,15 +33,11 @@ object Kernel {
   import WorkstealingScheduler.{Ptr, Node, IndexNode, RangeNode}
 
   abstract class Range[R] extends Kernel[RangeNode[R], Int, R] {
-    def newRoot: Ptr[RangeNode[R], Int, R] = {
-      val work = new RangeNode[R](null, null)(0, size, IndexNode.range(0, size), WorkstealingScheduler.initialStep)
-      val root = new Ptr[RangeNode[R], Int, R](null, 0)(work)
-      root
-    }
+    def applyRange(from: Int, until: Int): R
 
-    def workOn(ws: WorkstealingScheduler)(tree: Ptr[RangeNode[R], Int, R], size: Int): Boolean = {
+    def workOn(ws: WorkstealingScheduler)(tree: Ptr[RangeNode[R], Int, R]): Boolean = {
       // do some work
-      val node = tree.child
+      val node = /*READ*/tree.child
       var lsum = zero
       var rsum = zero
       var incCount = 0
@@ -68,23 +57,55 @@ object Kernel {
             val newrange = IndexNode.range(newp, u)
   
             // do some work on the left
-            if (node.casRange(currrange, newrange)) lsum = combine(lsum, apply(p, newp, size))
+            if (node.casRange(currrange, newrange)) lsum = combine(lsum, applyRange(p, newp))
           } else {
             val newu = math.max(p, u - currstep)
             val newrange = IndexNode.range(p, newu)
   
             // do some work on the right
-            if (node.casRange(currrange, newrange)) rsum = combine(apply(newu, u, size), rsum)
+            if (node.casRange(currrange, newrange)) rsum = combine(applyRange(newu, u), rsum)
           }
   
           // update step
           incCount = (incCount + 1) % incFreq
-          if (incCount == 0) node.step = math.min(maxStep, currstep * 2)
+          if (incCount == 0) node.step = /*WRITE*/math.min(maxStep, currstep * 2)
         } else looping = false
       }
   
       // complete node information
       ws.completeNode[RangeNode[R], Int, R](lsum, rsum, tree, this)
+    }
+  }
+
+  abstract class Iterative[N <: Node[N, T, R], T, R] extends Kernel[N, T, R] {
+
+    def workOn(ws: WorkstealingScheduler)(tree: Ptr[N, T, R]): Boolean = {
+      // do some work
+      val node = /*READ*/tree.child
+      var lsum = zero
+      var rsum = zero
+      var incCount = 0
+      val incFreq = ws.incrementFrequency
+      val maxStep = ws.maxStep
+      var looping = true
+      while (looping) {
+        val currstep = /*READ*/node.step
+        val currstate = /*READ*/node.state
+  
+        if (currstate != Node.Completed && currstate != Node.StolenOrExpanded) {
+          // reserve some work
+          val chunk = node.advance(currstep)
+
+          if (chunk != -1) lsum = combine(lsum, apply(node, chunk))
+  
+          // update step
+          incCount = (incCount + 1) % incFreq
+          if (incCount == 0) node.step = /*WRITE*/math.min(maxStep, currstep * 2)
+        } else looping = false
+      }
+  
+      // complete node information
+      ws.completeNode[N, T, R](lsum, rsum, tree, this)
     }
   }
 

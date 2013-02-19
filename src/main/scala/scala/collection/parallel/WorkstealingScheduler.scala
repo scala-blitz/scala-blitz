@@ -99,7 +99,7 @@ final class WorkstealingScheduler {
     val leaf = strategy.findWork[N, T, R](w, root)
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[N, T, R]) {
-        val nosteals = kernel.workOn(this)(leaf, size)
+        val nosteals = kernel.workOn(this)(leaf)
         if (!nosteals) {
           val subnode = strategy.chooseAsVictim[N, T, R](w.index, w.total, leaf)
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
@@ -172,9 +172,9 @@ final class WorkstealingScheduler {
     }
   }
 
-  def invokeParallelOperation[N <: Node[N, T, R], T, R](progress: Int, result: R, kernel: Kernel[N, T, R]): R = {
+  def invokeParallelOperation[N <: Node[N, T, R], T, R](w: Workstealing[N, T, R], kernel: Kernel[N, T, R]): R = {
     // create workstealing tree
-    val root = kernel.newRoot
+    val root = w.newRoot
     val work = root.child
     work.tryOwn(Invoker)
 
@@ -182,7 +182,7 @@ final class WorkstealingScheduler {
     dispatchWorkFJ(root, kernel)
 
     // piggy-back the caller into doing work
-    if (!kernel.workOn(this)(root, size)) workUntilNoWork(Invoker, root, kernel)
+    if (!kernel.workOn(this)(root)) workUntilNoWork(Invoker, root, kernel)
 
     // synchronize in case there's some other worker just
     // about to complete work
@@ -190,7 +190,7 @@ final class WorkstealingScheduler {
 
     lastroot = root
 
-    kernel.combine(result, root.child.result.get)
+    root.child.result.get
   }
 
 }
@@ -206,7 +206,7 @@ object WorkstealingScheduler {
     def getName: String
   }
 
-  abstract class Node[N <: Node[N, T, R], T, R](val left: Ptr[N, T, R], val right: Ptr[N, T, R]) {
+  abstract class Node[N <: Node[N, T, R], T, R](val left: Ptr[N, T, R], val right: Ptr[N, T, R])(@volatile var step: Int) {
     @volatile var owner: Owner = null
     @volatile var lresult: R = null.asInstanceOf[R]
     @volatile var rresult: R = null.asInstanceOf[R]
@@ -248,10 +248,10 @@ object WorkstealingScheduler {
 
   }
 
-  abstract class IndexNode[IN <: IndexNode[IN, T, R], T, R](l: Ptr[IN, T, R], r: Ptr[IN, T, R])(val start: Int, val end: Int, @volatile var range: Long, @volatile var step: Int)
-  extends Node[IN, T, R](l, r) {
+  abstract class IndexNode[IN <: IndexNode[IN, T, R], T, R](l: Ptr[IN, T, R], r: Ptr[IN, T, R])(val start: Int, val end: Int, @volatile var range: Long, st: Int)
+  extends Node[IN, T, R](l, r)(st) {
     var padding0: Int = 0 // <-- war story
-    var padding1: Int = 0
+    //var padding1: Int = 0
     //var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
@@ -295,6 +295,7 @@ object WorkstealingScheduler {
   final class RangeNode[R](l: Ptr[RangeNode[R], Int, R], r: Ptr[RangeNode[R], Int, R])(s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[RangeNode[R], Int, R](l, r)(s, e, rn, st) {
     var lindex = start
+    var rindex = end
 
     def next: Int = {
       val x = lindex

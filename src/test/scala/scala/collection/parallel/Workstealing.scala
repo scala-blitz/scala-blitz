@@ -956,11 +956,32 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
   }
 
   def run() {
+    import WorkstealingScheduler.{Ptr, RangeNode, IndexNode}
+
+    val workstealing = new Workstealing[RangeNode[Int], Int, Int] {
+      def newRoot = {
+        val work = new RangeNode[Int](null, null)(0, size, IndexNode.range(0, size), WorkstealingScheduler.initialStep)
+        val root = new Ptr[RangeNode[Int], Int, Int](null, 0)(work)
+        root
+      }
+    }
+
     val kernel = new Kernel.Range[Int] {
-      def size = ws.size
       def zero = 0
       def combine(a: Int, b: Int) = a + b
-      def apply(p: Int, np: Int, total: Int) = {
+      def apply(node: WorkstealingScheduler.RangeNode[Int], chunkSize: Int) = {
+        val p = node.lindex
+        val np = p + chunkSize
+        var i = p
+        var sum = 0
+        while (i < np) {
+          sum += i
+          i += 1
+        }
+        node.lindex = np
+        sum
+      }
+      def applyRange(p: Int, np: Int) = {
         var i = p
         var sum = 0
         while (i < np) {
@@ -973,7 +994,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
     var i = 0
     while (i < repeats) {
-      ws.invokeParallelOperation(0, 0, kernel)
+      ws.invokeParallelOperation(workstealing, kernel)
       i += 1
     }
   }
