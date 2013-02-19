@@ -5,29 +5,29 @@ package scala.collection.parallel
 
 
 
-abstract class Kernel[N <: WorkstealingScheduler.Node[N, T], T] {
+abstract class Kernel[N <: WorkstealingScheduler.Node[N, T, R], T, R] {
   /** The neutral element of the reduction.
    */
-  def zero: T
+  def zero: R
 
   /** Combines results from two chunks into the aggregate result.
    */
-  def combine(a: T, b: T): T
+  def combine(a: R, b: R): R
 
   /** Processes the specified chunk.
    */
-  def apply(progress: Int, nextProgress: Int, totalSize: Int): T
+  def apply(progress: Int, nextProgress: Int, totalSize: Int): R
 
   /** Returns true if completed with no stealing.
    *  Returns false if steal occurred.
    *
    *  May be overridden in subclass to specialize for better performance.
    */
-  def workOn(ws: WorkstealingScheduler)(tree: WorkstealingScheduler.Ptr[N, T], size: Int): Boolean
+  def workOn(ws: WorkstealingScheduler)(tree: WorkstealingScheduler.Ptr[N, T, R], size: Int): Boolean
 
   /** Returns the root of a fresh workstealing tree.
    */
-  def newRoot: WorkstealingScheduler.Ptr[N, T]
+  def newRoot: WorkstealingScheduler.Ptr[N, T, R]
 
   /** Problem size. */
   def size: Int
@@ -39,14 +39,14 @@ object Kernel {
 
   import WorkstealingScheduler.{Ptr, Node, IndexNode, RangeNode}
 
-  abstract class Range[T] extends Kernel[RangeNode[T], T] {
-    def newRoot: Ptr[RangeNode[T], T] = {
-      val work = new RangeNode[T](null, null)(0, size, IndexNode.range(0, size), WorkstealingScheduler.initialStep)
-      val root = new Ptr[RangeNode[T], T](null, 0)(work)
+  abstract class Range[R] extends Kernel[RangeNode[R], Int, R] {
+    def newRoot: Ptr[RangeNode[R], Int, R] = {
+      val work = new RangeNode[R](null, null)(0, size, IndexNode.range(0, size), WorkstealingScheduler.initialStep)
+      val root = new Ptr[RangeNode[R], Int, R](null, 0)(work)
       root
     }
 
-    def workOn(ws: WorkstealingScheduler)(tree: Ptr[RangeNode[T], T], size: Int): Boolean = {
+    def workOn(ws: WorkstealingScheduler)(tree: Ptr[RangeNode[R], Int, R], size: Int): Boolean = {
       // do some work
       val node = tree.child
       var lsum = zero
@@ -84,7 +84,7 @@ object Kernel {
       }
   
       // complete node information
-      ws.completeNode[RangeNode[T], T](lsum, rsum, tree, this)
+      ws.completeNode[RangeNode[R], Int, R](lsum, rsum, tree, this)
     }
   }
 

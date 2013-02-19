@@ -940,7 +940,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     println("...::: Last tree :::...")
     val balance = lastroot.balance
     println(lastroot.toString(ws)(0))
-    println("result: " + lastroot.asInstanceOf[WorkstealingScheduler.Ptr[_, Int]].reduce(_ + _))
+    println("result: " + lastroot.asInstanceOf[WorkstealingScheduler.Ptr[_, Int, Int]].reduce(_ + _))
     //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
