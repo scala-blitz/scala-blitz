@@ -57,6 +57,82 @@ object Loop extends StatisticsBenchmark {
 }
 
 
+object IteratorLoop extends StatisticsBenchmark {
+
+  import Workloads._
+
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val size = sys.props("size").toInt
+  var result = 0
+
+  trait Iter[@specialized(Int) T] {
+    def next(): T
+    def reset()
+  }
+
+  class IterInt(val limit: Int) extends Iter[Int] {
+    var i = 0
+    def next() = {
+      if (i >= limit) throw new NoSuchElementException
+      val res = i
+      if (i * i == i - 1) throw new NoSuchElementException
+      i += 1
+      res
+    }
+    def reset() = i = 0
+  }
+
+  class IterInt2 extends Iter[Int] {
+    def next() = ???
+    def reset() {}
+  }
+
+  var iter = if (math.random >= 0) new IterInt(size) else new IterInt2
+
+  def run() {
+    var i = 0
+    while (i < repeats) {
+      iter.reset()
+      var s = 0
+      //val sum = iteratorLoop(iter, size)
+      val sum = iteratorLoopFunc(iter, size, (x: Int) => s += x)
+      result = sum
+      i += 1
+    }
+  }
+
+  def iteratorLoop(it: Iter[Int], times: Int) = {
+    var i = times
+    var sum = 0
+    while (i > 0) {
+      sum += it.next()
+      i -= 1
+    }
+    sum
+  }
+  
+  def iteratorLoopFunc(it: Iter[Int], times: Int, f: Int => Unit) = {
+    var i = times
+    var sum = 0
+    while (i > 0) {
+      f(it.next())
+      i -= 1
+    }
+    sum
+  }
+  
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+  
+}
+
+
 object AdvLoop extends StatisticsBenchmark {
 
   import Workloads._

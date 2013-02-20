@@ -99,7 +99,7 @@ final class WorkstealingScheduler {
     val leaf = strategy.findWork[N, T, R](w, root)
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[N, T, R]) {
-        val nosteals = kernel.workOn(this)(leaf)
+        val nosteals = leaf.child.workOn(this)(leaf, kernel)
         if (!nosteals) {
           val subnode = strategy.chooseAsVictim[N, T, R](w.index, w.total, leaf)
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
@@ -182,7 +182,7 @@ final class WorkstealingScheduler {
     dispatchWorkFJ(root, kernel)
 
     // piggy-back the caller into doing work
-    if (!kernel.workOn(this)(root)) workUntilNoWork(Invoker, root, kernel)
+    if (!work.workOn(this)(root, kernel)) workUntilNoWork(Invoker, root, kernel)
 
     // synchronize in case there's some other worker just
     // about to complete work
@@ -225,6 +225,13 @@ object WorkstealingScheduler {
     }
 
     final def trySteal(parent: Ptr[N, T, R]): Boolean = parent.expand()
+
+    /** Returns true if completed with no stealing.
+     *  Returns false if steal occurred.
+     *
+     *  May be overridden in subclass to specialize for better performance.
+     */
+    def workOn(ws: WorkstealingScheduler)(tree: WorkstealingScheduler.Ptr[N, T, R], kernel: Kernel[N, T, R]): Boolean
 
     final def toString(ws: WorkstealingScheduler)(lev: Int): String = {
        nodeString[N, T, R](ws)(this) + (if (!isLeaf) {
@@ -319,6 +326,48 @@ object WorkstealingScheduler {
       nnode
     }
 
+    def workOn(ws: WorkstealingScheduler)(tree: Ptr[RangeNode[R], Int, R], kernel: Kernel[RangeNode[R], Int, R]): Boolean = {
+      // do some work
+      val k = kernel.asInstanceOf[Kernel.Range[R]]
+      import k._
+      val node = /*READ*/tree.child
+      var lsum = zero
+      var rsum = zero
+      var incCount = 0
+      val incFreq = ws.incrementFrequency
+      val maxStep = ws.maxStep
+      var looping = true
+      val rand = WorkstealingScheduler.localRandom
+      while (looping) {
+        val currstep = /*READ*/node.step
+        val currrange = /*READ*/node.range
+        val p = IndexNode.progress(currrange)
+        val u = IndexNode.until(currrange)
+  
+        if (!IndexNode.stolen(currrange) && !IndexNode.completed(currrange)) {
+          if (rand.nextBoolean) {
+            val newp = math.min(u, p + currstep)
+            val newrange = IndexNode.range(newp, u)
+  
+            // do some work on the left
+            if (node.casRange(currrange, newrange)) lsum = combine(lsum, applyRange(p, newp))
+          } else {
+            val newu = math.max(p, u - currstep)
+            val newrange = IndexNode.range(p, newu)
+  
+            // do some work on the right
+            if (node.casRange(currrange, newrange)) rsum = combine(applyRange(newu, u), rsum)
+          }
+  
+          // update step
+          incCount = (incCount + 1) % incFreq
+          if (incCount == 0) node.step = /*WRITE*/math.min(maxStep, currstep * 2)
+        } else looping = false
+      }
+  
+      // complete node information
+      ws.completeNode[RangeNode[R], Int, R](lsum, rsum, tree, kernel)
+    }
   }
 
   object IndexNode {
