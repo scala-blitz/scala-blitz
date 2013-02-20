@@ -1003,9 +1003,9 @@ object StealLoop extends StatisticsBenchmark {
 
 object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
-  val ws = new WorkstealingScheduler
+  val range = new WorkstealingRange
 
-  import ws._
+  import range._
 
   override def runBenchmark(noTimes: Int): List[Long] = {
     val times = super.runBenchmark(noTimes)
@@ -1015,8 +1015,8 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
     println("...::: Last tree :::...")
     val balance = lastroot.balance
-    println(lastroot.toString(ws)(0))
-    println("result: " + lastroot.asInstanceOf[WorkstealingScheduler.Ptr[_, Int, Int]].reduce(_ + _))
+    println(lastroot.toString(0))
+    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int]].reduce(_ + _))
     //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
@@ -1032,31 +1032,10 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
   }
 
   def run() {
-    import WorkstealingScheduler.{Ptr, RangeNode, IndexNode}
-
-    val workstealing = new Workstealing[RangeNode[Int], Int, Int] {
-      def newRoot = {
-        val work = new RangeNode[Int](null, null)(0, size, IndexNode.range(0, size), WorkstealingScheduler.initialStep)
-        val root = new Ptr[RangeNode[Int], Int, Int](null, 0)(work)
-        root
-      }
-    }
-
-    val kernel = new Kernel.Range[Int] {
+    val rangekernel = new range.RangeKernel[Int] {
       def zero = 0
       def combine(a: Int, b: Int) = a + b
-      def apply(node: WorkstealingScheduler.RangeNode[Int], chunkSize: Int) = {
-        val p = node.lindex
-        val np = p + chunkSize
-        var i = p
-        var sum = 0
-        while (i < np) {
-          sum += i
-          i += 1
-        }
-        node.lindex = np
-        sum
-      }
+      def apply(node: range.RangeNode[Int], chunkSize: Int) = ???
       def applyRange(p: Int, np: Int) = {
         var i = p
         var sum = 0
@@ -1067,10 +1046,25 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
         sum
       }
     }
+    val coll: WorkstealingCollection[Int] = range
+    val collkernel = new coll.Kernel[Int] {
+      def zero = 0
+      def combine(a: Int, b: Int) = a + b
+      def apply(node: coll.N[Int], chunkSize: Int) = {
+        var left = chunkSize
+        var sum = 0
+        while (left > 0) {
+          sum += node.next()
+          left -= 1
+        }
+        sum
+      }
+    }
 
     var i = 0
     while (i < repeats) {
-      ws.invokeParallelOperation(workstealing, kernel)
+      coll.invokeParallelOperation(collkernel)
+      //range.invokeParallelOperation(rangekernel)
       i += 1
     }
   }

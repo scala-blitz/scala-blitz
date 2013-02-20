@@ -15,6 +15,8 @@ package parallel {
 
   object Utils {
 
+    val unsafe = getUnsafe()
+  
     def getUnsafe(): Unsafe = {
       if (this.getClass.getClassLoader == null) Unsafe.getUnsafe()
       try {
