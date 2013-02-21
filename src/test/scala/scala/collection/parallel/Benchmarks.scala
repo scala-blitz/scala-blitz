@@ -35,6 +35,7 @@ object Loop extends StatisticsBenchmark {
   val repeats = sys.props.getOrElse("repeats", "1").toInt
   val size = sys.props("size").toInt
   var result = 0
+  var loopstep = 1
 
   def run() {
     var i = 0
@@ -43,6 +44,17 @@ object Loop extends StatisticsBenchmark {
       result = sum
       i += 1
     }
+  }
+
+  def kernel2(sz: Int) = {
+    var i = 0
+    var sum = 0
+    val s = loopstep
+    while (i < sz) {
+      sum += i
+      i += s
+    }
+    sum
   }
   
   override def runBenchmark(noTimes: Int): List[Long] = {
@@ -1003,7 +1015,9 @@ object StealLoop extends StatisticsBenchmark {
 
 object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
-  val range = new WorkstealingRange
+  val size = sys.props("size").toInt
+
+  val range = new WorkstealingRange(0 until size)
 
   import range._
 
@@ -1016,7 +1030,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     println("...::: Last tree :::...")
     val balance = lastroot.balance
     println(lastroot.toString(0))
-    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int, Int]].reduce(_ + _))
+    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int, Int]].child.result)
     //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
@@ -1035,13 +1049,21 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     val rangekernel = new range.RangeKernel[Int] {
       def zero = 0
       def combine(a: Int, b: Int) = a + b
-      def apply(node: range.RangeNode[Int], chunkSize: Int) = ???
-      def applyRange(p: Int, np: Int) = {
-        var i = p
+      def applyRange(node: range.RangeNode[Int], from: Int, to: Int, step: Int) = {
+        var x = from
         var sum = 0
-        while (i < np) {
-          sum += i
-          i += 1
+        while (x <= to) {
+          sum += x
+          x += step
+        }
+        sum
+      }
+      def applyRange1(node: range.RangeNode[Int], from: Int, to: Int) = {
+        var x = from
+        var sum = 0
+        while (x <= to) {
+          sum += x
+          x += 1
         }
         sum
       }

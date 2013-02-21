@@ -29,10 +29,9 @@ trait WorkstealingCollection[T] {
 
   def size: Int
 
-  abstract class Node[@specialized(Int) S, R](val left: Ptr[S, R], val right: Ptr[S, R])(@volatile var step: Int) {
+  abstract class Node[@specialized S, R](val left: Ptr[S, R], val right: Ptr[S, R])(@volatile var step: Int) {
     @volatile var owner: Owner = null
     @volatile var lresult: R = null.asInstanceOf[R]
-    @volatile var rresult: R = null.asInstanceOf[R]
     @volatile var result: Option[R] = null
 
     def repr = this.asInstanceOf[N[R]]
@@ -56,7 +55,6 @@ trait WorkstealingCollection[T] {
     def nodeString: String = "Node(%s)()(lres = %s, rres = %s, res = %s) #%d".format(
       if (owner == null) "none" else "worker " + owner.index,
       lresult,
-      rresult,
       result,
       System.identityHashCode(this)
     )
@@ -124,78 +122,11 @@ trait WorkstealingCollection[T] {
 
     def workDone(n: Node[S, R]) = n.workDone
 
-    def reduce(op: (R, R) => R): R = if (child.isLeaf) {
-      op(child.lresult, child.rresult)
-    } else {
-      val leftsubres = child.left.reduce(op)
-      val rightsubres = child.right.reduce(op)
-      op(op(op(child.lresult, leftsubres), rightsubres), child.rresult)
-    }
-
     def treeSize: Int = {
       if (child.isLeaf) 1
       else 1 + child.left.treeSize + child.right.treeSize
     }
 
-  }
-
-  def completeNode[S, R](lsum: R, rsum: R, tree: Ptr[S, R], kernel: Kernel[S, R]): Boolean = {
-    val work = tree.child
-
-    val state_t0 = work.state
-    val wasCompleted = if (state_t0 eq Completed) {
-      work.lresult = lsum
-      work.rresult = rsum
-      while (work.result == null) work.casResult(null, None)
-      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
-      true
-    } else if (state_t0 eq StolenOrExpanded) {
-      // help expansion if necessary
-      if (tree.child.isLeaf) tree.expand()
-      tree.child.lresult = lsum
-      tree.child.rresult = rsum
-      while (tree.child.result == null) tree.child.casResult(null, None)
-      //val work = tree.child
-      //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
-      false
-    } else sys.error("unreachable: " + state_t0 + ", " + work.toString(0))
-
-    // push result up as far as possible
-    pushUp(tree, kernel)
-
-    wasCompleted
-  }
-  
-  @tailrec final def pushUp[S, R](tree: Ptr[S, R], k: Kernel[S, R]) {
-    val r = /*READ*/tree.child.result
-    r match {
-      case null =>
-        // we're done, owner did not finish his work yet
-      case Some(_) =>
-        // we're done, somebody else already pushed up
-      case None =>
-        val finalresult =
-          if (tree.child.isLeaf) Some(k.combine(tree.child.lresult, tree.child.rresult))
-          else {
-            // check if result already set for children
-            val leftresult = /*READ*/tree.child.left.child.result
-            val rightresult = /*READ*/tree.child.right.child.result
-            (leftresult, rightresult) match {
-              case (Some(lr), Some(rr)) =>
-                val r = k.combine(tree.child.lresult, k.combine(lr, k.combine(rr, tree.child.rresult)))
-                Some(r)
-              case (_, _) => // we're done, some of the children did not finish yet
-                None
-            }
-          }
-
-        if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
-          // if at root, notify completion, otherwise go one level up
-          if (tree.up == null) tree.synchronized {
-            tree.notifyAll()
-          } else pushUp(tree.up, k)
-        } else pushUp(tree, k) // retry
-    }
   }
 
   object Invoker extends Worker {
@@ -281,7 +212,7 @@ trait WorkstealingCollection[T] {
     }
   }
 
-  abstract class Kernel[@specialized(Int) S, R] {
+  abstract class Kernel[@specialized S, R] {
     def repr = this.asInstanceOf[K[R]]
 
     /** Returns true if completed with no stealing.
@@ -292,7 +223,6 @@ trait WorkstealingCollection[T] {
     def workOn(tree: Ptr[S, R]): Boolean = {
       val node = /*READ*/tree.child
       var lsum = zero
-      var rsum = zero
       var incCount = 0
       val incFreq = incrementFrequency
       val ms = maxStep
@@ -314,7 +244,64 @@ trait WorkstealingCollection[T] {
       }
   
       // complete node information
-      completeNode[S, R](lsum, rsum, tree, this)
+      completeNode(lsum, tree)
+    }
+
+    private def completeNode(lsum: R, tree: Ptr[S, R]): Boolean = {
+      val work = tree.child
+  
+      val state_t0 = work.state
+      val wasCompleted = if (state_t0 eq Completed) {
+        work.lresult = lsum
+        while (work.result == null) work.casResult(null, None)
+        //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
+        true
+      } else if (state_t0 eq StolenOrExpanded) {
+        // help expansion if necessary
+        if (tree.child.isLeaf) tree.expand()
+        tree.child.lresult = lsum
+        while (tree.child.result == null) tree.child.casResult(null, None)
+        //val work = tree.child
+        //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
+        false
+      } else sys.error("unreachable: " + state_t0 + ", " + work.toString(0))
+  
+      // push result up as far as possible
+      pushUp(tree)
+  
+      wasCompleted
+    }
+    
+    @tailrec private def pushUp(tree: Ptr[S, R]) {
+      val r = /*READ*/tree.child.result
+      r match {
+        case null =>
+          // we're done, owner did not finish his work yet
+        case Some(_) =>
+          // we're done, somebody else already pushed up
+        case None =>
+          val finalresult =
+            if (tree.child.isLeaf) Some(tree.child.lresult)
+            else {
+              // check if result already set for children
+              val leftresult = /*READ*/tree.child.left.child.result
+              val rightresult = /*READ*/tree.child.right.child.result
+              (leftresult, rightresult) match {
+                case (Some(lr), Some(rr)) =>
+                  val r = combine(tree.child.lresult, combine(lr, rr))
+                  Some(r)
+                case (_, _) => // we're done, some of the children did not finish yet
+                  None
+              }
+            }
+  
+          if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
+            // if at root, notify completion, otherwise go one level up
+            if (tree.up == null) tree.synchronized {
+              tree.notifyAll()
+            } else pushUp(tree.up)
+          } else pushUp(tree) // retry
+      }
     }
 
     /** The neutral element of the reduction.
