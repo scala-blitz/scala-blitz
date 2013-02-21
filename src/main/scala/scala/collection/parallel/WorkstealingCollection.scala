@@ -8,7 +8,7 @@ import collection._
 
 
 
-abstract class WorkstealingCollection[T] {
+trait WorkstealingCollection[T] {
 
   import WorkstealingCollection._
 
@@ -23,13 +23,13 @@ abstract class WorkstealingCollection[T] {
   val invocationMethod = sys.props("invocationMethod")
   val incrementFrequency = 1
 
-  type N[R] <: Node[R]
+  type N[R] <: Node[T, R]
 
-  type K[R] <: Kernel[R]
+  type K[R] <: Kernel[T, R]
 
   def size: Int
 
-  abstract class Node[R](val left: Ptr[R], val right: Ptr[R])(@volatile var step: Int) {
+  abstract class Node[@specialized(Int) S, R](val left: Ptr[S, R], val right: Ptr[S, R])(@volatile var step: Int) {
     @volatile var owner: Owner = null
     @volatile var lresult: R = null.asInstanceOf[R]
     @volatile var rresult: R = null.asInstanceOf[R]
@@ -49,7 +49,7 @@ abstract class WorkstealingCollection[T] {
       else tryOwn(thiz)
     }
 
-    final def trySteal(parent: Ptr[R]): Boolean = parent.expand()
+    final def trySteal(parent: Ptr[S, R]): Boolean = parent.expand()
 
     def workDone = 0
 
@@ -71,21 +71,21 @@ abstract class WorkstealingCollection[T] {
 
     def workRemaining: Int
 
-    def newExpanded(parent: Ptr[R]): Node[R]
+    def newExpanded(parent: Ptr[S, R]): Node[S, R]
 
     def state: State
 
     def advance(step: Int): Int
 
-    def next(): T
+    def next(): S
 
     def markStolen(): Boolean
 
   }
 
-  final class Ptr[R](val up: Ptr[R], val level: Int)(@volatile var child: Node[R]) {
-    def casChild(ov: Node[R], nv: Node[R]) = Utils.unsafe.compareAndSwapObject(this, CHILD_OFFSET, ov, nv)
-    def writeChild(nv: Node[R]) = Utils.unsafe.putObjectVolatile(this, CHILD_OFFSET, nv)
+  final class Ptr[S, R](val up: Ptr[S, R], val level: Int)(@volatile var child: Node[S, R]) {
+    def casChild(ov: Node[S, R], nv: Node[S, R]) = Utils.unsafe.compareAndSwapObject(this, CHILD_OFFSET, ov, nv)
+    def writeChild(nv: Node[S, R]) = Utils.unsafe.putObjectVolatile(this, CHILD_OFFSET, nv)
 
     /** Try to expand node and return true if node was expanded.
      *  Return false if node was completed.
@@ -122,7 +122,7 @@ abstract class WorkstealingCollection[T] {
       }
     }
 
-    def workDone(n: Node[R]) = n.workDone
+    def workDone(n: Node[S, R]) = n.workDone
 
     def reduce(op: (R, R) => R): R = if (child.isLeaf) {
       op(child.lresult, child.rresult)
@@ -139,7 +139,7 @@ abstract class WorkstealingCollection[T] {
 
   }
 
-  def completeNode[R](lsum: R, rsum: R, tree: Ptr[R], kernel: Kernel[R]): Boolean = {
+  def completeNode[S, R](lsum: R, rsum: R, tree: Ptr[S, R], kernel: Kernel[S, R]): Boolean = {
     val work = tree.child
 
     val state_t0 = work.state
@@ -166,7 +166,7 @@ abstract class WorkstealingCollection[T] {
     wasCompleted
   }
   
-  @tailrec final def pushUp[R](tree: Ptr[R], k: Kernel[R]) {
+  @tailrec final def pushUp[S, R](tree: Ptr[S, R], k: Kernel[S, R]) {
     val r = /*READ*/tree.child.result
     r match {
       case null =>
@@ -204,14 +204,10 @@ abstract class WorkstealingCollection[T] {
     def getName = "Invoker"
   }
 
-  var lastroot: Ptr[_] = _
-  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
-  val treesizes = collection.mutable.ArrayBuffer[Int]()
-
-  @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[R], kernel: K[R]) {
+  @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[T, R], kernel: K[R]) {
     val leaf = strategy.findWork[R](w, root)
     if (leaf != null) {
-      @tailrec def workAndDescend(leaf: Ptr[R]) {
+      @tailrec def workAndDescend(leaf: Ptr[T, R]) {
         val nosteals = kernel.workOn(leaf)
         if (!nosteals) {
           val subnode = strategy.chooseAsVictim[R](w.index, w.total, leaf)
@@ -225,7 +221,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  class WorkerThread[R](val root: Ptr[R], val index: Int, val total: Int, kernel: K[R]) extends Thread with Worker {
+  class WorkerThread[R](val root: Ptr[T, R], val index: Int, val total: Int, kernel: K[R]) extends Thread with Worker {
     setName("Worker: " + index)
 
     override final def run() {
@@ -233,7 +229,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  def dispatchWorkT[R](root: Ptr[R], kernel: K[R]) {
+  def dispatchWorkT[R](root: Ptr[T, R], kernel: K[R]) {
     var i = 1
     while (i < par) {
       val w = new WorkerThread[R](root, i, par, kernel)
@@ -242,7 +238,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  def joinWorkT[R](root: Ptr[R]) = {
+  def joinWorkT[R](root: Ptr[T, R]) = {
     var r = /*READ*/root.child.result
     if (r == null || r.isEmpty) root.synchronized {
       r = /*READ*/root.child.result
@@ -257,7 +253,7 @@ abstract class WorkstealingCollection[T] {
 
   val fjpool = new ForkJoinPool()
 
-  class WorkerTask[R](val root: Ptr[R], val index: Int, val total: Int, kernel: K[R]) extends RecursiveAction with Worker {
+  class WorkerTask[R](val root: Ptr[T, R], val index: Int, val total: Int, kernel: K[R]) extends RecursiveAction with Worker {
     def getName = "WorkerTask(" + index + ")"
 
     def compute() {
@@ -265,7 +261,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  def dispatchWorkFJ[R](root: Ptr[R], kernel: K[R]) {
+  def dispatchWorkFJ[R](root: Ptr[T, R], kernel: K[R]) {
     var i = 1
     while (i < par) {
       val w = new WorkerTask(root, i, par, kernel)
@@ -274,7 +270,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  def joinWorkFJ[R](root: Ptr[R]) = {
+  def joinWorkFJ[R](root: Ptr[T, R]) = {
     var r = /*READ*/root.child.result
     if (r == null || r.isEmpty) root.synchronized {
       r = /*READ*/root.child.result
@@ -285,7 +281,7 @@ abstract class WorkstealingCollection[T] {
     }
   }
 
-  abstract class Kernel[R] {
+  abstract class Kernel[@specialized(Int) S, R] {
     def repr = this.asInstanceOf[K[R]]
 
     /** Returns true if completed with no stealing.
@@ -293,7 +289,7 @@ abstract class WorkstealingCollection[T] {
      *
      *  May be overridden in subclass to specialize for better performance.
      */
-    def workOn(tree: Ptr[R]): Boolean = {
+    def workOn(tree: Ptr[S, R]): Boolean = {
       val node = /*READ*/tree.child
       var lsum = zero
       var rsum = zero
@@ -318,7 +314,7 @@ abstract class WorkstealingCollection[T] {
       }
   
       // complete node information
-      completeNode[R](lsum, rsum, tree, this)
+      completeNode[S, R](lsum, rsum, tree, this)
     }
 
     /** The neutral element of the reduction.
@@ -334,9 +330,9 @@ abstract class WorkstealingCollection[T] {
     def apply(node: N[R], chunkSize: Int): R
   }
 
-  def newRoot[R]: Ptr[R]
+  def newRoot[R]: Ptr[T, R]
 
-  def invokeParallelOperation[R](kernel: Kernel[R]): R = {
+  def invokeParallelOperation[R](kernel: Kernel[T, R]): R = {
     // create workstealing tree
     val root = newRoot[R]
     val work = root.child
@@ -362,25 +358,25 @@ abstract class WorkstealingCollection[T] {
     /** Finds work in the tree for the given worker, which is one out of `total` workers.
      *  This search may include stealing work.
      */
-    def findWork[R](worker: Worker, tree: Ptr[R]): Ptr[R]
+    def findWork[R](worker: Worker, tree: Ptr[T, R]): Ptr[T, R]
 
     /** Returns true if the worker labeled with `index` with a total of
      *  `total` workers should go left at level `level`.
      *  Returns false otherwise.
      */
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean
 
     /** Which node the stealer takes at this level. */
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R]
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R]
 
     /** Which node the victim takes at this level. */
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R]
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R]
 
   }
 
   abstract class FindFirstStrategy extends Strategy {
 
-    final def findWork[R](worker: Worker, tree: Ptr[R]): Ptr[R] = {
+    final def findWork[R](worker: Worker, tree: Ptr[T, R]): Ptr[T, R] = {
       val index = worker.index
       val total = worker.total
       val node = tree.child
@@ -417,14 +413,14 @@ abstract class WorkstealingCollection[T] {
     /** Returns true iff the worker should first go left at this level of the tree top. */
     final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = {
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
       val level = tree.level
       if (isTreeTop(total, level)) {
         chooseInTreeTop(index, level)
       } else localRandom.nextBoolean
     }
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       val level = tree.level
       if (isTreeTop(total, level)) {
         if (chooseInTreeTop(index, level)) tree.child.left
@@ -432,7 +428,7 @@ abstract class WorkstealingCollection[T] {
       } else tree.child.right
     }
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       val level = tree.level
       if (isTreeTop(total, level)) {
         if (chooseInTreeTop(index, level)) tree.child.left
@@ -448,14 +444,14 @@ abstract class WorkstealingCollection[T] {
     
     final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = {
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
       val level = tree.level
       if (isTreeTop(total, level) && tree.child.isLeaf) {
         chooseInTreeTop(index, level)
       } else localRandom.nextBoolean
     }
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       val level = tree.level
       if (isTreeTop(total, level)) {
         if (chooseInTreeTop(index, level)) tree.child.left
@@ -463,7 +459,7 @@ abstract class WorkstealingCollection[T] {
       } else tree.child.right
     }
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       val level = tree.level
       if (isTreeTop(total, level)) {
         if (chooseInTreeTop(index, level)) tree.child.left
@@ -485,17 +481,17 @@ abstract class WorkstealingCollection[T] {
       r
     }
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = {
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
       val levelmod = tree.level % log2(total)
       ((index >> levelmod) & 0x1) == 0
     }
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       if (choose(index, total, tree)) tree.child.left
       else tree.child.right
     }
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]): Ptr[R] = {
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
       if (choose(index, total, tree)) tree.child.left
       else tree.child.right
     }
@@ -504,38 +500,38 @@ abstract class WorkstealingCollection[T] {
 
   object RandomWalk extends FindFirstStrategy {
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = localRandom.nextBoolean
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = localRandom.nextBoolean
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.right
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.left
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
 
   }
 
   object RandomAll extends FindFirstStrategy {
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = localRandom.nextBoolean
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = localRandom.nextBoolean
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
 
   }
 
   object Predefined extends FindFirstStrategy {
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]): Boolean = true
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = true
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.right
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.left
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
 
   }
 
   object FindMax extends Strategy {
 
-    @tailrec def findWork[R](worker: Worker, tree: Ptr[R]) = {
-      def search(current: Ptr[R]): Ptr[R] = if (current.child.isLeaf) current else {
+    @tailrec def findWork[R](worker: Worker, tree: Ptr[T, R]) = {
+      def search(current: Ptr[T, R]): Ptr[T, R] = if (current.child.isLeaf) current else {
         val left = search(current.child.left)
         val rght = search(current.child.right)
         val leftwork = left.child.workRemaining
@@ -554,13 +550,17 @@ abstract class WorkstealingCollection[T] {
       } else null
     }
 
-    def choose[R](index: Int, total: Int, tree: Ptr[R]) = sys.error("never called")
+    def choose[R](index: Int, total: Int, tree: Ptr[T, R]) = sys.error("never called")
 
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.right
+    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
 
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[R]) = tree.child.left
+    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
 
   }
+
+  var lastroot: Ptr[_, _] = _
+  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
+  val treesizes = collection.mutable.ArrayBuffer[Int]()
 
 }
 
@@ -575,9 +575,9 @@ object WorkstealingCollection {
     def getName: String
   }
    
-  val OWNER_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_]].getDeclaredField("owner"))
-  val RESULT_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_]].getDeclaredField("result"))
-  val CHILD_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Ptr[_]].getDeclaredField("child"))
+  val OWNER_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_, _]].getDeclaredField("owner"))
+  val RESULT_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_, _]].getDeclaredField("result"))
+  val CHILD_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Ptr[_, _]].getDeclaredField("child"))
 
   trait State
 

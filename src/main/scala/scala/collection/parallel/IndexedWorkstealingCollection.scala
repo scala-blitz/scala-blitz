@@ -14,10 +14,10 @@ abstract class IndexedWorkstealingCollection[T] extends WorkstealingCollection[T
 
   def size: Int
 
-  abstract class IndexNode[R](l: Ptr[R], r: Ptr[R])(val start: Int, val end: Int, @volatile var range: Long, st: Int)
-  extends Node[R](l, r)(st) {
+  abstract class IndexNode[@specialized(Int) S, R](l: Ptr[S, R], r: Ptr[S, R])(val start: Int, val end: Int, @volatile var range: Long, st: Int)
+  extends Node[S, R](l, r)(st) {
     var padding0: Int = 0 // <-- war story
-    //var padding1: Int = 0
+    var padding1: Int = 0
     //var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
@@ -78,7 +78,7 @@ abstract class IndexedWorkstealingCollection[T] extends WorkstealingCollection[T
 
 
 object IndexedWorkstealingCollection {
-  val RANGE_OFFSET = Utils.unsafe.objectFieldOffset(classOf[IndexedWorkstealingCollection[_]#IndexNode[_]].getDeclaredField("range"))
+  val RANGE_OFFSET = Utils.unsafe.objectFieldOffset(classOf[IndexedWorkstealingCollection[_]#IndexNode[_, _]].getDeclaredField("range"))
 
   def createRange(p: Int, u: Int): Long = (p.toLong << 32) | u
 

@@ -1016,7 +1016,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     println("...::: Last tree :::...")
     val balance = lastroot.balance
     println(lastroot.toString(0))
-    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int]].reduce(_ + _))
+    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int, Int]].reduce(_ + _))
     //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
@@ -1047,7 +1047,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
       }
     }
     val coll: WorkstealingCollection[Int] = range
-    val collkernel = new coll.Kernel[Int] {
+    val collkernel = new coll.Kernel[Int, Int] {
       def zero = 0
       def combine(a: Int, b: Int) = a + b
       def apply(node: coll.N[Int], chunkSize: Int) = {
@@ -1063,8 +1063,8 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
     var i = 0
     while (i < repeats) {
-      coll.invokeParallelOperation(collkernel)
-      //range.invokeParallelOperation(rangekernel)
+      //coll.invokeParallelOperation(collkernel)
+      range.invokeParallelOperation(rangekernel)
       i += 1
     }
   }

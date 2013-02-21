@@ -19,10 +19,9 @@ class WorkstealingRange extends IndexedWorkstealingCollection[Int] {
 
   type K[R] = RangeKernel[R]
 
-  final class RangeNode[R](l: Ptr[R], r: Ptr[R])(s: Int, e: Int, rn: Long, st: Int)
-  extends IndexNode[R](l, r)(s, e, rn, st) {
+  final class RangeNode[R](l: Ptr[Int, R], r: Ptr[Int, R])(s: Int, e: Int, rn: Long, st: Int)
+  extends IndexNode[Int, R](l, r)(s, e, rn, st) {
     var lindex = start
-    var rindex = end
 
     def next(): Int = {
       val x = lindex
@@ -30,7 +29,7 @@ class WorkstealingRange extends IndexedWorkstealingCollection[Int] {
       x
     }
 
-    def newExpanded(parent: Ptr[R]): RangeNode[R] = {
+    def newExpanded(parent: Ptr[Int, R]): RangeNode[R] = {
       val r = /*READ*/range
       val p = positiveProgress(r)
       val u = until(r)
@@ -39,8 +38,8 @@ class WorkstealingRange extends IndexedWorkstealingCollection[Int] {
       val secondhalf = remaining - firsthalf
       val lnode = new RangeNode[R](null, null)(p, p + firsthalf, createRange(p, p + firsthalf), initialStep)
       val rnode = new RangeNode[R](null, null)(p + firsthalf, u, createRange(p + firsthalf, u), initialStep)
-      val lptr = new Ptr[R](parent, parent.level + 1)(lnode)
-      val rptr = new Ptr[R](parent, parent.level + 1)(rnode)
+      val lptr = new Ptr[Int, R](parent, parent.level + 1)(lnode)
+      val rptr = new Ptr[Int, R](parent, parent.level + 1)(rnode)
       val nnode = new RangeNode(lptr, rptr)(start, end, r, step)
       nnode.owner = this.owner
       nnode
@@ -48,10 +47,10 @@ class WorkstealingRange extends IndexedWorkstealingCollection[Int] {
 
   }  
 
-  abstract class RangeKernel[R] extends Kernel[R] {
+  abstract class RangeKernel[R] extends Kernel[Int, R] {
     def applyRange(from: Int, until: Int): R
 
-    override def workOn(tree: Ptr[R]): Boolean = {
+    override def workOn(tree: Ptr[Int, R]): Boolean = {
       val node = /*READ*/tree.child.repr
       var lsum = zero
       var rsum = zero
@@ -88,13 +87,13 @@ class WorkstealingRange extends IndexedWorkstealingCollection[Int] {
       }
   
       // complete node information
-      completeNode[R](lsum, rsum, tree, this)
+      completeNode[Int, R](lsum, rsum, tree, this)
     }
   }
 
   def newRoot[R] = {
     val work = new RangeNode[R](null, null)(0, size, createRange(0, size), initialStep)
-    val root = new Ptr[R](null, 0)(work)
+    val root = new Ptr[Int, R](null, 0)(work)
     root
   }
 
