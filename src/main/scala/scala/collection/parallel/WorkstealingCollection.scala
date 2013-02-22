@@ -12,17 +12,6 @@ trait WorkstealingCollection[T] {
 
   import WorkstealingCollection._
 
-  val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
-  val par = sys.props("par").toInt
-  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
-  val strategy: Strategy = strategies(sys.props("strategy"))
-  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
-  val repeats = sys.props.getOrElse("repeats", "1").toInt
-  val starterThread = sys.props("starterThread")
-  val starterCooldown = sys.props("starterCooldown").toInt
-  val invocationMethod = sys.props("invocationMethod")
-  val incrementFrequency = 1
-
   type N[R] <: Node[T, R]
 
   type K[R] <: Kernel[T, R]
@@ -48,7 +37,7 @@ trait WorkstealingCollection[T] {
       else tryOwn(thiz)
     }
 
-    final def trySteal(parent: Ptr[S, R]): Boolean = parent.expand()
+    final def trySteal(parent: AnyRef): Boolean = parent.asInstanceOf[Ptr[S, R]].expand()
 
     def workDone = 0
 
@@ -136,12 +125,12 @@ trait WorkstealingCollection[T] {
   }
 
   @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[T, R], kernel: K[R]) {
-    val leaf = strategy.findWork[R](w, root)
+    val leaf = strategy.findWork[T, R](w, root).asInstanceOf[Ptr[T, R]]
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[T, R]) {
         val nosteals = kernel.workOn(leaf)
         if (!nosteals) {
-          val subnode = strategy.chooseAsVictim[R](w.index, w.total, leaf)
+          val subnode = strategy.chooseAsVictim[T, R](w.index, w.total, leaf).asInstanceOf[Ptr[T, R]]
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
         }
       }
@@ -340,210 +329,16 @@ trait WorkstealingCollection[T] {
     root.child.result.get
   }
 
-  abstract class Strategy {
-
-    /** Finds work in the tree for the given worker, which is one out of `total` workers.
-     *  This search may include stealing work.
-     */
-    def findWork[R](worker: Worker, tree: Ptr[T, R]): Ptr[T, R]
-
-    /** Returns true if the worker labeled with `index` with a total of
-     *  `total` workers should go left at level `level`.
-     *  Returns false otherwise.
-     */
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean
-
-    /** Which node the stealer takes at this level. */
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R]
-
-    /** Which node the victim takes at this level. */
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R]
-
-  }
-
-  abstract class FindFirstStrategy extends Strategy {
-
-    final def findWork[R](worker: Worker, tree: Ptr[T, R]): Ptr[T, R] = {
-      val index = worker.index
-      val total = worker.total
-      val node = tree.child
-      if (node.isLeaf) {
-        if (node.state eq Completed) null // no further expansions
-        else {
-          // more work
-          if (node.tryOwn(worker)) tree
-          else if (node.trySteal(tree)) {
-            val subnode = chooseAsStealer(index, total, tree)
-            if (subnode.child.tryOwn(worker)) subnode
-            else findWork(worker, tree)
-          } else findWork(worker, tree)
-        }
-      } else {
-        // descend deeper
-        if (choose(index, total, tree)) {
-          val ln = findWork(worker, node.left)
-          if (ln != null) ln else findWork(worker, node.right)
-        } else {
-          val rn = findWork(worker, node.right)
-          if (rn != null) rn else findWork(worker, node.left)
-        }
-      }
-    }
-
-  }
-
-  object AssignTop extends FindFirstStrategy {
-
-    /** Returns true iff the level of the tree is such that: 2^level < total */
-    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
-    /** Returns true iff the worker should first go left at this level of the tree top. */
-    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        chooseInTreeTop(index, level)
-      } else localRandom.nextBoolean
-    }
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.right
-    }
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.left
-    }
-
-  }
-
-  object AssignTopLeaf extends FindFirstStrategy {
-
-    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
-    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
-      val level = tree.level
-      if (isTreeTop(total, level) && tree.child.isLeaf) {
-        chooseInTreeTop(index, level)
-      } else localRandom.nextBoolean
-    }
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.right
-    }
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      val level = tree.level
-      if (isTreeTop(total, level)) {
-        if (chooseInTreeTop(index, level)) tree.child.left
-        else tree.child.right
-      } else tree.child.left
-    }
-
-  }
-
-  object Assign extends FindFirstStrategy {
-
-    private def log2(x: Int) = {
-      var v = x
-      var r = -1
-      while (v != 0) {
-        r += 1
-        v = v >>> 1
-      }
-      r
-    }
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = {
-      val levelmod = tree.level % log2(total)
-      ((index >> levelmod) & 0x1) == 0
-    }
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      if (choose(index, total, tree)) tree.child.left
-      else tree.child.right
-    }
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]): Ptr[T, R] = {
-      if (choose(index, total, tree)) tree.child.left
-      else tree.child.right
-    }
-
-  }
-
-  object RandomWalk extends FindFirstStrategy {
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = localRandom.nextBoolean
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
-
-  }
-
-  object RandomAll extends FindFirstStrategy {
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = localRandom.nextBoolean
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
-
-  }
-
-  object Predefined extends FindFirstStrategy {
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]): Boolean = true
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
-
-  }
-
-  object FindMax extends Strategy {
-
-    @tailrec def findWork[R](worker: Worker, tree: Ptr[T, R]) = {
-      def search(current: Ptr[T, R]): Ptr[T, R] = if (current.child.isLeaf) current else {
-        val left = search(current.child.left)
-        val rght = search(current.child.right)
-        val leftwork = left.child.workRemaining
-        val rghtwork = rght.child.workRemaining
-        if (leftwork > rghtwork) left else rght
-      }
-
-      val max = search(tree)
-      if (max.child.workRemaining > 0) {
-        if (max.child.tryOwn(worker)) max
-        else if (max.child.trySteal(max)) {
-          val subnode = chooseAsStealer(worker.index, worker.total, max)
-          if (subnode.child.tryOwn(worker)) subnode
-          else findWork(worker, tree)
-        } else findWork(worker, tree)
-      } else null
-    }
-
-    def choose[R](index: Int, total: Int, tree: Ptr[T, R]) = sys.error("never called")
-
-    def chooseAsStealer[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.right
-
-    def chooseAsVictim[R](index: Int, total: Int, tree: Ptr[T, R]) = tree.child.left
-
-  }
+  val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
+  val par = sys.props("par").toInt
+  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
+  val strategy: Strategy = strategies(sys.props("strategy"))
+  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val starterThread = sys.props("starterThread")
+  val starterCooldown = sys.props("starterCooldown").toInt
+  val invocationMethod = sys.props("invocationMethod")
+  val incrementFrequency = 1
 
   var lastroot: Ptr[_, _] = _
   val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
@@ -583,6 +378,213 @@ object WorkstealingCollection {
   val initialStep = sys.props("step").toInt
 
   def localRandom = scala.concurrent.forkjoin.ThreadLocalRandom.current
+
+  type Tree[S, R] = WorkstealingCollection[S]#Ptr[S, R]
+
+  abstract class Strategy {
+
+    /** Finds work in the tree for the given worker, which is one out of `total` workers.
+     *  This search may include stealing work.
+     */
+    def findWork[S, R](worker: Worker, tree: Tree[S, R]): Tree[S, R]
+
+    /** Returns true if the worker labeled with `index` with a total of
+     *  `total` workers should go left at level `level`.
+     *  Returns false otherwise.
+     */
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean
+
+    /** Which node the stealer takes at this level. */
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R]
+
+    /** Which node the victim takes at this level. */
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R]
+
+  }
+
+  abstract class FindFirstStrategy extends Strategy {
+
+    final def findWork[S, R](worker: Worker, tree: Tree[S, R]) = {
+      val index = worker.index
+      val total = worker.total
+      val node = tree.child
+      if (node.isLeaf) {
+        if (node.state eq Completed) null // no further expansions
+        else {
+          // more work
+          if (node.tryOwn(worker)) tree
+          else if (node.trySteal(tree)) {
+            val subnode = chooseAsStealer(index, total, tree)
+            if (subnode.child.tryOwn(worker)) subnode
+            else findWork[S, R](worker, tree)
+          } else findWork[S, R](worker, tree)
+        }
+      } else {
+        // descend deeper
+        if (choose(index, total, tree)) {
+          val ln = findWork[S, R](worker, node.left)
+          if (ln != null) ln else findWork[S, R](worker, node.right)
+        } else {
+          val rn = findWork[S, R](worker, node.right)
+          if (rn != null) rn else findWork[S, R](worker, node.left)
+        }
+      }
+    }
+
+  }
+
+  object AssignTop extends FindFirstStrategy {
+
+    /** Returns true iff the level of the tree is such that: 2^level < total */
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    /** Returns true iff the worker should first go left at this level of the tree top. */
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        chooseInTreeTop(index, level)
+      } else localRandom.nextBoolean
+    }
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
+    }
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
+    }
+
+  }
+
+  object AssignTopLeaf extends FindFirstStrategy {
+
+    final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
+    
+    final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = {
+      val level = tree.level
+      if (isTreeTop(total, level) && tree.child.isLeaf) {
+        chooseInTreeTop(index, level)
+      } else localRandom.nextBoolean
+    }
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.right
+    }
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      val level = tree.level
+      if (isTreeTop(total, level)) {
+        if (chooseInTreeTop(index, level)) tree.child.left
+        else tree.child.right
+      } else tree.child.left
+    }
+
+  }
+
+  object Assign extends FindFirstStrategy {
+
+    private def log2(x: Int) = {
+      var v = x
+      var r = -1
+      while (v != 0) {
+        r += 1
+        v = v >>> 1
+      }
+      r
+    }
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = {
+      val levelmod = tree.level % log2(total)
+      ((index >> levelmod) & 0x1) == 0
+    }
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]): Tree[S, R] = {
+      if (choose(index, total, tree)) tree.child.left
+      else tree.child.right
+    }
+
+  }
+
+  object RandomWalk extends FindFirstStrategy {
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = localRandom.nextBoolean
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.right
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.left
+
+  }
+
+  object RandomAll extends FindFirstStrategy {
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = localRandom.nextBoolean
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]) = if (localRandom.nextBoolean) tree.child.left else tree.child.right
+
+  }
+
+  object Predefined extends FindFirstStrategy {
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]): Boolean = true
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.right
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.left
+
+  }
+
+  object FindMax extends Strategy {
+
+    @tailrec def findWork[S, R](worker: Worker, tree: Tree[S, R]) = {
+      def search(current: Tree[S, R]): Tree[S, R] = if (current.child.isLeaf) current else {
+        val left = search(current.child.left)
+        val rght = search(current.child.right)
+        val leftwork = left.child.workRemaining
+        val rghtwork = rght.child.workRemaining
+        if (leftwork > rghtwork) left else rght
+      }
+
+      val max = search(tree)
+      if (max.child.workRemaining > 0) {
+        if (max.child.tryOwn(worker)) max
+        else if (max.child.trySteal(max)) {
+          val subnode = chooseAsStealer(worker.index, worker.total, max)
+          if (subnode.child.tryOwn(worker)) subnode
+          else findWork(worker, tree)
+        } else findWork(worker, tree)
+      } else null
+    }
+
+    def choose[S, R](index: Int, total: Int, tree: Tree[S, R]) = sys.error("never called")
+
+    def chooseAsStealer[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.right
+
+    def chooseAsVictim[S, R](index: Int, total: Int, tree: Tree[S, R]) = tree.child.left
+
+  }
 
 }
 
