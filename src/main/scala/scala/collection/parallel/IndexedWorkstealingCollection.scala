@@ -83,6 +83,8 @@ trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
 
     def apply(node: N[R], chunkSize: Int) = ???
 
+    def isNotRandom = false
+
     override def workOn(tree: Ptr[S, R]): Boolean = {
       val node = /*READ*/tree.child.repr
       var lsum = zero
@@ -99,16 +101,16 @@ trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
         val u = until(currrange)
   
         if (!stolen(currrange) && !completed(currrange)) {
-          if (rand.nextBoolean) {
+          if (isNotRandom || rand.nextBoolean) {
             val newp = math.min(u, p + currstep)
             val newrange = createRange(newp, u)
-  
+
             // do some work on the left
             if (node.casRange(currrange, newrange)) lsum = combine(lsum, applyIndex(node, p, newp))
           } else {
             val newu = math.max(p, u - currstep)
             val newrange = createRange(p, newu)
-  
+
             // do some work on the right
             if (node.casRange(currrange, newrange)) rsum = combine(applyIndex(node, newu, u), rsum)
           }

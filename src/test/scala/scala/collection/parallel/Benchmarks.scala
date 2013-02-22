@@ -69,6 +69,48 @@ object Loop extends StatisticsBenchmark {
 }
 
 
+object ArrayLoop extends StatisticsBenchmark {
+
+  import Workloads._
+
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val size = sys.props("size").toInt
+  var result = 0
+  var loopstep = 1
+  val array = new Array[Int](size)
+
+  def run() {
+    var i = 0
+    while (i < repeats) {
+      val sum = kernel2(size)
+      result = sum
+      i += 1
+    }
+  }
+
+  def kernel2(sz: Int) = {
+    var i = 0
+    var sum = 0
+    val arr = array
+    while (i < sz) {
+      sum += arr(i)
+      i += 1
+    }
+    sum
+  }
+  
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+  
+}
+
+
 object IteratorLoop extends StatisticsBenchmark {
 
   import Workloads._
@@ -197,6 +239,54 @@ object StaticChunkingLoop extends StatisticsBenchmark {
     }
   }
 
+  def run() {
+    val workers = for (idx <- 0 until par) yield new Worker(idx)
+    for (w <- workers) w.start()
+    for (w <- workers) w.join()
+    workers.map(_.result).sum
+  }
+
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    printStatistics("<All>", times)
+    printStatistics("<Stable>", times.drop(5))
+
+    times
+  }
+
+}
+
+
+object StaticChunkingArrayLoop extends StatisticsBenchmark {
+
+  import Workloads._
+
+  val size = sys.props("size").toInt
+  val par = sys.props("par").toInt
+  val array = new Array[Int](size)
+
+  final class Worker(val idx: Int) extends Thread {
+    @volatile var result = 0
+    override def run() {
+      var i = 0
+      val total = size / par
+      result = kernel2(idx * total, (idx + 1) * total)
+    }
+  }
+
+  def kernel2(from: Int, until: Int) = {
+    var i = from
+    var sum = 0
+    val arr = array
+    while (i < until) {
+      val x = arr(i)
+      sum += x
+      i += 1
+    }
+    sum
+  }
+  
   def run() {
     val workers = for (idx <- 0 until par) yield new Worker(idx)
     for (w <- workers) w.start()
@@ -1018,6 +1108,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   val range = new WorkstealingRange(0 until size)
+  val array = new WorkstealingArray(new Array[Int](size))
 
   import range._
 
@@ -1082,11 +1173,26 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
         sum
       }
     }
+    val arraykernel = new array.ArrayKernel[Int, Int] {
+      def zero = 0
+      def combine(a: Int, b: Int) = a + b
+      def applyIndex(node: array.ArrayNode[Int, Int], p: Int, np: Int) = {
+        val arr = node.arr
+        var i = p
+        var sum = 0
+        while (i < np) {
+          sum += arr(i)
+          i += 1
+        }
+        sum
+      }
+    }
 
     var i = 0
     while (i < repeats) {
       //coll.invokeParallelOperation(collkernel)
-      range.invokeParallelOperation(rangekernel)
+      //range.invokeParallelOperation(rangekernel)
+      array.invokeParallelOperation(arraykernel)
       i += 1
     }
   }

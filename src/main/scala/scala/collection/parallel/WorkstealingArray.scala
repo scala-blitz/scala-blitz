@@ -47,7 +47,9 @@ class WorkstealingArray[@specialized T](val array: Array[T]) extends IndexedWork
 
   }
 
-  abstract class ArrayKernel[@specialized S, R](val arr: Array[S]) extends IndexKernel[S, R]
+  abstract class ArrayKernel[@specialized S, R] extends IndexKernel[S, R] {
+    override def isNotRandom = true
+  }
 
   def newRoot[R] = {
     val work = new ArrayNode[T, R](null, null)(array, 0, size, createRange(0, size), initialStep)
