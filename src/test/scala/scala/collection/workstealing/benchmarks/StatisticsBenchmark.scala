@@ -1,4 +1,4 @@
-package scala.collection.parallel
+package scala.collection.workstealing
 package benchmarks
 
 

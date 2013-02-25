@@ -1,4 +1,4 @@
-package scala.collection.parallel
+package scala.collection.workstealing
 
 
 
@@ -8,7 +8,9 @@ import collection._
 
 
 
-class ArrayWorkstealing[@specialized T](val array: Array[T], val config: Workstealing.Config) extends IndexedWorkstealing[T] {
+class ParArray[@specialized T](val array: Array[T], val config: Workstealing.Config)
+extends IndexedWorkstealing[T]
+with ParOperations[T] {
 
   import IndexedWorkstealing._
   import Workstealing.initialStep

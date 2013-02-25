@@ -1,14 +1,18 @@
-package scala.collection.parallel
+package scala.collection.workstealing
 
 
 
 import sun.misc.Unsafe
 import annotation.tailrec
 import collection._
+import scala.language.experimental.macros
+import scala.reflect.macros._
 
 
 
-class RangeWorkstealing(val range: Range, val config: Workstealing.Config) extends IndexedWorkstealing[Int] {
+class ParRange(val range: Range, val config: Workstealing.Config)
+extends IndexedWorkstealing[Int]
+with ParOperations[Int] {
 
   import IndexedWorkstealing._
   import Workstealing.initialStep
@@ -68,7 +72,49 @@ class RangeWorkstealing(val range: Range, val config: Workstealing.Config) exten
     root
   }
 
+  override def foreach[U](f: Int => U): Unit = macro ParRange.foreach[U]
+
 }
+
+
+object ParRange {
+
+  def foreach[U: c.WeakTypeTag](c: Context)(f: c.Expr[Int => U]): c.Expr[Unit] = {
+    import c.universe._
+
+    val prefix = c.applicationPrefix
+
+    val callee = c.Expr[Nothing](prefix)
+    val loop = reify {
+      val xs = callee.splice.asInstanceOf[ParRange]
+      xs.invokeParallelOperation(new xs.RangeKernel[Unit] {
+        def zero = ()
+        def combine(a: Unit, b: Unit) = a
+        def applyRange(node: xs.RangeNode[Unit], from: Int, to: Int, step: Int) = {
+          var i = from
+          while (i <= to) {
+            f.splice(i)
+            i += step
+          }
+        }
+        def applyRange1(node: xs.RangeNode[Unit], from: Int, to: Int) = {
+          var i = from
+          while (i <= to) {
+            f.splice(i)
+            i += 1
+          }
+        }       
+      })
+    }
+    c.inlineAndReset(loop)
+  }
+
+}
+
+
+
+
+
 
 
 

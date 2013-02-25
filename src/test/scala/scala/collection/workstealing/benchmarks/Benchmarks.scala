@@ -1,4 +1,4 @@
-package scala.collection.parallel
+package scala.collection.workstealing
 package benchmarks
 
 
@@ -1110,8 +1110,8 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
   val repeats = sys.props.getOrElse("repeats", "1").toInt
   val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
 
-  val range = new RangeWorkstealing(0 until size, Workstealing.DefaultConfig)
-  val array = new ArrayWorkstealing(new Array[Int](size), Workstealing.DefaultConfig)
+  val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+  val array = new ParArray(new Array[Int](size), Workstealing.DefaultConfig)
 
   import range._
 
