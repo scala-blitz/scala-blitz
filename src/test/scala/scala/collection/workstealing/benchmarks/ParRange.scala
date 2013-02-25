@@ -45,6 +45,20 @@ object ParRangeForeachPC extends StatisticsBenchmark {
 }
 
 
+object ParRangeFold extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    @volatile var found = false
+    range.foreach(x => if ((x & 0xfffff) == 0) found = true)
+  }
+
+}
+
+
+
 
 
 

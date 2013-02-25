@@ -79,13 +79,14 @@ with ParOperations[Int] {
 
 object ParRange {
 
+  // TODO fix case where `f` is not a literal
   def foreach[U: c.WeakTypeTag](c: Context)(f: c.Expr[Int => U]): c.Expr[Unit] = {
     import c.universe._
 
     val prefix = c.applicationPrefix
 
     val callee = c.Expr[Nothing](prefix)
-    val loop = reify {
+    val kernel = reify {
       val xs = callee.splice.asInstanceOf[ParRange]
       xs.invokeParallelOperation(new xs.RangeKernel[Unit] {
         def zero = ()
@@ -106,7 +107,7 @@ object ParRange {
         }       
       })
     }
-    c.inlineAndReset(loop)
+    c.inlineAndReset(kernel)
   }
 
 }
