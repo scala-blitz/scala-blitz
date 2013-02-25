@@ -1106,9 +1106,11 @@ object StealLoop extends StatisticsBenchmark {
 object WorkstealingSchedulerLoop extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
+  val repeats = sys.props.getOrElse("repeats", "1").toInt
+  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
 
-  val range = new WorkstealingRange(0 until size)
-  val array = new WorkstealingArray(new Array[Int](size))
+  val range = new RangeWorkstealing(0 until size, Workstealing.DefaultConfig)
+  val array = new ArrayWorkstealing(new Array[Int](size), Workstealing.DefaultConfig)
 
   import range._
 
@@ -1116,18 +1118,20 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     val times = super.runBenchmark(noTimes)
     val stabletimes = times.drop(5)
 
+    import Workstealing._
+
     if (lastroot == null) return times
 
     println("...::: Last tree :::...")
     val balance = lastroot.balance
     println(lastroot.toString(0))
-    println("result: " + lastroot.asInstanceOf[WorkstealingCollection[Int]#Ptr[Int, Int]].child.result)
+    println("result: " + lastroot.asInstanceOf[Workstealing[Int]#Ptr[Int, Int]].child.result)
     //println(balance.toList.sortBy(_._1.getName).map(p => p._1 + ": " + p._2).mkString("...::: Work balance :::...\n", "\n", ""))
     println("total: " + balance.foldLeft(0)(_ + _._2))
     println()
 
     println("...::: Statistics :::...")
-    println("strategy: " + strategy.getClass.getSimpleName)
+    println("strategy: " + Workstealing.strategy.getClass.getSimpleName)
     for ((workerindex, diffs) <- imbalance.toList.sortBy(_._1).headOption) printStatistics("<worker " + workerindex + " imbalance>", diffs.map(_.toLong).toList)
     printStatistics("<Tree size>", treesizes.map(_.toLong).toList)
     printStatistics("<All>", times)
@@ -1159,7 +1163,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
         sum
       }
     }
-    val coll: WorkstealingCollection[Int] = range
+    val coll: Workstealing[Int] = range
     val collkernel = new coll.Kernel[Int, Int] {
       def zero = 0
       def combine(a: Int, b: Int) = a + b
@@ -1203,7 +1207,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
       Thread.sleep(500)
     }
 
-    lastroot = null
+    Workstealing.lastroot = null
 
     // debugging
     /*if (debugging) {
@@ -1221,10 +1225,12 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
       println("run completed...")
     }
 
+    import Workstealing._
+
     if (lastroot == null) return
 
     val balance = lastroot.balance
-    val workmean = size / par
+    val workmean = size / Workstealing.DefaultConfig.par
     for ((w, workdone) <- balance; if w != null) {
       imbalance(w.index) += math.abs(workmean - workdone)
     }

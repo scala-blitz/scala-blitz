@@ -8,10 +8,10 @@ import collection._
 
 
 
-class WorkstealingRange(val range: Range) extends IndexedWorkstealingCollection[Int] {
+class RangeWorkstealing(val range: Range, val config: Workstealing.Config) extends IndexedWorkstealing[Int] {
 
-  import IndexedWorkstealingCollection._
-  import WorkstealingCollection.initialStep
+  import IndexedWorkstealing._
+  import Workstealing.initialStep
 
   def size = range.size
 

@@ -8,15 +8,17 @@ import collection._
 
 
 
-trait WorkstealingCollection[T] {
+trait Workstealing[T] {
 
-  import WorkstealingCollection._
+  import Workstealing._
 
   type N[R] <: Node[T, R]
 
   type K[R] <: Kernel[T, R]
 
   def size: Int
+
+  def config: Workstealing.Config
 
   abstract class Node[@specialized S, R](val left: Ptr[S, R], val right: Ptr[S, R])(@volatile var step: Int) {
     @volatile var owner: Owner = null
@@ -120,7 +122,7 @@ trait WorkstealingCollection[T] {
 
   object Invoker extends Worker {
     def index = 0
-    def total = par
+    def total = config.par
     def getName = "Invoker"
   }
 
@@ -151,8 +153,8 @@ trait WorkstealingCollection[T] {
 
   def dispatchWorkT[R](root: Ptr[T, R], kernel: K[R]) {
     var i = 1
-    while (i < par) {
-      val w = new WorkerThread[R](root, i, par, kernel)
+    while (i < config.par) {
+      val w = new WorkerThread[R](root, i, config.par, kernel)
       w.start()
       i += 1
     }
@@ -183,8 +185,8 @@ trait WorkstealingCollection[T] {
 
   def dispatchWorkFJ[R](root: Ptr[T, R], kernel: K[R]) {
     var i = 1
-    while (i < par) {
-      val w = new WorkerTask(root, i, par, kernel)
+    while (i < config.par) {
+      val w = new WorkerTask(root, i, config.par, kernel)
       fjpool.execute(w)
       i += 1
     }
@@ -213,8 +215,8 @@ trait WorkstealingCollection[T] {
       val node = /*READ*/tree.child
       var lsum = zero
       var incCount = 0
-      val incFreq = incrementFrequency
-      val ms = maxStep
+      val incFreq = config.incrementFrequency
+      val ms = config.maxStep
       var looping = true
       while (looping) {
         val currstep = /*READ*/node.step
@@ -329,25 +331,10 @@ trait WorkstealingCollection[T] {
     root.child.result.get
   }
 
-  val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
-  val par = sys.props("par").toInt
-  val inspectgc = sys.props.getOrElse("inspectgc", "false").toBoolean
-  val strategy: Strategy = strategies(sys.props("strategy"))
-  val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
-  val repeats = sys.props.getOrElse("repeats", "1").toInt
-  val starterThread = sys.props("starterThread")
-  val starterCooldown = sys.props("starterCooldown").toInt
-  val invocationMethod = sys.props("invocationMethod")
-  val incrementFrequency = 1
-
-  var lastroot: Ptr[_, _] = _
-  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
-  val treesizes = collection.mutable.ArrayBuffer[Int]()
-
 }
 
 
-object WorkstealingCollection {
+object Workstealing {
 
   type Owner = Worker
 
@@ -357,9 +344,31 @@ object WorkstealingCollection {
     def getName: String
   }
    
-  val OWNER_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_, _]].getDeclaredField("owner"))
-  val RESULT_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Node[_, _]].getDeclaredField("result"))
-  val CHILD_OFFSET = Utils.unsafe.objectFieldOffset(classOf[WorkstealingCollection[_]#Ptr[_, _]].getDeclaredField("child"))
+  val OWNER_OFFSET = Utils.unsafe.objectFieldOffset(classOf[Workstealing[_]#Node[_, _]].getDeclaredField("owner"))
+  val RESULT_OFFSET = Utils.unsafe.objectFieldOffset(classOf[Workstealing[_]#Node[_, _]].getDeclaredField("result"))
+  val CHILD_OFFSET = Utils.unsafe.objectFieldOffset(classOf[Workstealing[_]#Ptr[_, _]].getDeclaredField("child"))
+
+  trait Config {
+    def maxStep: Int
+    def incrementFrequency: Int
+    def par: Int
+  }
+
+  object DefaultConfig extends Config {
+    val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
+    val incrementFrequency = 1
+    val par = sys.props("par").toInt
+  }
+
+  val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
+  val strategy: Strategy = strategies(sys.props("strategy"))
+  val starterThread = sys.props("starterThread")
+  val starterCooldown = sys.props("starterCooldown").toInt
+  val invocationMethod = sys.props("invocationMethod")
+
+  var lastroot: Workstealing[_]#Ptr[_, _] = _
+  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until sys.props("par").toInt) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
+  val treesizes = collection.mutable.ArrayBuffer[Int]()
 
   trait State
 
@@ -379,7 +388,7 @@ object WorkstealingCollection {
 
   def localRandom = scala.concurrent.forkjoin.ThreadLocalRandom.current
 
-  type Tree[S, R] = WorkstealingCollection[S]#Ptr[S, R]
+  type Tree[S, R] = Workstealing[S]#Ptr[S, R]
 
   abstract class Strategy {
 

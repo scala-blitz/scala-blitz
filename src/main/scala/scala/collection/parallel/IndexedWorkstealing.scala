@@ -8,9 +8,9 @@ import collection._
 
 
 
-trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
+trait IndexedWorkstealing[T] extends Workstealing[T] {
 
-  import IndexedWorkstealingCollection._
+  import IndexedWorkstealing._
 
   type N[R] <: IndexNode[T, R]
 
@@ -53,9 +53,9 @@ trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
 
     final def state = {
       val range_t0 = /*READ*/range
-      if (completed(range_t0)) WorkstealingCollection.Completed
-      else if (stolen(range_t0)) WorkstealingCollection.StolenOrExpanded
-      else WorkstealingCollection.AvailableOrOwned
+      if (completed(range_t0)) Workstealing.Completed
+      else if (stolen(range_t0)) Workstealing.StolenOrExpanded
+      else Workstealing.AvailableOrOwned
     }
 
     final def advance(step: Int): Int = {
@@ -90,10 +90,10 @@ trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
       var lsum = zero
       var rsum = zero
       var incCount = 0
-      val incFreq = incrementFrequency
-      val ms = maxStep
+      val incFreq = config.incrementFrequency
+      val ms = config.maxStep
       var looping = true
-      val rand = WorkstealingCollection.localRandom
+      val rand = Workstealing.localRandom
       while (looping) {
         val currstep = /*READ*/node.step
         val currrange = /*READ*/node.range
@@ -189,8 +189,8 @@ trait IndexedWorkstealingCollection[T] extends WorkstealingCollection[T] {
 }
 
 
-object IndexedWorkstealingCollection {
-  val RANGE_OFFSET = Utils.unsafe.objectFieldOffset(classOf[IndexedWorkstealingCollection[_]#IndexNode[_, _]].getDeclaredField("range"))
+object IndexedWorkstealing {
+  val RANGE_OFFSET = Utils.unsafe.objectFieldOffset(classOf[IndexedWorkstealing[_]#IndexNode[_, _]].getDeclaredField("range"))
 
   def createRange(p: Int, u: Int): Long = (p.toLong << 32) | u
 

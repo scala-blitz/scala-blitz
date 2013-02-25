@@ -8,10 +8,10 @@ import collection._
 
 
 
-class WorkstealingArray[@specialized T](val array: Array[T]) extends IndexedWorkstealingCollection[T] {
+class ArrayWorkstealing[@specialized T](val array: Array[T], val config: Workstealing.Config) extends IndexedWorkstealing[T] {
 
-  import IndexedWorkstealingCollection._
-  import WorkstealingCollection.initialStep
+  import IndexedWorkstealing._
+  import Workstealing.initialStep
 
   val size = sys.props("size").toInt
 
