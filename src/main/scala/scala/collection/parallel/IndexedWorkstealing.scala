@@ -29,7 +29,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
 
     override def workDone = positiveProgress(range) - start + end - until(range)
 
-    override def nodeString = "[%.2f%%] RangeNode(%s)(%d, %d, %d, %d, %d)(lres = %s, res = %s) #%d".format(
+    override def nodeString = "[%.2f%%] IndexNode(%s)(%d, %d, %d, %d, %d)(lres = %s, res = %s) #%d".format(
       (positiveProgress(range) - start + end - until(range)).toDouble / size * 100,
       if (owner == null) "none" else "worker " + owner.index,
       start,

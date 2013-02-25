@@ -13,7 +13,7 @@ class ArrayWorkstealing[@specialized T](val array: Array[T], val config: Workste
   import IndexedWorkstealing._
   import Workstealing.initialStep
 
-  val size = sys.props("size").toInt
+  def size = array.length
 
   type N[R] = ArrayNode[T, R]
 

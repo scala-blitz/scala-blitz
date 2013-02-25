@@ -1,4 +1,5 @@
 package scala.collection.parallel
+package benchmarks
 
 
 

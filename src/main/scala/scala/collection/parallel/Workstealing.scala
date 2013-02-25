@@ -127,12 +127,12 @@ trait Workstealing[T] {
   }
 
   @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[T, R], kernel: K[R]) {
-    val leaf = strategy.findWork[T, R](w, root).asInstanceOf[Ptr[T, R]]
+    val leaf = config.strategy.findWork[T, R](w, root).asInstanceOf[Ptr[T, R]]
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[T, R]) {
         val nosteals = kernel.workOn(leaf)
         if (!nosteals) {
-          val subnode = strategy.chooseAsVictim[T, R](w.index, w.total, leaf).asInstanceOf[Ptr[T, R]]
+          val subnode = config.strategy.chooseAsVictim[T, R](w.index, w.total, leaf).asInstanceOf[Ptr[T, R]]
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
         }
       }
@@ -326,7 +326,7 @@ trait Workstealing[T] {
     // about to complete work
     joinWorkFJ(root)
 
-    lastroot = root
+    if (debugMode) lastroot = root
 
     root.child.result.get
   }
@@ -352,23 +352,21 @@ object Workstealing {
     def maxStep: Int
     def incrementFrequency: Int
     def par: Int
+    def strategy: Strategy
   }
 
   object DefaultConfig extends Config {
     val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
     val incrementFrequency = 1
     val par = sys.props("par").toInt
+    val strategy: Strategy = strategies(sys.props("strategy"))
   }
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
-  val strategy: Strategy = strategies(sys.props("strategy"))
-  val starterThread = sys.props("starterThread")
-  val starterCooldown = sys.props("starterCooldown").toInt
-  val invocationMethod = sys.props("invocationMethod")
-
   var lastroot: Workstealing[_]#Ptr[_, _] = _
   val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until sys.props("par").toInt) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
   val treesizes = collection.mutable.ArrayBuffer[Int]()
+  var debugMode = sys.props("debug").toBoolean
 
   trait State
 

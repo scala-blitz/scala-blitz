@@ -1,4 +1,5 @@
 package scala.collection.parallel
+package benchmarks
 
 
 
@@ -1131,7 +1132,7 @@ object WorkstealingSchedulerLoop extends StatisticsBenchmark {
     println()
 
     println("...::: Statistics :::...")
-    println("strategy: " + Workstealing.strategy.getClass.getSimpleName)
+    println("strategy: " + Workstealing.DefaultConfig.strategy.getClass.getSimpleName)
     for ((workerindex, diffs) <- imbalance.toList.sortBy(_._1).headOption) printStatistics("<worker " + workerindex + " imbalance>", diffs.map(_.toLong).toList)
     printStatistics("<Tree size>", treesizes.map(_.toLong).toList)
     printStatistics("<All>", times)
