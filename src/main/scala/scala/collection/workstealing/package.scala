@@ -39,15 +39,15 @@ package object workstealing {
                 Block(paramVals, Block(paramVals2, body))
               }
 
-              prefix match {
+              def nestedFunction2Block(t: Tree): Tree = t match {
                 case Function(params, body) =>
                   function2block(params, body)
-                case Block(stats, Function(params, body)) =>
-                  // TODO generalize for arbitrary number of nested blocks
-                  function2block(params, body)
+                case Block(stats, t2) =>
+                  Block(stats, nestedFunction2Block(t2))
                 case x =>
                   ap
               }
+              nestedFunction2Block(prefix)
             case _ =>
               super.transform(tree)
           }
@@ -57,10 +57,34 @@ package object workstealing {
       inliner.transform(tree)
     }
 
-    def applicationPrefix = c.macroApplication match {
+    /** Returns the selection prefix of the current macro application.
+     */
+    def applyPrefix = c.macroApplication match {
       case Apply(TypeApply(Select(prefix, name), targs), args) =>
         prefix
+      case Apply(Apply(TypeApply(Select(prefix, name), targs), args1), args2) =>
+        prefix
+      case Apply(Apply(Apply(TypeApply(Select(prefix, name), targs), args1), args2), args3) =>
+        prefix
+      case Apply(Select(prefix, name), args) =>
+        prefix
     }
+
+    /** Used to generate a local val for a function expression,
+     *  so that the function value is created only once.
+     * 
+     *  If `f` is a function literal, returns the literal.
+     *  Otherwise, stores the function literal to a local value
+     *  and returns a pair of the local value definition and an ident tree.
+     */
+    def functionExpr2Local[F](f: c.Expr[F]) = f.tree match {
+      case Function(_, _) =>
+        (c.Expr[Unit](EmptyTree), c.Expr[F](f.tree))
+      case _ =>
+        val localname = newTermName("localf$0")
+        (c.Expr[Unit](ValDef(Modifiers(), localname, TypeTree(), f.tree)), c.Expr[F](Ident(localname)))
+    }
+
   }
 
 }

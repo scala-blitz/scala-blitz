@@ -10,7 +10,7 @@ import collection._
 
 class ParArray[@specialized T](val array: Array[T], val config: Workstealing.Config)
 extends IndexedWorkstealing[T]
-with ParOperations[T] {
+with ParIterableOperations[T] {
 
   import IndexedWorkstealing._
   import Workstealing.initialStep
