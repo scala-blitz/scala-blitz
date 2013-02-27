@@ -70,6 +70,12 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
       }
     }
 
+    final def markCompleted(): Boolean = {
+      val range_t0 = /*READ*/range
+      if (completed(range_t0) || stolen(range_t0)) false
+      else casRange(range_t0, createCompleted(range_t0))
+    }
+
     final def markStolen(): Boolean = {
       val range_t0 = /*READ*/range
       if (completed(range_t0) || stolen(range_t0)) false
@@ -86,7 +92,8 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
     def isNotRandom = false
 
     override def workOn(tree: Ptr[S, R]): Boolean = {
-      val node = /*READ*/tree.child.repr
+      val rawn = /*READ*/tree.child
+      val node = rawn.repr
       var lsum = zero
       var rsum = zero
       var incCount = 0
@@ -94,7 +101,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
       val ms = config.maxStep
       var looping = true
       val rand = Workstealing.localRandom
-      while (looping) {
+      while (looping && notTerminated) {
         val currstep = /*READ*/node.step
         val currrange = /*READ*/node.range
         val p = progress(currrange)
@@ -120,7 +127,9 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
           if (incCount == 0) node.step = /*WRITE*/math.min(ms, currstep * 2)
         } else looping = false
       }
-  
+
+      completeIteration(rawn)
+
       // complete node information
       completeNode(lsum, rsum, tree)
     }
@@ -144,7 +153,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
         //val work = tree.child
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         false
-      } else sys.error("unreachable: " + range_t0 + ", " + work.toString(0))
+      } else sys.error("unreachable: " + progress(range_t0) + ", " + until(range_t0) + ", " + work.state + ", " + work.toString(0))
   
       // push result up as far as possible
       pushUp(tree)
@@ -221,6 +230,13 @@ object IndexedWorkstealing {
     val u = until(r)
     val stolenp = -p - 1
     createRange(stolenp, u)
+  }
+
+  def createCompleted(r: Long): Long = {
+    val p = progress(r)
+    val u = until(r)
+    val completedp = u
+    createRange(completedp, u)
   }
 }
 

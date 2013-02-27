@@ -68,6 +68,8 @@ trait Workstealing[T] {
 
     def next(): S
 
+    def markCompleted(): Boolean
+
     def markStolen(): Boolean
 
   }
@@ -204,6 +206,14 @@ trait Workstealing[T] {
   }
 
   abstract class Kernel[@specialized S, R] {
+    @volatile protected var notTermFlag = true
+
+    /** Contains `false` if the operation can complete before all the elements have been processed.
+     *  This is useful for methods like `find`, `forall` and `exists`, as well as methods in which
+     *  the argument function can throw an exception.
+     */
+    def notTerminated = notTermFlag
+
     def repr = this.asInstanceOf[K[R]]
 
     /** Returns true if completed with no stealing.
@@ -218,7 +228,7 @@ trait Workstealing[T] {
       val incFreq = config.incrementFrequency
       val ms = config.maxStep
       var looping = true
-      while (looping) {
+      while (looping && notTerminated) {
         val currstep = /*READ*/node.step
         val currstate = /*READ*/node.state
   
@@ -233,14 +243,27 @@ trait Workstealing[T] {
           if (incCount == 0) node.step = /*WRITE*/math.min(ms, currstep * 2)
         } else looping = false
       }
-  
+
+      completeIteration(node)
+
       // complete node information
       completeNode(lsum, tree)
     }
 
+    protected final def completeIteration(node: Node[S, R]) {
+      // if completion was early, complete iteration
+      if (!notTerminated) {
+        var state = node.state
+        while (state eq AvailableOrOwned) {
+          node.markCompleted()
+          state = node.state
+        }
+      }
+    }
+
     private def completeNode(lsum: R, tree: Ptr[S, R]): Boolean = {
       val work = tree.child
-  
+
       val state_t0 = work.state
       val wasCompleted = if (state_t0 eq Completed) {
         work.lresult = lsum

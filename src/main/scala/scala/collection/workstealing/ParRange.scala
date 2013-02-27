@@ -86,6 +86,17 @@ with ParIterableOperations[Int] {
 
   override def count(p: Int => Boolean): Int = macro ParRange.count
 
+  // TODO fix when macros with generated bridges are fixed
+  //override def min[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.min[U]
+
+  //override def max[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.max[U]
+
+  override def find(p: Int => Boolean): Option[Int] = macro ParRange.find
+
+  override def forall(p: Int => Boolean): Boolean = macro ParRange.forall
+
+  override def exists(p: Int => Boolean): Boolean = macro ParRange.exists
+
 }
 
 
@@ -268,6 +279,86 @@ object ParRange {
     }
     aggregate[Int](c)(zero)(combop)(seqop)
   }
+
+  def min[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]]): c.Expr[Int] = {
+    import c.universe._
+
+    val op = reify {
+     (x: Int, y: Int) => if (ord.splice.compare(x, y) <= 0) x else y
+    }
+    reduce[Int](c)(op)
+  }
+
+  def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]]): c.Expr[Int] = {
+    import c.universe._
+
+    val op = reify {
+      (x: Int, y: Int) => if (ord.splice.compare(x, y) >= 0) x else y
+    }
+    reduce[Int](c)(op)
+  }
+
+  def find(c: Context)(p: c.Expr[Int => Boolean]): c.Expr[Option[Int]] = {
+    import c.universe._
+
+    val (lv, pred) = c.functionExpr2Local[Int => Boolean](p)
+    val callee = c.Expr[Nothing](c.applyPrefix)
+    val kernel = reify {
+      lv.splice
+      val xs = callee.splice.asInstanceOf[ParRange]
+      xs.invokeParallelOperation(new xs.RangeKernel[Option[Int]] {
+        def zero = None
+        def combine(a: Option[Int], b: Option[Int]) = if (a.nonEmpty) a else b
+        def applyRange(node: xs.RangeNode[Option[Int]], from: Int, to: Int, step: Int) = {
+          var found: Option[Int] = None
+          var i = from
+          while (i <= to) {
+            if (pred.splice(i)) {
+              found = Some(i)
+              notTermFlag = false
+              i = to + 1
+            } else i += step
+          }
+          found
+        }
+        def applyRange1(node: xs.RangeNode[Option[Int]], from: Int, to: Int) = {
+          var found: Option[Int] = None
+          var i = from
+          while (i <= to) {
+            if (pred.splice(i)) {
+              found = Some(i)
+              notTermFlag = false
+              i = to + 1
+            } else i += 1
+          }
+          found
+        }
+      })
+    }
+    c.inlineAndReset(kernel)
+  }
+
+  def forall(c: Context)(p: c.Expr[Int => Boolean]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val np = reify {
+      (x: Int) => !p.splice(x)
+    }
+    val found = find(c)(np)
+    reify {
+      found.splice.isEmpty
+    }
+  }
+
+  def exists(c: Context)(p: c.Expr[Int => Boolean]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val found = find(c)(p)
+    reify {
+      found.splice.nonEmpty
+    }
+  }
+
 }
 
 

@@ -25,7 +25,15 @@ trait ParIterableOperations[T] {
 
   def min[U >: T](implicit ord: Ordering[U]): T = macro ParIterableOperations.min[T, U]
 
-  //def max[U >: T](implicit ord: Ordering[U]): T = macro ParIterableOperations.max[T, U]
+  def max[U >: T](implicit ord: Ordering[U]): T = macro ParIterableOperations.max[T, U]
+
+  def find(p: T => Boolean): Option[T] = macro ParIterableOperations.find[T]
+
+  def forall(p: T => Boolean): Boolean = macro ParIterableOperations.forall[T]
+
+  def exists(p: T => Boolean): Boolean = macro ParIterableOperations.exists[T]
+
+  //def copyToArray[U >: T](xs: Array[U], start: Int, len: Int): Unit = macro ParIterableOperations.copyToArray[T, U]
 
 }
 
@@ -143,6 +151,7 @@ object ParIterableOperations {
     c.inlineAndReset(kernel)
   }
 
+  // TODO fix these methods to store arguments in a local when necessary
   def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]]): c.Expr[U] = {
     import c.universe._
 
@@ -188,6 +197,73 @@ object ParIterableOperations {
       (x: T, y: T) => if (ord.splice.compare(x, y) <= 0) x else y
     }
     reduce[T, T](c)(op)
+  }
+
+  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]]): c.Expr[T] = {
+    import c.universe._
+
+    val op = reify {
+      (x: T, y: T) => if (ord.splice.compare(x, y) >= 0) x else y
+    }
+    reduce[T, T](c)(op)
+  }
+
+  def find[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Option[T]] = {
+    import c.universe._
+
+    val (lv, pred) = c.functionExpr2Local[T => Boolean](p)
+    val callee = c.Expr[Nothing](c.applyPrefix)
+    val kernel = reify {
+      lv.splice
+      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      xs.invokeParallelOperation(new xs.Kernel[T, Option[T]] {
+        def zero = None
+        def combine(a: Option[T], b: Option[T]) = if (a.nonEmpty) a else b
+        def apply(node: xs.N[Option[T]], chunkSize: Int) = {
+          var left = chunkSize
+          var found: Option[T] = None
+          while (left > 0) {
+            val elem = node.next()
+            if (pred.splice(elem)) {
+              found = Some(elem)
+              notTermFlag = false
+              left = 0
+            }
+            left -= 1
+          }
+          found
+        }
+      })
+    }
+    c.inlineAndReset(kernel)
+  }
+
+  def forall[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val np = reify {
+      (x: T) => !p.splice(x)
+    }
+    val found = find[T](c)(np)
+    reify {
+      found.splice.isEmpty
+    }
+  }
+
+  def exists[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val found = find[T](c)(p)
+    reify {
+      found.splice.nonEmpty
+    }
+  }
+
+  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(xs: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
+    import c.universe._
+
+    // TODO
+    null
   }
 
 }

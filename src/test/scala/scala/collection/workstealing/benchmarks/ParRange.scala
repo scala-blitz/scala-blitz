@@ -225,6 +225,82 @@ object ParRangeCountPC extends StatisticsBenchmark {
 }
 
 
+object ParRangeFind extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  var i = 1
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.find(x => 10 * x < 0)
+  }
+
+}
+
+
+object ParRangeFindGeneric extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  var i = 1
+
+  def run() {
+    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.find(x => 10 * x < 0)
+  }
+
+}
+
+
+object ParRangeFindPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+
+  def run() {
+    val range = (0 until size).par
+    range.find(x => 10 * x < 0)
+  }
+
+}
+
+
+object ParRangeFindEarly extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  var i = 1
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.find(x => x % 50000000 == 12000000)
+  }
+
+}
+
+
+object ParRangeFindEarlyGeneric extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  var i = 1
+
+  def run() {
+    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.find(x => x % 50000000 == 12000000)
+  }
+
+}
+
+
+object ParRangeFindEarlyPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+
+  def run() {
+    val range = (0 until size).par
+    range.find(x => x % 50000000 == 25000000)
+  }
+
+}
+
+
 
 
 

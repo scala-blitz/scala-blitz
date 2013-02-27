@@ -4,7 +4,7 @@ package scala.collection
 
 import sun.misc.Unsafe
 import scala.language.experimental.macros
-import scala.reflect.macros._
+import scala.reflect.macros.Context
 
 
 

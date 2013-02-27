@@ -10,10 +10,10 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     name := "workstealing",
     version := "0.1",
-    scalaVersion := "2.10.0-RC3",
+    scalaVersion := "2.10.0",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % "2.10.0-RC3"
+      "org.scala-lang" % "scala-reflect" % "2.10.0"
     )
   )
 }
