@@ -89,6 +89,7 @@ with ParIterableOperations[Int] {
   // TODO fix when macros with generated bridges are fixed
   //override def min[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.min[U]
 
+  // TODO fix when macros with generated bridges are fixed
   //override def max[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.max[U]
 
   override def find(p: Int => Boolean): Option[Int] = macro ParRange.find
@@ -200,7 +201,7 @@ object ParRange {
           sum
         }
       })
-      if (rs == ParIterableOperations.nil) throw new UnsupportedOperationException
+      if (rs == ParIterableOperations.nil) throw new java.lang.UnsupportedOperationException
       else rs.asInstanceOf[U]
     }
     c.inlineAndReset(kernel)

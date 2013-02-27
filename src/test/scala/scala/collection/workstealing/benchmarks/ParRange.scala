@@ -266,7 +266,6 @@ object ParRangeFindPC extends StatisticsBenchmark {
 object ParRangeFindEarly extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
-  var i = 1
 
   def run() {
     val range = new ParRange(0 until size, Workstealing.DefaultConfig)
@@ -279,7 +278,6 @@ object ParRangeFindEarly extends StatisticsBenchmark {
 object ParRangeFindEarlyGeneric extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
-  var i = 1
 
   def run() {
     val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
@@ -295,7 +293,46 @@ object ParRangeFindEarlyPC extends StatisticsBenchmark {
 
   def run() {
     val range = (0 until size).par
-    range.find(x => x % 50000000 == 25000000)
+    range.find(x => x % 50000000 == 12000000)
+  }
+
+}
+
+
+object ParRangeCopyToArray extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.copyToArray(arr, 0, arr.length)
+  }
+
+}
+
+
+object ParRangeCopyToArrayGeneric extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.copyToArray(arr, 0, arr.length)
+  }
+
+}
+
+
+object ParRangeCopyToArrayPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = (0 until size).par
+    range.copyToArray(arr, 0, arr.length)
   }
 
 }

@@ -33,7 +33,7 @@ trait ParIterableOperations[T] {
 
   def exists(p: T => Boolean): Boolean = macro ParIterableOperations.exists[T]
 
-  //def copyToArray[U >: T](xs: Array[U], start: Int, len: Int): Unit = macro ParIterableOperations.copyToArray[T, U]
+  def copyToArray[U >: T](arr: Array[U], start: Int, len: Int): Unit = macro ParIterableOperations.copyToArray[T, U]
 
 }
 
@@ -118,7 +118,7 @@ object ParIterableOperations {
           }
         }
       })
-      if (rs == ParIterableOperations.nil) throw new UnsupportedOperationException
+      if (rs == ParIterableOperations.nil) throw new java.lang.UnsupportedOperationException
       else rs.asInstanceOf[U]
     }
     c.inlineAndReset(kernel)
@@ -259,11 +259,34 @@ object ParIterableOperations {
     }
   }
 
-  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(xs: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
+  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
 
-    // TODO
-    null
+    val callee = c.Expr[Nothing](c.applyPrefix)
+    val kernel = reify {
+      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      xs.invokeParallelOperation(new xs.Kernel[T, Int] {
+        private def mathmin(a: Int, b: Int) = if (a < b) a else b
+        override def afterExpand(tree: xs.Node[T, Int]) {
+          // TODO inspect the remaining work on the left and on the right and set lresult
+        }
+        def zero = -1
+        def combine(a: Int, b: Int) = -1
+        def apply(node: xs.N[Int], chunkSize: Int) = {
+          var i = node.lresult
+          var left = mathmin(i + chunkSize, mathmin(arr.splice.length, start.splice + len.splice))
+          while (left > 0) {
+            arr.splice(i) = node.next()
+            left -= 1
+            i += 1
+          }
+          node.lresult = i
+          i
+        }
+      })
+      ()
+    }
+    c.inlineAndReset(kernel)
   }
 
 }

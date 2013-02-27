@@ -39,7 +39,7 @@ trait Workstealing[T] {
       else tryOwn(thiz)
     }
 
-    final def trySteal(parent: AnyRef): Boolean = parent.asInstanceOf[Ptr[S, R]].expand()
+    final def trySteal(parent: AnyRef, kernel: AnyRef): Boolean = parent.asInstanceOf[Ptr[S, R]].expand(kernel.asInstanceOf[Kernel[S, R]])
 
     def workDone = 0
 
@@ -81,7 +81,7 @@ trait Workstealing[T] {
     /** Try to expand node and return true if node was expanded.
      *  Return false if node was completed.
      */
-    @tailrec def expand(): Boolean = {
+    @tailrec def expand(kernel: Kernel[S, R]): Boolean = {
       val child_t0 = /*READ*/child
       if (!child_t0.isLeaf) true else { // already expanded
         // first set progress to -progress
@@ -89,13 +89,14 @@ trait Workstealing[T] {
         if (state_t1 eq Completed) false // already completed
         else {
           if (state_t1 ne StolenOrExpanded) {
-            if (child_t0.markStolen()) expand() // marked stolen - now move on to node creation
-            else expand() // wasn't marked stolen and failed marking stolen - retry
+            if (child_t0.markStolen()) expand(kernel) // marked stolen - now move on to node creation
+            else expand(kernel) // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
             val expanded = child_t0.newExpanded(this)
+            kernel.afterExpand(expanded)
             if (casChild(child_t0, expanded)) true // try to replace with expansion
-            else expand() // failure (spurious or due to another expand) - retry
+            else expand(kernel) // failure (spurious or due to another expand) - retry
           }
         }
       }
@@ -129,7 +130,7 @@ trait Workstealing[T] {
   }
 
   @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[T, R], kernel: K[R]) {
-    val leaf = config.strategy.findWork[T, R](w, root).asInstanceOf[Ptr[T, R]]
+    val leaf = config.strategy.findWork[T, R](w, root, kernel).asInstanceOf[Ptr[T, R]]
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[T, R]) {
         val nosteals = kernel.workOn(leaf)
@@ -211,10 +212,26 @@ trait Workstealing[T] {
     /** Contains `false` if the operation can complete before all the elements have been processed.
      *  This is useful for methods like `find`, `forall` and `exists`, as well as methods in which
      *  the argument function can throw an exception.
+     *
+     *  By default it returns the state of the `notTermFlag` that kernel implementations may set.
      */
     def notTerminated = notTermFlag
 
     def repr = this.asInstanceOf[K[R]]
+
+    /** Initializes the workstealing tree node.
+     *
+     *  By default does nothing, but some kernels may choose to override this default behaviour
+     *  to store operation-specific information into the node.
+     */
+    def beforeWorkOn(tree: Ptr[S, R]) {}
+
+    /** Initializes a node that has just been expanded.
+     * 
+     *  By default does nothing, but some kernels may choose to override this default behaviour
+     *  to store operation-specific information into the node.
+     */
+    def afterExpand(tree: Node[S, R]) {}
 
     /** Returns true if completed with no stealing.
      *  Returns false if steal occurred.
@@ -222,6 +239,8 @@ trait Workstealing[T] {
      *  May be overridden in subclass to specialize for better performance.
      */
     def workOn(tree: Ptr[S, R]): Boolean = {
+      beforeWorkOn(tree)
+
       val node = /*READ*/tree.child
       var lsum = zero
       var incCount = 0
@@ -250,14 +269,16 @@ trait Workstealing[T] {
       completeNode(lsum, tree)
     }
 
+    /** Completes the iteration in the node.
+     * 
+     *  Some parallel operations do not traverse all the elements in a chunk or a node. The purpose of this
+     *  method is to bring the node into a Completed or Stolen state before proceeding.
+     */
     protected final def completeIteration(node: Node[S, R]) {
-      // if completion was early, complete iteration
-      if (!notTerminated) {
-        var state = node.state
-        while (state eq AvailableOrOwned) {
-          node.markCompleted()
-          state = node.state
-        }
+      var state = node.state
+      while (state eq AvailableOrOwned) {
+        node.markCompleted()
+        state = node.state
       }
     }
 
@@ -272,7 +293,7 @@ trait Workstealing[T] {
         true
       } else if (state_t0 eq StolenOrExpanded) {
         // help expansion if necessary
-        if (tree.child.isLeaf) tree.expand()
+        if (tree.child.isLeaf) tree.expand(this)
         tree.child.lresult = lsum
         while (tree.child.result == null) tree.child.casResult(null, None)
         //val work = tree.child
@@ -411,12 +432,14 @@ object Workstealing {
 
   type Tree[S, R] = Workstealing[S]#Ptr[S, R]
 
+  type Kernel[S, R] = Workstealing[S]#Kernel[S, R]
+
   abstract class Strategy {
 
     /** Finds work in the tree for the given worker, which is one out of `total` workers.
      *  This search may include stealing work.
      */
-    def findWork[S, R](worker: Worker, tree: Tree[S, R]): Tree[S, R]
+    def findWork[S, R](worker: Worker, tree: Tree[S, R], kernel: Kernel[S, R]): Tree[S, R]
 
     /** Returns true if the worker labeled with `index` with a total of
      *  `total` workers should go left at level `level`.
@@ -434,7 +457,7 @@ object Workstealing {
 
   abstract class FindFirstStrategy extends Strategy {
 
-    final def findWork[S, R](worker: Worker, tree: Tree[S, R]) = {
+    final def findWork[S, R](worker: Worker, tree: Tree[S, R], kernel: Kernel[S, R]) = {
       val index = worker.index
       val total = worker.total
       val node = tree.child
@@ -443,20 +466,20 @@ object Workstealing {
         else {
           // more work
           if (node.tryOwn(worker)) tree
-          else if (node.trySteal(tree)) {
+          else if (node.trySteal(tree, kernel)) {
             val subnode = chooseAsStealer(index, total, tree)
             if (subnode.child.tryOwn(worker)) subnode
-            else findWork[S, R](worker, tree)
-          } else findWork[S, R](worker, tree)
+            else findWork[S, R](worker, tree, kernel)
+          } else findWork[S, R](worker, tree, kernel)
         }
       } else {
         // descend deeper
         if (choose(index, total, tree)) {
-          val ln = findWork[S, R](worker, node.left)
-          if (ln != null) ln else findWork[S, R](worker, node.right)
+          val ln = findWork[S, R](worker, node.left, kernel)
+          if (ln != null) ln else findWork[S, R](worker, node.right, kernel)
         } else {
-          val rn = findWork[S, R](worker, node.right)
-          if (rn != null) rn else findWork[S, R](worker, node.left)
+          val rn = findWork[S, R](worker, node.right, kernel)
+          if (rn != null) rn else findWork[S, R](worker, node.left, kernel)
         }
       }
     }
@@ -588,7 +611,7 @@ object Workstealing {
 
   object FindMax extends Strategy {
 
-    @tailrec def findWork[S, R](worker: Worker, tree: Tree[S, R]) = {
+    @tailrec def findWork[S, R](worker: Worker, tree: Tree[S, R], kernel: Kernel[S, R]) = {
       def search(current: Tree[S, R]): Tree[S, R] = if (current.child.isLeaf) current else {
         val left = search(current.child.left)
         val rght = search(current.child.right)
@@ -600,11 +623,11 @@ object Workstealing {
       val max = search(tree)
       if (max.child.workRemaining > 0) {
         if (max.child.tryOwn(worker)) max
-        else if (max.child.trySteal(max)) {
+        else if (max.child.trySteal(max, kernel)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)
           if (subnode.child.tryOwn(worker)) subnode
-          else findWork(worker, tree)
-        } else findWork(worker, tree)
+          else findWork(worker, tree, kernel)
+        } else findWork(worker, tree, kernel)
       } else null
     }
 
