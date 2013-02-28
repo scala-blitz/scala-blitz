@@ -286,7 +286,6 @@ object ParIterableOperations {
           node.left.child.lresult = new Status(leftarrstart, leftarrstart)
           node.right.child.lresult = new Status(rightarrstart, rightarrstart)
         }
-        override def storeLResult(node: xs.Node[T, Status], res: Status) {}
         def zero = null
         def combine(a: Status, b: Status) = null
         def apply(node: xs.N[Status], chunkSize: Int) = {

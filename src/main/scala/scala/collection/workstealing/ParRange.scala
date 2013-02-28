@@ -369,42 +369,54 @@ object ParRange {
   def copyToArray[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
 
-    null
-//    val callee = c.Expr[Nothing](c.applyPrefix)
-//    val kernel = reify {
-//      val xs = callee.splice.asInstanceOf[Workstealing[T]]
-//      xs.invokeParallelOperation(new xs.Kernel[T, ParIterableOperations.CopyToArrayStatus] {
-//        type Status = ParIterableOperations.CopyToArrayStatus
-//        private def mathmin(a: Int, b: Int) = if (a < b) a else b
-//        override def afterCreateRoot(root: xs.Ptr[T, Status]) {
-//          root.child.lresult = new Status(start.splice, start.splice)
-//        }
-//        override def afterExpand(old: xs.Node[T, Status], node: xs.Node[T, Status]) {
-//          val completed = node.elementsCompleted
-//          val arrstart = old.lresult.arrayStart + completed
-//          val leftarrstart = arrstart
-//          val rightarrstart = arrstart + node.left.child.elementsRemaining
-//
-//          node.left.child.lresult = new Status(leftarrstart, leftarrstart)
-//          node.right.child.lresult = new Status(rightarrstart, rightarrstart)
-//        }
-//        override def storeLResult(node: xs.Node[T, Status], res: Status) {}
-//        def zero = null
-//        def combine(a: Status, b: Status) = null
-//        def apply(node: xs.N[Status], chunkSize: Int) = {
-//          var i = node.lresult.arrayProgress
-//          var limit = mathmin(i + chunkSize, mathmin(arr.splice.length, start.splice + len.splice))
-//          while (i < limit) {
-//            arr.splice(i) = node.next()
-//            i += 1
-//          }
-//          node.lresult.arrayProgress = i
-//          null
-//        }
-//      })
-//      ()
-//    }
-//    c.inlineAndReset(kernel)
+    val callee = c.Expr[Nothing](c.applyPrefix)
+    val kernel = reify {
+      val xs = callee.splice.asInstanceOf[ParRange]
+      xs.invokeParallelOperation(new xs.RangeKernel[ParIterableOperations.CopyToArrayStatus] {
+        type Status = ParIterableOperations.CopyToArrayStatus
+        private def mathmin(a: Int, b: Int) = if (a < b) a else b
+        override def afterCreateRoot(root: xs.Ptr[Int, Status]) {
+          root.child.lresult = new Status(start.splice, start.splice)
+        }
+        override def afterExpand(old: xs.Node[Int, Status], node: xs.Node[Int, Status]) {
+          val completed = node.elementsCompleted
+          val arrstart = old.lresult.arrayStart + completed
+          val leftarrstart = arrstart
+          val rightarrstart = arrstart + node.left.child.elementsRemaining
+
+          node.left.child.lresult = new Status(leftarrstart, leftarrstart)
+          node.right.child.lresult = new Status(rightarrstart, rightarrstart)
+        }
+        def zero = null
+        def combine(a: Status, b: Status) = null
+        def applyRange(node: xs.RangeNode[Status], from: Int, to: Int, step: Int) = {
+          var i = node.lresult.arrayProgress
+          var limit = mathmin(i + (to - from) + 1, mathmin(arr.splice.length, start.splice + len.splice))
+          var j = from
+          while (i < limit) {
+            arr.splice(i) = j
+            i += 1
+            j += step
+          }
+          node.lresult.arrayProgress = i
+          null
+        }
+        def applyRange1(node: xs.RangeNode[Status], from: Int, to: Int) = {
+          var i = node.lresult.arrayProgress
+          var limit = mathmin(i + (to - from) + 1, mathmin(arr.splice.length, start.splice + len.splice))
+          var j = from
+          while (i < limit) {
+            arr.splice(i) = j
+            i += 1
+            j += 1
+          }
+          node.lresult.arrayProgress = i
+          null
+        }
+      })
+      ()
+    }
+    c.inlineAndReset(kernel)
   }
 
   def copyToArray2[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int]): c.Expr[Unit] = {
