@@ -5,12 +5,13 @@ package scala.collection.workstealing
 import sun.misc.Unsafe
 import annotation.tailrec
 import collection._
+import reflect.ClassTag
 
 
 
-class ParArray[@specialized T](val array: Array[T], val config: Workstealing.Config)
-extends IndexedWorkstealing[T]
-with ParIterableOperations[T] {
+class ParArray[@specialized T](val array: Array[T], val config: Workstealing.Config) extends ParIterable[T]
+with ParIterableLike[T, ParArray[T]]
+with IndexedWorkstealing[T] {
 
   import IndexedWorkstealing._
   import Workstealing.initialStep
@@ -60,6 +61,90 @@ with ParIterableOperations[T] {
   }
 
 }
+
+
+object ParArray {
+  import collection.mutable.ArrayBuffer
+
+  private val COMBINER_CHUNK_SIZE_LIMIT = 1024
+
+  private class Chunk[@specialized T: ClassTag](val array: Array[T]) {
+    var elements = -1
+  }
+
+  final class LinkedCombiner[@specialized T: ClassTag](chsz: Int, larr: Array[T], lpos: Int, chs: ArrayBuffer[Chunk[T]], clr: Boolean)
+  extends Combiner[T, ParArray[T], LinkedCombiner[T]] {
+    private[ParArray] var chunksize: Int = chsz
+    private[ParArray] var lastarr: Array[T] = larr
+    private[ParArray] var lastpos: Int = lpos
+    private[ParArray] var chunks: ArrayBuffer[Chunk[T]] = chs
+
+    def this() = this(0, null, 0, null, true)
+
+    if (clr) clear()
+
+    private[ParArray] def createChunk(): Chunk[T] = {
+      chunksize = math.min(chunksize * 2, COMBINER_CHUNK_SIZE_LIMIT)
+      val array = implicitly[ClassTag[T]].newArray(chunksize)
+      val chunk = new Chunk[T](array)
+      chunk
+    }
+
+    private[ParArray] def closeLast() {
+      chunks.last.elements = lastpos
+    }
+
+    def +=(elem: T): LinkedCombiner[T] = {
+      if (lastpos < chunksize) {
+        lastarr(lastpos) = elem
+        lastpos += 1
+        this
+      } else {
+        closeLast()
+        val lastnode = createChunk()
+        lastarr = lastnode.array
+        lastpos = 0
+        chunks += lastnode
+        +=(elem)
+      }
+    }
+  
+    def result: ParArray[T] = ???
+  
+    def combine(that: LinkedCombiner[T]): LinkedCombiner[T] = {
+      this.closeLast()
+      
+      val res = new LinkedCombiner(
+        math.max(this.chunksize, that.chunksize),
+        that.lastarr,
+        that.lastpos,
+        this.chunks ++= that.chunks,
+        false
+      )
+      
+      this.clear()
+      that.clear()
+
+      res
+    }
+
+    def clear(): Unit = {
+      chunksize = 4
+      val lastnode = createChunk()
+      lastarr = lastnode.array
+      lastpos = 0
+      chunks = ArrayBuffer(lastnode)
+    }
+
+  }
+
+}
+
+
+
+
+
+
 
 
 

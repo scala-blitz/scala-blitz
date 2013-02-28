@@ -7,42 +7,44 @@ import scala.reflect.macros._
 
 
 
-trait ParIterableOperations[T] {
+trait ParIterableLike[+T, +Repr] {
 
-  def foreach[U](f: T => U): Unit = macro ParIterableOperations.foreach[T, U]
+  //protected[this] def newCombiner: Combiner[T, Repr]
 
-  def fold[U >: T](z: U)(op: (U, U) => U): U = macro ParIterableOperations.fold[T, U]
+  def foreach[U](f: T => U): Unit = macro ParIterableLike.foreach[T, U]
 
-  def reduce[U >: T](op: (U, U) => U): U = macro ParIterableOperations.reduce[T, U]
+  def fold[U >: T](z: U)(op: (U, U) => U): U = macro ParIterableLike.fold[T, U]
 
-  def aggregate[S](z: =>S)(combop: (S, S) => S)(seqop: (S, T) => S): S = macro ParIterableOperations.aggregate[T, S]
+  def reduce[U >: T](op: (U, U) => U): U = macro ParIterableLike.reduce[T, U]
 
-  def sum[U >: T](implicit num: Numeric[U]): U = macro ParIterableOperations.sum[T, U]
+  def aggregate[S](z: =>S)(combop: (S, S) => S)(seqop: (S, T) => S): S = macro ParIterableLike.aggregate[T, S]
 
-  def product[U >: T](implicit num: Numeric[U]): U = macro ParIterableOperations.product[T, U]
+  def sum[U >: T](implicit num: Numeric[U]): U = macro ParIterableLike.sum[T, U]
 
-  def count(p: T => Boolean): Int = macro ParIterableOperations.count[T]
+  def product[U >: T](implicit num: Numeric[U]): U = macro ParIterableLike.product[T, U]
 
-  def min[U >: T](implicit ord: Ordering[U]): T = macro ParIterableOperations.min[T, U]
+  def count(p: T => Boolean): Int = macro ParIterableLike.count[T]
 
-  def max[U >: T](implicit ord: Ordering[U]): T = macro ParIterableOperations.max[T, U]
+  def min[U >: T](implicit ord: Ordering[U]): T = macro ParIterableLike.min[T, U]
 
-  def find(p: T => Boolean): Option[T] = macro ParIterableOperations.find[T]
+  def max[U >: T](implicit ord: Ordering[U]): T = macro ParIterableLike.max[T, U]
 
-  def forall(p: T => Boolean): Boolean = macro ParIterableOperations.forall[T]
+  def find(p: T => Boolean): Option[T] = macro ParIterableLike.find[T]
 
-  def exists(p: T => Boolean): Boolean = macro ParIterableOperations.exists[T]
+  def forall(p: T => Boolean): Boolean = macro ParIterableLike.forall[T]
 
-  def copyToArray[U >: T](arr: Array[U], start: Int, len: Int): Unit = macro ParIterableOperations.copyToArray[T, U]
+  def exists(p: T => Boolean): Boolean = macro ParIterableLike.exists[T]
 
-  def copyToArray[U >: T](arr: Array[U], start: Int): Unit = macro ParIterableOperations.copyToArray2[T, U]
+  def copyToArray[U >: T](arr: Array[U], start: Int, len: Int): Unit = macro ParIterableLike.copyToArray[T, U]
 
-  def copyToArray[U >: T](arr: Array[U]): Unit = macro ParIterableOperations.copyToArray3[T, U]
+  def copyToArray[U >: T](arr: Array[U], start: Int): Unit = macro ParIterableLike.copyToArray2[T, U]
+
+  def copyToArray[U >: T](arr: Array[U]): Unit = macro ParIterableLike.copyToArray3[T, U]
 
 }
 
 
-object ParIterableOperations {
+object ParIterableLike {
   
   def foreach[T: c.WeakTypeTag, U: c.WeakTypeTag](c: Context)(f: c.Expr[T => U]): c.Expr[Unit] = {
     import c.universe._
@@ -103,7 +105,7 @@ object ParIterableOperations {
       lv.splice
       val xs = callee.splice.asInstanceOf[Workstealing[T]]
       val rs = xs.invokeParallelOperation(new xs.Kernel[T, Any] {
-        val zero = ParIterableOperations.nil
+        val zero = ParIterableLike.nil
         def combine(a: Any, b: Any) = {
           if (a == zero) b
           else if (b == zero) a
@@ -122,7 +124,7 @@ object ParIterableOperations {
           }
         }
       })
-      if (rs == ParIterableOperations.nil) throw new java.lang.UnsupportedOperationException
+      if (rs == ParIterableLike.nil) throw new java.lang.UnsupportedOperationException
       else rs.asInstanceOf[U]
     }
     c.inlineAndReset(kernel)
@@ -271,8 +273,8 @@ object ParIterableOperations {
     val callee = c.Expr[Nothing](c.applyPrefix)
     val kernel = reify {
       val xs = callee.splice.asInstanceOf[Workstealing[T]]
-      xs.invokeParallelOperation(new xs.Kernel[T, ParIterableOperations.CopyToArrayStatus] {
-        type Status = ParIterableOperations.CopyToArrayStatus
+      xs.invokeParallelOperation(new xs.Kernel[T, ParIterableLike.CopyToArrayStatus] {
+        type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
         override def afterCreateRoot(root: xs.Ptr[T, Status]) {
           root.child.lresult = new Status(start.splice, start.splice)

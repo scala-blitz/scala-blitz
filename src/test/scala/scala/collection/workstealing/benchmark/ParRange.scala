@@ -24,7 +24,7 @@ object ParRangeForeachGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     @volatile var found = false
     range.foreach((x: Int) => if ((x & 0xfffff) == 0) found = true)
   }
@@ -62,7 +62,7 @@ object ParRangeFoldGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.fold(0)(_ + _)
   }
 
@@ -98,7 +98,7 @@ object ParRangeReduceGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.reduce(_ + _)
   }
 
@@ -134,7 +134,7 @@ object ParRangeAggregateGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.aggregate(0)(_ + _)(_ + _)
   }
 
@@ -170,7 +170,7 @@ object ParRangeSumGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.sum
   }
 
@@ -206,7 +206,7 @@ object ParRangeCountGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.count(x => (x & 0x3) == 0)
   }
 
@@ -244,7 +244,7 @@ object ParRangeFindGeneric extends StatisticsBenchmark {
   var i = 1
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.find(x => 10 * x < 0)
   }
 
@@ -280,7 +280,7 @@ object ParRangeFindEarlyGeneric extends StatisticsBenchmark {
   val size = sys.props("size").toInt
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.find(x => x % 50000000 == 12000000)
   }
 
@@ -318,7 +318,7 @@ object ParRangeCopyToArrayGeneric extends StatisticsBenchmark {
   val arr = new Array[Int](size)
 
   def run() {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     range.copyToArray(arr, 0, arr.length)
   }
 

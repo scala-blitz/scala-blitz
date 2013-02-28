@@ -10,14 +10,16 @@ import scala.reflect.macros._
 
 
 
-class ParRange(val range: Range, val config: Workstealing.Config)
-extends IndexedWorkstealing[Int]
-with ParIterableOperations[Int] {
+class ParRange(val range: Range, val config: Workstealing.Config) extends ParIterable[Int]
+with ParIterableLike[Int, ParIterable[Int]]
+with IndexedWorkstealing[Int] {
 
   import IndexedWorkstealing._
   import Workstealing.initialStep
 
   def size = range.size
+
+  //protected[this] def newCombiner: Combiner[Int, ]
 
   type N[R] = RangeNode[R]
 
@@ -182,7 +184,7 @@ object ParRange {
       lv.splice
       val xs = callee.splice.asInstanceOf[ParRange]
       val rs = xs.invokeParallelOperation(new xs.RangeKernel[Any] {
-        val zero = ParIterableOperations.nil
+        val zero = ParIterableLike.nil
         def combine(a: Any, b: Any) = {
           if (a == zero) b
           else if (b == zero) a
@@ -207,7 +209,7 @@ object ParRange {
           sum
         }
       })
-      if (rs == ParIterableOperations.nil) throw new java.lang.UnsupportedOperationException
+      if (rs == ParIterableLike.nil) throw new java.lang.UnsupportedOperationException
       else rs.asInstanceOf[U]
     }
     c.inlineAndReset(kernel)
@@ -372,8 +374,8 @@ object ParRange {
     val callee = c.Expr[Nothing](c.applyPrefix)
     val kernel = reify {
       val xs = callee.splice.asInstanceOf[ParRange]
-      xs.invokeParallelOperation(new xs.RangeKernel[ParIterableOperations.CopyToArrayStatus] {
-        type Status = ParIterableOperations.CopyToArrayStatus
+      xs.invokeParallelOperation(new xs.RangeKernel[ParIterableLike.CopyToArrayStatus] {
+        type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
         override def afterCreateRoot(root: xs.Ptr[Int, Status]) {
           root.child.lresult = new Status(start.splice, start.splice)

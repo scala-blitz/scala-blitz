@@ -6,10 +6,10 @@ package test
 
 
 
-object ParIterableOperationsTest extends App {
+object ParIterableLikeTest extends App {
 
   def copyToArray(size: Int) {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     val arr = new Array[Int](size)
 
     range.copyToArray(arr, 0, arr.length)
@@ -20,7 +20,7 @@ object ParIterableOperationsTest extends App {
   }
 
   def sum(size: Int) {
-    val range: ParIterableOperations[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
     assert(range.sum == (0 until size).sum)
   }
 

@@ -1,0 +1,6 @@
+To fix:
+ ☐ argument expressions need to be assigned to a local var
+ ☐ parallel arrays need to be specialized
+ ☐ implement all the basic parallel operations
+ ☐ add combiner support
+ 
