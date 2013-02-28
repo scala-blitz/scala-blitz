@@ -1,5 +1,5 @@
 package scala.collection.workstealing
-package benchmarks
+package benchmark
 
 
 

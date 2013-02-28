@@ -44,11 +44,18 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
 
     final def casRange(ov: Long, nv: Long) = Utils.unsafe.compareAndSwapLong(this, RANGE_OFFSET, ov, nv)
 
-    final def workRemaining = {
+    final def elementsRemaining = {
       val r = /*READ*/range
-      val p = progress(r)
+      val p = positiveProgress(r)
       val u = until(r)
       u - p
+    }
+
+    final def elementsCompleted = {
+      val r = /*READ*/range
+      val p = positiveProgress(r)
+      val u = until(r)
+      (p - start) + (end - u)
     }
 
     final def state = {

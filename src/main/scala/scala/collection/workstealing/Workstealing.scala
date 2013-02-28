@@ -58,7 +58,9 @@ trait Workstealing[T] {
 
     /* abstract members */
 
-    def workRemaining: Int
+    def elementsRemaining: Int
+
+    def elementsCompleted: Int
 
     def newExpanded(parent: Ptr[S, R]): Node[S, R]
 
@@ -94,7 +96,7 @@ trait Workstealing[T] {
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
             val expanded = child_t0.newExpanded(this)
-            kernel.afterExpand(expanded)
+            kernel.afterExpand(child_t0, expanded)
             if (casChild(child_t0, expanded)) true // try to replace with expansion
             else expand(kernel) // failure (spurious or due to another expand) - retry
           }
@@ -226,12 +228,26 @@ trait Workstealing[T] {
      */
     def beforeWorkOn(tree: Ptr[S, R]) {}
 
+    /** Initializes the workstealing tree root.
+     *
+     *  By default does nothing, but some kernels may choose to override this default behaviour.
+     */
+    def afterCreateRoot(tree: Ptr[S, R]) {}
+
     /** Initializes a node that has just been expanded.
      * 
      *  By default does nothing, but some kernels may choose to override this default behaviour
      *  to store operation-specific information into the node.
      */
-    def afterExpand(tree: Node[S, R]) {}
+    def afterExpand(old: Node[S, R], node: Node[S, R]) {}
+
+    /** Stores the result of processing the node into the `lresult` field.
+     *
+     *  This behaviour can be overridden.
+     */
+    def storeLResult(node: Node[S, R], res: R) {
+      node.lresult = res
+    }
 
     /** Returns true if completed with no stealing.
      *  Returns false if steal occurred.
@@ -287,14 +303,14 @@ trait Workstealing[T] {
 
       val state_t0 = work.state
       val wasCompleted = if (state_t0 eq Completed) {
-        work.lresult = lsum
+        storeLResult(work, lsum)
         while (work.result == null) work.casResult(null, None)
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         true
       } else if (state_t0 eq StolenOrExpanded) {
         // help expansion if necessary
         if (tree.child.isLeaf) tree.expand(this)
-        tree.child.lresult = lsum
+        storeLResult(tree.child, lsum)
         while (tree.child.result == null) tree.child.casResult(null, None)
         //val work = tree.child
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
@@ -358,6 +374,7 @@ trait Workstealing[T] {
     // create workstealing tree
     val root = newRoot[R]
     val work = root.child
+    kernel.afterCreateRoot(root)
     work.tryOwn(Invoker)
 
     // let other workers know there's something to do
@@ -615,13 +632,13 @@ object Workstealing {
       def search(current: Tree[S, R]): Tree[S, R] = if (current.child.isLeaf) current else {
         val left = search(current.child.left)
         val rght = search(current.child.right)
-        val leftwork = left.child.workRemaining
-        val rghtwork = rght.child.workRemaining
+        val leftwork = left.child.elementsRemaining
+        val rghtwork = rght.child.elementsRemaining
         if (leftwork > rghtwork) left else rght
       }
 
       val max = search(tree)
-      if (max.child.workRemaining > 0) {
+      if (max.child.elementsRemaining > 0) {
         if (max.child.tryOwn(worker)) max
         else if (max.child.trySteal(max, kernel)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)

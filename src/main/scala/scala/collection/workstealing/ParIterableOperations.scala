@@ -35,6 +35,10 @@ trait ParIterableOperations[T] {
 
   def copyToArray[U >: T](arr: Array[U], start: Int, len: Int): Unit = macro ParIterableOperations.copyToArray[T, U]
 
+  def copyToArray[U >: T](arr: Array[U], start: Int): Unit = macro ParIterableOperations.copyToArray2[T, U]
+
+  def copyToArray[U >: T](arr: Array[U]): Unit = macro ParIterableOperations.copyToArray3[T, U]
+
 }
 
 
@@ -259,34 +263,67 @@ object ParIterableOperations {
     }
   }
 
+  class CopyToArrayStatus(val arrayStart: Int, var arrayProgress: Int)
+
   def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
 
     val callee = c.Expr[Nothing](c.applyPrefix)
     val kernel = reify {
       val xs = callee.splice.asInstanceOf[Workstealing[T]]
-      xs.invokeParallelOperation(new xs.Kernel[T, Int] {
+      xs.invokeParallelOperation(new xs.Kernel[T, ParIterableOperations.CopyToArrayStatus] {
+        type Status = ParIterableOperations.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
-        override def afterExpand(tree: xs.Node[T, Int]) {
-          // TODO inspect the remaining work on the left and on the right and set lresult
+        override def afterCreateRoot(root: xs.Ptr[T, Status]) {
+          root.child.lresult = new Status(start.splice, start.splice)
         }
-        def zero = -1
-        def combine(a: Int, b: Int) = -1
-        def apply(node: xs.N[Int], chunkSize: Int) = {
-          var i = node.lresult
-          var left = mathmin(i + chunkSize, mathmin(arr.splice.length, start.splice + len.splice))
-          while (left > 0) {
+        override def afterExpand(old: xs.Node[T, Status], node: xs.Node[T, Status]) {
+          val completed = node.elementsCompleted
+          val arrstart = old.lresult.arrayStart + completed
+          val leftarrstart = arrstart
+          val rightarrstart = arrstart + node.left.child.elementsRemaining
+
+          node.left.child.lresult = new Status(leftarrstart, leftarrstart)
+          node.right.child.lresult = new Status(rightarrstart, rightarrstart)
+        }
+        override def storeLResult(node: xs.Node[T, Status], res: Status) {}
+        def zero = null
+        def combine(a: Status, b: Status) = null
+        def apply(node: xs.N[Status], chunkSize: Int) = {
+          var i = node.lresult.arrayProgress
+          var limit = mathmin(i + chunkSize, mathmin(arr.splice.length, start.splice + len.splice))
+          while (i < limit) {
             arr.splice(i) = node.next()
-            left -= 1
             i += 1
           }
-          node.lresult = i
-          i
+          node.lresult.arrayProgress = i
+          null
         }
       })
       ()
     }
     c.inlineAndReset(kernel)
+  }
+
+  def copyToArray2[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int]): c.Expr[Unit] = {
+    import c.universe._
+
+    val len = reify {
+      arr.splice.length
+    }
+    copyToArray[T, U](c)(arr, start, len)
+  }
+
+  def copyToArray3[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]]): c.Expr[Unit] = {
+    import c.universe._
+
+    val start = reify {
+      0
+    }
+    val len = reify {
+      arr.splice.length
+    }
+    copyToArray[T, U](c)(arr, start, len)
   }
 
 }
