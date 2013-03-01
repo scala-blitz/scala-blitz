@@ -89,10 +89,10 @@ with IndexedWorkstealing[Int] {
   override def count(p: Int => Boolean): Int = macro ParRange.count
 
   // TODO fix when macros with generated bridges are fixed
-  //override def min[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.min[U]
+  def min2[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.min[U]
 
   // TODO fix when macros with generated bridges are fixed
-  //override def max[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.max[U]
+  def max2[U >: Int](implicit ord: Ordering[U]): Int = macro ParRange.max[U]
 
   override def find(p: Int => Boolean): Option[Int] = macro ParRange.find
 
@@ -106,6 +106,8 @@ with IndexedWorkstealing[Int] {
 
   override def copyToArray[U >: Int](arr: Array[U]): Unit = macro ParRange.copyToArray3[U]
 
+  // TODO fix when macros with generated bridges are fixed
+  def filter2(p: Int => Boolean): ParIterable[Int] = macro ParRange.filter
 }
 
 
@@ -115,10 +117,10 @@ object ParRange {
     import c.universe._
 
     val (lv, func) = c.functionExpr2Local(f)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.RangeKernel[Unit] {
         def zero = ()
         def combine(a: Unit, b: Unit) = a
@@ -145,10 +147,10 @@ object ParRange {
     import c.universe._
 
     val (l, oper) = c.functionExpr2Local[(U, U) => U](op)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
       l.splice
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.RangeKernel[U] {
         val zero = z.splice
         def combine(a: U, b: U) = oper.splice(a, b)
@@ -179,10 +181,10 @@ object ParRange {
     import c.universe._
 
     val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       val rs = xs.invokeParallelOperation(new xs.RangeKernel[Any] {
         val zero = ParIterableLike.nil
         def combine(a: Any, b: Any) = {
@@ -220,11 +222,11 @@ object ParRange {
 
     val (seqlv, seqoper) = c.functionExpr2Local[(S, Int) => S](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(S, S) => S](combop)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
       seqlv.splice
       comblv.splice
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.RangeKernel[S] {
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice(a, b)
@@ -311,10 +313,10 @@ object ParRange {
     import c.universe._
 
     val (lv, pred) = c.functionExpr2Local[Int => Boolean](p)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.RangeKernel[Option[Int]] {
         def zero = None
         def combine(a: Option[Int], b: Option[Int]) = if (a.nonEmpty) a else b
@@ -371,9 +373,9 @@ object ParRange {
   def copyToArray[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
 
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
-      val xs = callee.splice.asInstanceOf[ParRange]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.RangeKernel[ParIterableLike.CopyToArrayStatus] {
         type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
@@ -442,7 +444,53 @@ object ParRange {
     copyToArray[U](c)(arr, start, len)
   }
 
+  def filter(c: Context)(p: c.Expr[Int => Boolean]): c.Expr[ParIterable[Int]] = {
+    import c.universe._
+
+    val (lv, oper) = c.functionExpr2Local[Int => Boolean](p)
+    val callee = c.Expr[ParRange](c.applyPrefix)
+    val kernel = reify {
+      lv.splice
+      val xs = callee.splice
+      val cmb = xs.invokeParallelOperation(new xs.RangeKernel[Combiner[Int, ParIterable[Int]]] {
+        type Result = Combiner[Int, ParIterable[Int]]
+        override def beforeWorkOn(tree: xs.Ptr[Int, Result], node: xs.Node[Int, Result]) {
+          node.lresult = xs.createCombiner
+        }
+        def zero = null
+        def combine(a: Result, b: Result) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a combine b
+        def applyRange(node: xs.RangeNode[Result], from: Int, to: Int, step: Int) = {
+          val cmb = node.lresult
+          var i = from
+          while (i <= to) {
+            cmb += i
+            i += step
+          }
+          cmb
+        }
+        def applyRange1(node: xs.RangeNode[Result], from: Int, to: Int) = {
+          val cmb = node.lresult
+          var i = from
+          while (i <= to) {
+            cmb += i
+            i += 1
+          }
+          cmb
+        }
+      })
+      cmb.result
+    }
+    c.inlineAndReset(kernel)
+  }
+
 }
+
+
+
 
 
 

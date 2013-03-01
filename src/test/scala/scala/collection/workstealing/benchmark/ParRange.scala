@@ -345,7 +345,7 @@ object ParRangeFilter extends StatisticsBenchmark {
 
   def run() {
     val range = new ParRange(0 until size, Workstealing.DefaultConfig)
-    range.filter(x => true)
+    range.filter2(x => true)
   }
 
 }
