@@ -22,7 +22,7 @@ with IndexedWorkstealing[T] {
 
   type K[R] = ArrayKernel[T, R]
 
-  protected[this] def newCombiner = new ParArray.LinkedCombiner[T]
+  protected[this] def newCombiner = new ParArray.ArrayCombiner[T]
 
   final class ArrayNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val arr: Array[S], s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[S, R](l, r)(s, e, rn, st) {
@@ -69,28 +69,28 @@ object ParArray {
 
   private val COMBINER_CHUNK_SIZE_LIMIT = 1024
 
-  private trait Tree[T] {
+  trait Tree[T] {
     def level: Int
   }
 
-  private[ParArray] class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree[T] {
+  final class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree[T] {
     var elements = -1
     def level = 0
   }
 
-  private[ParArray] class Node[@specialized T](val left: Tree[T], val right: Tree[T], val level: Int) extends Tree[T]
+  final class Node[@specialized T](val left: Tree[T], val right: Tree[T], val level: Int) extends Tree[T]
 
-  final class LinkedCombiner[@specialized T: ClassTag](chsz: Int, larr: Array[T], lpos: Int, t: Chunk[T], chs: List[Tree[T]], clr: Boolean)
-  extends Combiner[T, ParArray[T]] with CombinerLike[T, ParArray[T], LinkedCombiner[T]] {
-    private[ParArray] var chunksize: Int = chsz
-    private[ParArray] var lastarr: Array[T] = larr
-    private[ParArray] var lastpos: Int = lpos
-    private[ParArray] var lasttree: Chunk[T] = t
-    private[ParArray] var chunkstack: List[Tree[T]] = chs
+  abstract class ChunkCombiner[@specialized T: ClassTag, To](init: Boolean)
+  extends Combiner[T, To] with CombinerLike[T, To, ChunkCombiner[T, To]] {
+    private[ParArray] var chunksize: Int = _
+    private[ParArray] var lastarr: Array[T] = _
+    private[ParArray] var lastpos: Int = _
+    private[ParArray] var lasttree: Chunk[T] = _
+    private[ParArray] var chunkstack: List[Tree[T]] = _
 
-    def this() = this(0, null, 0, null, null, true)
+    def this() = this(true)
 
-    if (clr) clear()
+    if (init) clear()
 
     private[ParArray] def createChunk(): Chunk[T] = {
       chunksize = math.min(chunksize * 2, COMBINER_CHUNK_SIZE_LIMIT)
@@ -125,7 +125,7 @@ object ParArray {
       merge(chunkstack)
     }
 
-    def +=(elem: T): LinkedCombiner[T] = {
+    def +=(elem: T): ChunkCombiner[T, To] = {
       if (lastpos < chunksize) {
         lastarr(lastpos) = elem
         lastpos += 1
@@ -141,19 +141,19 @@ object ParArray {
       }
     }
 
-    def result: ParArray[T] = null
+    def newChunkCombiner(shouldInit: Boolean): ChunkCombiner[T, To]
+
+    def result: To
   
-    def combine(that: LinkedCombiner[T]): LinkedCombiner[T] = {
+    def combine(that: ChunkCombiner[T, To]): ChunkCombiner[T, To] = {
       this.closeLast()
 
-      val res = new LinkedCombiner(
-        math.max(this.chunksize, that.chunksize),
-        that.lastarr,
-        that.lastpos,
-        that.lasttree,
-        that.chunkstack ::: List(this.tree),
-        false
-      )
+      val res = newChunkCombiner(false)
+      res.chunksize = math.max(this.chunksize, that.chunksize)
+      res.lastarr = that.lastarr
+      res.lastpos = that.lastpos
+      res.lasttree = that.lasttree
+      res.chunkstack = that.chunkstack ::: List(this.tree)
       
       this.clear()
       that.clear()
@@ -169,6 +169,18 @@ object ParArray {
       chunkstack = List(lasttree)
     }
 
+  }
+
+  final class ArrayCombiner[@specialized T: ClassTag](init: Boolean) extends ChunkCombiner[T, ParArray[T]](init) {
+    def this() = this(true)
+    def newChunkCombiner(shouldInit: Boolean) = new ArrayCombiner(shouldInit)
+    def result = ???
+  }
+
+  final class TreeCombiner[@specialized T: ClassTag](init: Boolean) extends ChunkCombiner[T, Tree[T]](init) {
+    def this() = this(true)
+    def newChunkCombiner(shouldInit: Boolean) = new TreeCombiner(shouldInit)
+    def result = tree
   }
 
 }

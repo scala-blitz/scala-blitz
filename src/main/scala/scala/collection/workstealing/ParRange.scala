@@ -19,7 +19,7 @@ with IndexedWorkstealing[Int] {
 
   def size = range.size
 
-  protected[this] def newCombiner = new ParArray.LinkedCombiner[Int]
+  protected[this] def newCombiner = new ParArray.ArrayCombiner[Int]
 
   type N[R] = RangeNode[R]
 
@@ -108,6 +108,10 @@ with IndexedWorkstealing[Int] {
 
   // TODO fix when macros with generated bridges are fixed
   def filter2(p: Int => Boolean): ParIterable[Int] = macro ParRange.filter
+
+  // TODO fix when macros with generated bridges are fixed
+  def filterNot2(p: Int => Boolean): ParIterable[Int] = macro ParRange.filterNot
+
 }
 
 
@@ -485,6 +489,15 @@ object ParRange {
       cmb.result
     }
     c.inlineAndReset(kernel)
+  }
+
+  def filterNot(c: Context)(p: c.Expr[Int => Boolean]): c.Expr[ParIterable[Int]] = {
+    import c.universe._
+
+    val np = reify {
+      (x: Int) => !p.splice(x)
+    }
+    filter(c)(np)
   }
 
 }

@@ -47,7 +47,7 @@ package object workstealing {
                 case x =>
                   ap
               }
-              nestedFunction2Block(prefix)
+              super.transform(nestedFunction2Block(prefix))
             case _ =>
               super.transform(tree)
           }

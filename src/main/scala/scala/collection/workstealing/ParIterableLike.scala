@@ -46,6 +46,24 @@ trait ParIterableLike[+T, +Repr] extends Workstealing[T @uncheckedVariance] {
 
   def filter(p: T => Boolean): Repr = macro ParIterableLike.filter[T, Repr]
 
+  def filterNot(p: T => Boolean): Repr = macro ParIterableLike.filterNot[T, Repr]
+
+//  override def partition(p: A => Boolean): (Repr, Repr) = self.partition(p)
+//  
+//  override def take(n: Int): Repr = self.take(n)
+//  
+//  override def drop(n: Int): Repr = self.drop(n)
+//  
+//  override def slice(from: Int, until: Int): Repr = self.slice(from, until)
+//  
+//  override def takeWhile(p: A => Boolean): Repr = self.takeWhile(p)
+//  
+//  override def dropWhile(p: A => Boolean): Repr = self.dropWhile(p)
+//  
+//  override def span(p: A => Boolean): (Repr, Repr) = self.span(p)
+//  
+//  override def splitAt(n: Int): (Repr, Repr) = self.splitAt(n)
+
 }
 
 
@@ -256,9 +274,11 @@ object ParIterableLike {
       (x: T) => !p.splice(x)
     }
     val found = find[T](c)(np)
-    reify {
+    val res = reify {
       found.splice.isEmpty
     }
+    println(res)
+    res
   }
 
   def exists[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Boolean] = {
@@ -363,6 +383,15 @@ object ParIterableLike {
       cmb.result
     }
     c.inlineAndReset(kernel)
+  }
+
+  def filterNot[T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Repr] = {
+    import c.universe._
+
+    val np = reify {
+      (x: T) => !p.splice(x)
+    }
+    filter[T, Repr](c)(np)
   }
 
 }
