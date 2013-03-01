@@ -2,20 +2,13 @@ package scala.collection.workstealing
 
 
 
-import scala.collection.mutable.Builder
+import annotation.unchecked.uncheckedVariance
 
 
 
-trait Combiner[@specialized -T, +To, Repr] {
+trait Combiner[@specialized -T, +To] extends CombinerLike[T, To, Combiner[T, To]]
 
-  def +=(elem: T): Combiner[T, To, Repr]
 
-  def result: To
-
-  def clear(): Unit
-
-  def combine(that: Repr): Repr
-
-}
+object Combiner
 
 

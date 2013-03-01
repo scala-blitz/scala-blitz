@@ -338,6 +338,45 @@ object ParRangeCopyToArrayPC extends StatisticsBenchmark {
 }
 
 
+object ParRangeFilter extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.filter(x => true)
+  }
+
+}
+
+
+object ParRangeFilterGeneric extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.filter(x => true)
+  }
+
+}
+
+
+object ParRangeFilterPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = (0 until size).par
+    range.filter(x => true)
+  }
+
+}
+
+
 
 
 

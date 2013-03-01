@@ -4,12 +4,12 @@ package scala.collection.workstealing
 
 import sun.misc.Unsafe
 import annotation.tailrec
-import collection._
-import reflect.ClassTag
+import scala.collection._
+import scala.reflect.ClassTag
 
 
 
-class ParArray[@specialized T](val array: Array[T], val config: Workstealing.Config) extends ParIterable[T]
+class ParArray[@specialized T: ClassTag](val array: Array[T], val config: Workstealing.Config) extends ParIterable[T]
 with ParIterableLike[T, ParArray[T]]
 with IndexedWorkstealing[T] {
 
@@ -21,6 +21,8 @@ with IndexedWorkstealing[T] {
   type N[R] = ArrayNode[T, R]
 
   type K[R] = ArrayKernel[T, R]
+
+  protected[this] def newCombiner = new ParArray.LinkedCombiner[T]
 
   final class ArrayNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val arr: Array[S], s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[S, R](l, r)(s, e, rn, st) {
@@ -64,22 +66,29 @@ with IndexedWorkstealing[T] {
 
 
 object ParArray {
-  import collection.mutable.ArrayBuffer
 
   private val COMBINER_CHUNK_SIZE_LIMIT = 1024
 
-  private class Chunk[@specialized T: ClassTag](val array: Array[T]) {
-    var elements = -1
+  private trait Tree[T] {
+    def level: Int
   }
 
-  final class LinkedCombiner[@specialized T: ClassTag](chsz: Int, larr: Array[T], lpos: Int, chs: ArrayBuffer[Chunk[T]], clr: Boolean)
-  extends Combiner[T, ParArray[T], LinkedCombiner[T]] {
+  private[ParArray] class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree[T] {
+    var elements = -1
+    def level = 0
+  }
+
+  private[ParArray] class Node[@specialized T](val left: Tree[T], val right: Tree[T], val level: Int) extends Tree[T]
+
+  final class LinkedCombiner[@specialized T: ClassTag](chsz: Int, larr: Array[T], lpos: Int, t: Chunk[T], chs: List[Tree[T]], clr: Boolean)
+  extends Combiner[T, ParArray[T]] with CombinerLike[T, ParArray[T], LinkedCombiner[T]] {
     private[ParArray] var chunksize: Int = chsz
     private[ParArray] var lastarr: Array[T] = larr
     private[ParArray] var lastpos: Int = lpos
-    private[ParArray] var chunks: ArrayBuffer[Chunk[T]] = chs
+    private[ParArray] var lasttree: Chunk[T] = t
+    private[ParArray] var chunkstack: List[Tree[T]] = chs
 
-    def this() = this(0, null, 0, null, true)
+    def this() = this(0, null, 0, null, null, true)
 
     if (clr) clear()
 
@@ -91,7 +100,29 @@ object ParArray {
     }
 
     private[ParArray] def closeLast() {
-      chunks.last.elements = lastpos
+      lasttree.elements = lastpos
+    }
+
+    private[ParArray] def mergeStack() = {
+      @tailrec def merge(stack: List[Tree[T]]): List[Tree[T]] = stack match {
+        case (c1: Chunk[T]) :: (c2: Chunk[T]) :: tail =>
+          merge(new Node[T](c2, c1, 1) :: tail)
+        case (n1: Node[T]) :: (n2: Node[T]) :: tail if n1.level == n2.level =>
+          merge(new Node[T](n2, n1, n1.level + 1) :: tail)
+        case _ =>
+          stack
+      }
+
+      chunkstack = merge(chunkstack)
+    }
+
+    private[ParArray] def tree = {
+      @tailrec def merge(stack: List[Tree[T]]): Tree[T] = stack match {
+        case t1 :: t2 :: tail => merge(new Node(t2, t1, math.max(t1.level, t2.level) + 1) :: tail)
+        case t :: Nil => t
+      }
+
+      merge(chunkstack)
     }
 
     def +=(elem: T): LinkedCombiner[T] = {
@@ -101,24 +132,26 @@ object ParArray {
         this
       } else {
         closeLast()
-        val lastnode = createChunk()
-        lastarr = lastnode.array
+        lasttree = createChunk()
+        lastarr = lasttree.array
         lastpos = 0
-        chunks += lastnode
+        chunkstack = lasttree :: chunkstack
+        mergeStack()
         +=(elem)
       }
     }
-  
-    def result: ParArray[T] = ???
+
+    def result: ParArray[T] = null
   
     def combine(that: LinkedCombiner[T]): LinkedCombiner[T] = {
       this.closeLast()
-      
+
       val res = new LinkedCombiner(
         math.max(this.chunksize, that.chunksize),
         that.lastarr,
         that.lastpos,
-        this.chunks ++= that.chunks,
+        that.lasttree,
+        that.chunkstack ::: List(this.tree),
         false
       )
       
@@ -130,10 +163,10 @@ object ParArray {
 
     def clear(): Unit = {
       chunksize = 4
-      val lastnode = createChunk()
-      lastarr = lastnode.array
+      lasttree = createChunk()
+      lastarr = lasttree.array
       lastpos = 0
-      chunks = ArrayBuffer(lastnode)
+      chunkstack = List(lasttree)
     }
 
   }

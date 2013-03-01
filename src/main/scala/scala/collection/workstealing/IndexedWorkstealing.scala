@@ -4,7 +4,7 @@ package scala.collection.workstealing
 
 import sun.misc.Unsafe
 import annotation.tailrec
-import collection._
+import scala.collection._
 
 
 
@@ -99,9 +99,8 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
     def isNotRandom = false
 
     override def workOn(tree: Ptr[S, R]): Boolean = {
-      beforeWorkOn(tree)
-
       val rawn = /*READ*/tree.child
+      beforeWorkOn(tree, rawn)
       val node = rawn.repr
       var lsum = zero
       var rsum = zero

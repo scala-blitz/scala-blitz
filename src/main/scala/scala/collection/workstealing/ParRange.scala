@@ -4,7 +4,7 @@ package scala.collection.workstealing
 
 import sun.misc.Unsafe
 import annotation.tailrec
-import collection._
+import scala.collection._
 import scala.language.experimental.macros
 import scala.reflect.macros._
 
@@ -19,7 +19,7 @@ with IndexedWorkstealing[Int] {
 
   def size = range.size
 
-  //protected[this] def newCombiner: Combiner[Int, ]
+  protected[this] def newCombiner = new ParArray.LinkedCombiner[Int]
 
   type N[R] = RangeNode[R]
 

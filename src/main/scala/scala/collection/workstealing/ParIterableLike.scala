@@ -4,12 +4,15 @@ package scala.collection.workstealing
 
 import scala.language.experimental.macros
 import scala.reflect.macros._
+import scala.annotation.unchecked.uncheckedVariance
 
 
 
-trait ParIterableLike[+T, +Repr] {
+trait ParIterableLike[+T, +Repr] extends Workstealing[T @uncheckedVariance] {
 
-  //protected[this] def newCombiner: Combiner[T, Repr]
+  protected[this] def newCombiner: Combiner[T, Repr]
+
+  private[workstealing] def createCombiner[S, That] = newCombiner.asInstanceOf[Combiner[S, That]]
 
   def foreach[U](f: T => U): Unit = macro ParIterableLike.foreach[T, U]
 
@@ -41,6 +44,8 @@ trait ParIterableLike[+T, +Repr] {
 
   def copyToArray[U >: T](arr: Array[U]): Unit = macro ParIterableLike.copyToArray3[T, U]
 
+  def filter(p: T => Boolean): Repr = macro ParIterableLike.filter[T, Repr]
+
 }
 
 
@@ -50,10 +55,10 @@ object ParIterableLike {
     import c.universe._
 
     val (lv, func) = c.functionExpr2Local[T => U](f)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.Kernel[T, Unit] {
         def zero = ()
         def combine(a: Unit, b: Unit) = a
@@ -73,10 +78,10 @@ object ParIterableLike {
     import c.universe._
 
     val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.Kernel[T, U] {
         val zero = z.splice
         def combine(a: U, b: U) = oper.splice(a, b)
@@ -100,10 +105,10 @@ object ParIterableLike {
     import c.universe._
 
     val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       val rs = xs.invokeParallelOperation(new xs.Kernel[T, Any] {
         val zero = ParIterableLike.nil
         def combine(a: Any, b: Any) = {
@@ -135,11 +140,11 @@ object ParIterableLike {
 
     val (seqlv, seqoper) = c.functionExpr2Local[(S, T) => S](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(S, S) => S](combop)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
       seqlv.splice
       comblv.splice
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.Kernel[T, S] {
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice(a, b)
@@ -218,10 +223,10 @@ object ParIterableLike {
     import c.universe._
 
     val (lv, pred) = c.functionExpr2Local[T => Boolean](p)
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
       lv.splice
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.Kernel[T, Option[T]] {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.nonEmpty) a else b
@@ -270,9 +275,9 @@ object ParIterableLike {
   def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
 
-    val callee = c.Expr[Nothing](c.applyPrefix)
+    val callee = c.Expr[ParIterableLike[T, _]](c.applyPrefix)
     val kernel = reify {
-      val xs = callee.splice.asInstanceOf[Workstealing[T]]
+      val xs = callee.splice
       xs.invokeParallelOperation(new xs.Kernel[T, ParIterableLike.CopyToArrayStatus] {
         type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
@@ -325,6 +330,39 @@ object ParIterableLike {
       arr.splice.length
     }
     copyToArray[T, U](c)(arr, start, len)
+  }
+
+  def filter[T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean]): c.Expr[Repr] = {
+    import c.universe._
+
+    val (lv, oper) = c.functionExpr2Local[T => Boolean](p)
+    val callee = c.Expr[ParIterableLike[T, Repr]](c.applyPrefix)
+    val kernel = reify {
+      lv.splice
+      val xs = callee.splice
+      val cmb = xs.invokeParallelOperation(new xs.Kernel[T, Combiner[T, Repr]] {
+        override def beforeWorkOn(tree: xs.Ptr[T, Combiner[T, Repr]], node: xs.Node[T, Combiner[T, Repr]]) {
+          node.lresult = xs.createCombiner
+        }
+        def zero = null
+        def combine(a: Combiner[T, Repr], b: Combiner[T, Repr]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a combine b
+        def apply(node: xs.N[Combiner[T, Repr]], chunkSize: Int) = {
+          var left = chunkSize
+          val cmb = node.lresult
+          while (left > 0) {
+            cmb += node.next()
+            left -= 1
+          }
+          cmb
+        }
+      })
+      cmb.result
+    }
+    c.inlineAndReset(kernel)
   }
 
 }

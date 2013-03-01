@@ -4,7 +4,7 @@ package scala.collection.workstealing
 
 import sun.misc.Unsafe
 import annotation.tailrec
-import collection._
+import scala.collection._
 
 
 
@@ -226,7 +226,7 @@ trait Workstealing[T] {
      *  By default does nothing, but some kernels may choose to override this default behaviour
      *  to store operation-specific information into the node.
      */
-    def beforeWorkOn(tree: Ptr[S, R]) {}
+    def beforeWorkOn(tree: Ptr[S, R], node: Node[S, R]) {}
 
     /** Initializes the workstealing tree root.
      *
@@ -255,9 +255,8 @@ trait Workstealing[T] {
      *  May be overridden in subclass to specialize for better performance.
      */
     def workOn(tree: Ptr[S, R]): Boolean = {
-      beforeWorkOn(tree)
-
       val node = /*READ*/tree.child
+      beforeWorkOn(tree, node)
       var lsum = zero
       var incCount = 0
       val incFreq = config.incrementFrequency
@@ -479,7 +478,7 @@ object Workstealing {
       val total = worker.total
       val node = tree.child
       if (node.isLeaf) {
-        if (node.state eq Completed) null // no further expansions
+        if ((node.state eq Completed) && node.owner != null) null // no further expansions
         else {
           // more work
           if (node.tryOwn(worker)) tree
@@ -629,18 +628,28 @@ object Workstealing {
   object FindMax extends Strategy {
 
     @tailrec def findWork[S, R](worker: Worker, tree: Tree[S, R], kernel: Kernel[S, R]) = {
-      def search(current: Tree[S, R]): Tree[S, R] = if (current.child.isLeaf) current else {
-        val left = search(current.child.left)
-        val rght = search(current.child.right)
-        val leftwork = left.child.elementsRemaining
-        val rghtwork = rght.child.elementsRemaining
-        if (leftwork > rghtwork) left else rght
+      def search(current: Tree[S, R]): Tree[S, R] = {
+        val node = /*READ*/current.child
+        if (node.isLeaf) {
+          if (node.state ne Completed) current
+          else if (node.owner == null) current
+          else null
+        } else {
+          val left = search(node.left)
+          val right = search(node.right)
+          if (left != null && right != null) {
+            val leftwork = left.child.elementsRemaining
+            val rightwork = right.child.elementsRemaining
+            if (leftwork > rightwork) left else right
+          } else if (left != null) left else right
+        }
       }
 
       val max = search(tree)
-      if (max.child.elementsRemaining > 0) {
-        if (max.child.tryOwn(worker)) max
-        else if (max.child.trySteal(max, kernel)) {
+      if (max != null) {
+        val node = /*READ*/max.child
+        if (node.tryOwn(worker)) max
+        else if (node.trySteal(max, kernel)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)
           if (subnode.child.tryOwn(worker)) subnode
           else findWork(worker, tree, kernel)
