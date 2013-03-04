@@ -41,8 +41,6 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     private def pop(ov: AnyRef, nv: AnyRef): Boolean = ???
 
-    private def prune(ov: AnyRef, nv: AnyRef): Boolean = ???
-
     private def switch(ov: AnyRef): Boolean = ???
 
     private def peekcurr: AnyRef = READ_STACK(pos)
@@ -62,9 +60,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         return -1
       } // otherwise neither were the other two stolen when they were read!
       val isLeft = prev match {
-        case NO_PARENT => left
-        case INNER_DONE => right
-        case tree => left
+        case NO_PARENT => true
+        case INNER_DONE => false
+        case tree => true
       }
 
       curr match {
@@ -78,9 +76,8 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
             move(step)
         }
         case tree =>
+          -1
       }
-
-      move(step)
     }
 
     /* node interface */
@@ -114,7 +111,7 @@ object TreeWorkstealing {
     def isLeaf(tree: TreeType): Boolean
   }
 
-  implicit class TreeOps[T: IsTree](tree: T) {
+  implicit class TreeOps[T >: Null <: AnyRef: IsTree](tree: T) {
     def left = implicitly[IsTree[T]].left(tree)
     def right = implicitly[IsTree[T]].right(tree)
     def size = implicitly[IsTree[T]].size(tree)
