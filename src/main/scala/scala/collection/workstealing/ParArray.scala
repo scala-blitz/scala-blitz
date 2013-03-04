@@ -71,14 +71,15 @@ object ParArray {
 
   trait Tree[T] {
     def level: Int
+    def size: Int
   }
 
   final class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree[T] {
-    var elements = -1
+    var size = -1
     def level = 0
   }
 
-  final class Node[@specialized T](val left: Tree[T], val right: Tree[T], val level: Int) extends Tree[T]
+  final class Node[@specialized T](val left: Tree[T], val right: Tree[T], val level: Int, val size: Int) extends Tree[T]
 
   abstract class ChunkCombiner[@specialized T: ClassTag, To](init: Boolean)
   extends Combiner[T, To] with CombinerLike[T, To, ChunkCombiner[T, To]] {
@@ -100,15 +101,15 @@ object ParArray {
     }
 
     private[ParArray] def closeLast() {
-      lasttree.elements = lastpos
+      lasttree.size = lastpos
     }
 
     private[ParArray] def mergeStack() = {
       @tailrec def merge(stack: List[Tree[T]]): List[Tree[T]] = stack match {
         case (c1: Chunk[T]) :: (c2: Chunk[T]) :: tail =>
-          merge(new Node[T](c2, c1, 1) :: tail)
+          merge(new Node[T](c2, c1, 1, c1.size + c2.size) :: tail)
         case (n1: Node[T]) :: (n2: Node[T]) :: tail if n1.level == n2.level =>
-          merge(new Node[T](n2, n1, n1.level + 1) :: tail)
+          merge(new Node[T](n2, n1, n1.level + 1, n1.size + n2.size) :: tail)
         case _ =>
           stack
       }
@@ -118,7 +119,7 @@ object ParArray {
 
     private[ParArray] def tree = {
       @tailrec def merge(stack: List[Tree[T]]): Tree[T] = stack match {
-        case t1 :: t2 :: tail => merge(new Node(t2, t1, math.max(t1.level, t2.level) + 1) :: tail)
+        case t1 :: t2 :: tail => merge(new Node(t2, t1, math.max(t1.level, t2.level) + 1, t1.size + t2.size) :: tail)
         case t :: Nil => t
       }
 

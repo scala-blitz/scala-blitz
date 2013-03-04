@@ -42,7 +42,9 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
       System.identityHashCode(this)
     )
 
-    final def casRange(ov: Long, nv: Long) = Utils.unsafe.compareAndSwapLong(this, RANGE_OFFSET, ov, nv)
+    final def CAS_RANGE(ov: Long, nv: Long) = Utils.unsafe.compareAndSwapLong(this, RANGE_OFFSET, ov, nv)
+
+    /* node interface */
 
     final def elementsRemaining = {
       val r = /*READ*/range
@@ -72,7 +74,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
         val p = progress(range_t0)
         val u = until(range_t0)
         val newp = math.min(u, p + step)
-        if (casRange(range_t0, createRange(newp, u))) newp - p
+        if (CAS_RANGE(range_t0, createRange(newp, u))) newp - p
         else -1
       }
     }
@@ -80,13 +82,13 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
     final def markCompleted(): Boolean = {
       val range_t0 = /*READ*/range
       if (completed(range_t0) || stolen(range_t0)) false
-      else casRange(range_t0, createCompleted(range_t0))
+      else CAS_RANGE(range_t0, createCompleted(range_t0))
     }
 
     final def markStolen(): Boolean = {
       val range_t0 = /*READ*/range
       if (completed(range_t0) || stolen(range_t0)) false
-      else casRange(range_t0, createStolen(range_t0))
+      else CAS_RANGE(range_t0, createStolen(range_t0))
     }
 
   }
@@ -121,13 +123,13 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
             val newrange = createRange(newp, u)
 
             // do some work on the left
-            if (node.casRange(currrange, newrange)) lsum = combine(lsum, applyIndex(node, p, newp))
+            if (node.CAS_RANGE(currrange, newrange)) lsum = combine(lsum, applyIndex(node, p, newp))
           } else {
             val newu = math.max(p, u - currstep)
             val newrange = createRange(p, newu)
 
             // do some work on the right
-            if (node.casRange(currrange, newrange)) rsum = combine(applyIndex(node, newu, u), rsum)
+            if (node.CAS_RANGE(currrange, newrange)) rsum = combine(applyIndex(node, newu, u), rsum)
           }
   
           // update step
@@ -149,7 +151,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
       val wasCompleted = if (completed(range_t0)) {
         work.lresult = lsum
         work.rresult = rsum
-        while (work.result == null) work.casResult(null, None)
+        while (work.result == null) work.CAS_RESULT(null, None)
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         true
       } else if (stolen(range_t0)) {
@@ -157,7 +159,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
         if (tree.child.isLeaf) tree.expand(this)
         tree.child.repr.lresult = lsum
         tree.child.repr.rresult = rsum
-        while (tree.child.result == null) tree.child.casResult(null, None)
+        while (tree.child.result == null) tree.child.CAS_RESULT(null, None)
         //val work = tree.child
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         false
@@ -192,7 +194,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
               }
             }
   
-          if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
+          if (finalresult.nonEmpty) if (tree.child.CAS_RESULT(r, finalresult)) {
             // if at root, notify completion, otherwise go one level up
             if (tree.up == null) tree.synchronized {
               tree.notifyAll()

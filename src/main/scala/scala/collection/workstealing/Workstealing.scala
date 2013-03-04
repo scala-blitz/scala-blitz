@@ -27,15 +27,15 @@ trait Workstealing[T] {
 
     def repr = this.asInstanceOf[N[R]]
 
-    final def casOwner(ov: Owner, nv: Owner) = Utils.unsafe.compareAndSwapObject(this, OWNER_OFFSET, ov, nv)
-    final def casResult(ov: Option[R], nv: Option[R]) = Utils.unsafe.compareAndSwapObject(this, RESULT_OFFSET, ov, nv)
+    final def CAS_OWNER(ov: Owner, nv: Owner) = Utils.unsafe.compareAndSwapObject(this, OWNER_OFFSET, ov, nv)
+    final def CAS_RESULT(ov: Option[R], nv: Option[R]) = Utils.unsafe.compareAndSwapObject(this, RESULT_OFFSET, ov, nv)
 
     final def isLeaf = left eq null
 
     @tailrec final def tryOwn(thiz: Owner): Boolean = {
       val currowner = /*READ*/owner
       if (currowner != null) false
-      else if (casOwner(currowner, thiz)) true
+      else if (CAS_OWNER(currowner, thiz)) true
       else tryOwn(thiz)
     }
 
@@ -303,14 +303,14 @@ trait Workstealing[T] {
       val state_t0 = work.state
       val wasCompleted = if (state_t0 eq Completed) {
         storeLResult(work, lsum)
-        while (work.result == null) work.casResult(null, None)
+        while (work.result == null) work.CAS_RESULT(null, None)
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         true
       } else if (state_t0 eq StolenOrExpanded) {
         // help expansion if necessary
         if (tree.child.isLeaf) tree.expand(this)
         storeLResult(tree.child, lsum)
-        while (tree.child.result == null) tree.child.casResult(null, None)
+        while (tree.child.result == null) tree.child.CAS_RESULT(null, None)
         //val work = tree.child
         //println(Thread.currentThread.getName + " -> " + work.start + " to " + work.progress + "; id=" + System.identityHashCode(work))
         false
@@ -345,7 +345,7 @@ trait Workstealing[T] {
               }
             }
   
-          if (finalresult.nonEmpty) if (tree.child.casResult(r, finalresult)) {
+          if (finalresult.nonEmpty) if (tree.child.CAS_RESULT(r, finalresult)) {
             // if at root, notify completion, otherwise go one level up
             if (tree.up == null) tree.synchronized {
               tree.notifyAll()
