@@ -15,6 +15,7 @@ object TreeWorkstealingTest extends App {
   }
 
   val treeIsTree = new TreeWorkstealing.IsTree[Tree] {
+    def element[@specialized S](tree: Tree) = ().asInstanceOf[S]
     def left(tree: Tree): Tree = tree.left
     def right(tree: Tree): Tree = tree.right
     def size(tree: Tree): Int = tree.size

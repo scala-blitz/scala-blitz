@@ -138,13 +138,17 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     final def next(): S = if (iterleft > 0) {
       iterleft -= 1
-      if (iterdepth == SINGLE_NODE) iterstack(0).asInstanceOf[S]
-      else null.asInstanceOf[S]
+      if (iterdepth == SINGLE_NODE) iterstack(0).asInstanceOf[TreeType].element[S]
+      else {
+        //val res = iterstack(iterdepth)
+        null.asInstanceOf[S]
+      }
     } else throw new NoSuchElementException
 
     final def markCompleted(): Boolean = ???
 
-    final def markStolen(): Boolean = ???    
+    final def markStolen(): Boolean = ???
+
   }
 
   abstract class TreeKernel[@specialized S, R] extends Kernel[S, R] {
@@ -156,6 +160,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 object TreeWorkstealing {
 
   trait IsTree[TreeType >: Null <: AnyRef] {
+    def element[@specialized S](tree: TreeType): S
     def left(tree: TreeType): TreeType
     def right(tree: TreeType): TreeType
     def size(tree: TreeType): Int
@@ -164,6 +169,7 @@ object TreeWorkstealing {
   }
 
   implicit class TreeOps[T >: Null <: AnyRef](val tree: T) extends AnyVal {
+    def element[@specialized S](implicit isTree: IsTree[T]) = isTree.element(tree)
     def left(implicit isTree: IsTree[T]) = isTree.left(tree)
     def right(implicit isTree: IsTree[T]) = isTree.right(tree)
     def size(implicit isTree: IsTree[T]) = isTree.size(tree)
