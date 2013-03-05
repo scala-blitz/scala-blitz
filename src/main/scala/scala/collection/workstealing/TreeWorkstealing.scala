@@ -5,6 +5,7 @@ package scala.collection.workstealing
 import sun.misc.Unsafe
 import annotation.tailrec
 import scala.collection._
+import scala.reflect.ClassTag
 
 
 
@@ -21,13 +22,23 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
   abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], initialStep: Int)
   extends Node[S, R](l, r)(initialStep) {
     var padding0: Int = 0
-    var padding1: Int = 0
-    var padding2: Int = 0
-    var padding3: Int = 0
+    //var padding1: Int = 0
+    //var padding2: Int = 0
+    //var padding3: Int = 0
     //var padding4: Int = 0
     //var padding5: Int = 0
-    var current: TreeType = null
     var pos: Int = 0
+    var current: TreeType = null
+    val iterstack = new Array[AnyRef](stack.length)
+    var iterleft = -1
+    var iterdepth = 0
+
+    init()
+
+    private def init() {
+      while (stack(pos) ne null) pos += 1
+      pos -= 1
+    }
 
     final def OFFSET(idx: Int): Long = STACK_BASE_OFFSET + idx * STACK_INDEX_SCALE
 
@@ -37,11 +48,20 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     private def snatch(node: TreeType) = ???
 
-    private def push(ov: AnyRef, nv: AnyRef): Boolean = ???
+    private def push(ov: AnyRef, nv: TreeType): Boolean = if (CAS_STACK(pos + 1, ov, nv)) {
+      pos += 1
+      true
+    } else false
 
-    private def pop(ov: AnyRef, nv: AnyRef): Boolean = ???
+    private def pop(ov: AnyRef, nv: AnyRef): Boolean = if (CAS_STACK(pos, ov, nv)) {
+      pos -= 1
+      true
+    } else false
 
-    private def switch(ov: AnyRef): Boolean = ???
+    private def switch(ov: AnyRef): Boolean = if (CAS_STACK(pos, ov, INNER_DONE)) {
+      current = ov.asInstanceOf[TreeType]
+      true
+    } else false
 
     private def peekcurr: AnyRef = READ_STACK(pos)
 
@@ -51,7 +71,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     private def isStolen(v: AnyRef) = v.isInstanceOf[StolenValue]
 
-    @tailrec private def move(step: Int): Int = {
+    @tailrec private def move(step: Int): Int = if (pos < 0) -1 else {
       val next = peeknext
       val curr = peekcurr
       val prev = peekprev
@@ -75,9 +95,31 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
             else pop(INNER_DONE, null)
             move(step)
         }
-        case tree =>
-          -1
+        case tree: TreeType => next match {
+          case SUBTREE_DONE =>
+            switch(tree)
+            val sz = tree.size - tree.left.size - tree.right.size
+            prepareIteration(sz, SINGLE_NODE, tree)
+            sz
+          case null =>
+            val nv = if (isLeft) SUBTREE_DONE else null
+            if (tree.isLeaf || tree.size <= step) {
+              if (pop(tree, nv)) {
+                prepareIteration(tree.size, 0, tree)
+                tree.size
+              } else move(step)
+            } else {
+              push(null, tree.left)
+              move(step)
+            }
+        }
       }
+    }
+
+    def prepareIteration(chunk: Int, depth: Int, current: TreeType) {
+      iterleft = chunk
+      iterdepth = depth
+      iterstack(0) = current
     }
 
     /* node interface */
@@ -88,7 +130,17 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     final def state = ???
 
-    final def advance(step: Int): Int = move(step)
+    final def advance(step: Int): Int = {
+      val chunk = move(step)
+      iterleft = chunk
+      chunk
+    }
+
+    final def next(): S = if (iterleft > 0) {
+      iterleft -= 1
+      if (iterdepth == SINGLE_NODE) iterstack(0).asInstanceOf[S]
+      else null.asInstanceOf[S]
+    } else throw new NoSuchElementException
 
     final def markCompleted(): Boolean = ???
 
@@ -111,17 +163,28 @@ object TreeWorkstealing {
     def isLeaf(tree: TreeType): Boolean
   }
 
-  implicit class TreeOps[T >: Null <: AnyRef: IsTree](tree: T) {
-    def left = implicitly[IsTree[T]].left(tree)
-    def right = implicitly[IsTree[T]].right(tree)
-    def size = implicitly[IsTree[T]].size(tree)
-    def height = implicitly[IsTree[T]].height(tree)
-    def isLeaf = implicitly[IsTree[T]].isLeaf(tree)
+  implicit class TreeOps[T >: Null <: AnyRef](val tree: T) extends AnyVal {
+    def left(implicit isTree: IsTree[T]) = isTree.left(tree)
+    def right(implicit isTree: IsTree[T]) = isTree.right(tree)
+    def size(implicit isTree: IsTree[T]) = isTree.size(tree)
+    def height(implicit isTree: IsTree[T]) = isTree.height(tree)
+    def isLeaf(implicit isTree: IsTree[T]) = isTree.isLeaf(tree)
+  }
+
+  def initializeStack[TreeType >: Null <: AnyRef: IsTree](root: TreeType): Array[AnyRef] = {
+    if (root eq null) Array(SUBTREE_DONE, null)
+    else {
+      val array = new Array[AnyRef](root.height + 2)
+      array(0) = root
+      array
+    }
   }
 
   val STACK_BASE_OFFSET = Utils.unsafe.arrayBaseOffset(classOf[Array[AnyRef]])
 
   val STACK_INDEX_SCALE = Utils.unsafe.arrayIndexScale(classOf[Array[AnyRef]])
+
+  val SINGLE_NODE = -1
 
   /* iteration stack values */
 

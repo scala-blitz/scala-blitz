@@ -16,8 +16,6 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
 
   type K[R] <: IndexKernel[T, R]
 
-  def size: Int
-
   abstract class IndexNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val start: Int, val end: Int, @volatile var range: Long, st: Int)
   extends Node[S, R](l, r)(st) {
     @volatile var rresult: R = null.asInstanceOf[R]
