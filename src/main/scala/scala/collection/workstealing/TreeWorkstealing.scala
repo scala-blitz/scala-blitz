@@ -22,16 +22,59 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
   abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], initialStep: Int)
   extends Node[S, R](l, r)(initialStep) {
     var padding0: Int = 0
-    //var padding1: Int = 0
-    //var padding2: Int = 0
-    //var padding3: Int = 0
+    var padding1: Int = 0
+    var padding2: Int = 0
+    var padding3: Int = 0
     //var padding4: Int = 0
     //var padding5: Int = 0
     var pos: Int = 0
     var current: TreeType = null
-    val iterstack = new Array[AnyRef](stack.length)
-    var iterleft = -1
-    var iterdepth = 0
+    val iter = new Iteration(isTree.tag.newArray(stack.length), 0, 0)
+
+    def extractElement(t: TreeType): S
+
+    class Iteration(val stack: Array[TreeType], var depth: Int, var left: Int) {
+      def push(v: TreeType) {
+        depth += 1
+        stack(depth) = v
+      }
+      def pop() = {
+        val res = stack(depth)
+        depth -= 1
+        res
+      }
+      def peek = stack(depth)
+      def valuePeek(d: Int): S = extractElement(stack(d))
+      def prepare(chunk: Int, current: TreeType) {
+        if (chunk == SINGLE_NODE) {
+          left = 1
+          depth = SINGLE_NODE
+          stack(0) = current
+        } else {
+          left = chunk
+          depth = 0
+          stack(0) = current
+          while (!peek.isLeaf) push(peek.left)
+        }
+      }
+      def move() {
+        val n = pop()
+        if (!n.isLeaf/* || (n.isLeaf && isTree.external))*/) {
+          push(n.right)
+          while (!peek.isLeaf) push(peek.left)
+        } else
+        n
+      }
+      def next() = if (left > 0) {
+        left -= 1
+        if (depth == SINGLE_NODE) valuePeek(0)
+        else {
+          val res = valuePeek(depth)
+          move()
+          res
+        }
+      } else throw new NoSuchElementException
+    }
 
     init()
 
@@ -98,14 +141,13 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         case tree: TreeType => next match {
           case SUBTREE_DONE =>
             switch(tree)
-            val sz = tree.size - tree.left.size - tree.right.size
-            prepareIteration(sz, SINGLE_NODE, tree)
-            sz
+            iter.prepare(SINGLE_NODE, tree)
+            if (isTree.external) 0 else 1
           case null =>
             val nv = if (isLeft) SUBTREE_DONE else null
             if (tree.isLeaf || tree.size <= step) {
               if (pop(tree, nv)) {
-                prepareIteration(tree.size, 0, tree)
+                iter.prepare(tree.size, tree)
                 tree.size
               } else move(step)
             } else {
@@ -116,12 +158,6 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       }
     }
 
-    def prepareIteration(chunk: Int, depth: Int, current: TreeType) {
-      iterleft = chunk
-      iterdepth = depth
-      iterstack(0) = current
-    }
-
     /* node interface */
 
     final def elementsRemaining = ???
@@ -130,20 +166,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     final def state = ???
 
-    final def advance(step: Int): Int = {
-      val chunk = move(step)
-      iterleft = chunk
-      chunk
-    }
+    final def advance(step: Int): Int = move(step)
 
-    final def next(): S = if (iterleft > 0) {
-      iterleft -= 1
-      if (iterdepth == SINGLE_NODE) iterstack(0).asInstanceOf[TreeType].element[S]
-      else {
-        //val res = iterstack(iterdepth)
-        null.asInstanceOf[S]
-      }
-    } else throw new NoSuchElementException
+    final def next(): S = iter.next()
 
     final def markCompleted(): Boolean = ???
 
@@ -160,16 +185,16 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 object TreeWorkstealing {
 
   trait IsTree[TreeType >: Null <: AnyRef] {
-    def element[@specialized S](tree: TreeType): S
     def left(tree: TreeType): TreeType
     def right(tree: TreeType): TreeType
     def size(tree: TreeType): Int
     def height(tree: TreeType): Int
     def isLeaf(tree: TreeType): Boolean
+    def tag: ClassTag[TreeType]
+    def external: Boolean
   }
 
   implicit class TreeOps[T >: Null <: AnyRef](val tree: T) extends AnyVal {
-    def element[@specialized S](implicit isTree: IsTree[T]) = isTree.element(tree)
     def left(implicit isTree: IsTree[T]) = isTree.left(tree)
     def right(implicit isTree: IsTree[T]) = isTree.right(tree)
     def size(implicit isTree: IsTree[T]) = isTree.size(tree)
@@ -177,7 +202,7 @@ object TreeWorkstealing {
     def isLeaf(implicit isTree: IsTree[T]) = isTree.isLeaf(tree)
   }
 
-  def initializeStack[TreeType >: Null <: AnyRef: IsTree](root: TreeType): Array[AnyRef] = {
+  def initializeStack[TreeType >: Null <: AnyRef, S](root: TreeType)(implicit isTree: IsTree[TreeType]): Array[AnyRef] = {
     if (root eq null) Array(SUBTREE_DONE, null)
     else {
       val array = new Array[AnyRef](root.height + 2)
