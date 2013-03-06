@@ -216,6 +216,22 @@ object TreeWorkstealingTest extends App {
   testIteration(0 until 8, 1, true)
   testIteration(0 until 8, 2, true)
   testIteration(0 until 8, 4, true)
+  testIteration(0 until 32, 1, true)
+  testIteration(0 until 32, 4, true)
+  testIteration(0 until 32, 8, true)
+  testIteration(0 until 64, 1, true)
+  testIteration(0 until 64, 4, true)
+  testIteration(0 until 64, 8, true)
+  testIteration(0 until 64, 16, true)
+  testIteration(0 until 64, 32, true)
+  testIteration(0 until 1164, 1, true)
+  testIteration(0 until 1164, 4, true)
+  testIteration(0 until 1164, 8, true)
+  testIteration(0 until 1164, 16, true)
+  testIteration(0 until 1164, 32, true)
+  testIteration(0 until 1164, 64, true)
+  testIteration(0 until 1164, 128, true)
+  testIteration(0 until 1164, 256, true)
 
 }
 

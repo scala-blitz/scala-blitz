@@ -38,12 +38,12 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         depth += 1
         stack(depth) = v
       }
-      def pop() = {
+      def pop() = if (depth >= 0) {
         val res = stack(depth)
         depth -= 1
         res
-      }
-      def peek = stack(depth)
+      } else null
+      def peek = if (depth >= 0) stack(depth) else null
       def valuePeek(d: Int): S = extractElement(stack(d))
       def prepare(chunk: Int, current: TreeType) {
         if (chunk == SINGLE_NODE) {
@@ -59,10 +59,18 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       }
       def move() {
         val n = pop()
-        if (!n.isLeaf/* || (n.isLeaf && isTree.external))*/) {
-          push(n.right)
-          while (!peek.isLeaf) push(peek.left)
-        } else
+        if (isTree.external) {
+          if (peek != null && !peek.isLeaf) {
+            val inner = pop()
+            push(inner.right)
+            while (!peek.isLeaf) push(peek.left)
+          }
+        } else {
+          if (!n.isLeaf) {
+            push(n.right)
+            while (!peek.isLeaf) push(peek.left)
+          }
+        }
         n
       }
       def next() = if (left > 0) {
