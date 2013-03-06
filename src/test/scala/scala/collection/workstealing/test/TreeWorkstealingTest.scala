@@ -50,7 +50,7 @@ object TreeWorkstealingTest extends App {
 
   def toNode(root: Tree): workstealing.TreeNode[Int, Unit] = {
     val stack = TreeWorkstealing.initializeStack(root)(treeIsTree)
-    new workstealing.TreeNode[Int, Unit](null, null)(root, stack, 1) {
+    new workstealing.TreeNode[Int, Unit](null, null)(root, stack, root.size, 1) {
       def newExpanded(parent: workstealing.Ptr[Int, Unit]) = ???
       def extractElement(t: Tree) = t.element
     }
@@ -58,7 +58,7 @@ object TreeWorkstealingTest extends App {
 
   def toExtNode(root: Tree): extworkstealing.TreeNode[Int, Unit] = {
     val stack = TreeWorkstealing.initializeStack(root)(externalTreeIsTree)
-    new extworkstealing.TreeNode[Int, Unit](null, null)(root, stack, 1) {
+    new extworkstealing.TreeNode[Int, Unit](null, null)(root, stack, root.size, 1) {
       def newExpanded(parent: extworkstealing.Ptr[Int, Unit]) = ???
       def extractElement(t: Tree) = t.element
     }
@@ -232,6 +232,62 @@ object TreeWorkstealingTest extends App {
   testIteration(0 until 1164, 64, true)
   testIteration(0 until 1164, 128, true)
   testIteration(0 until 1164, 256, true)
+
+  def testStealing(range: Range, step: Int) {
+    val seen = mutable.ArrayBuffer[Int]()
+    val root = createExternalTree(range)
+    val wsnd = toExtNode(root)
+
+    val stealer = new Thread {
+      override def run() {
+        wsnd.markStolen()
+      }
+    }
+    stealer.start()
+
+    var loop = true
+    while (loop) {
+      var chunk = wsnd.advance(step)
+      if (chunk == -1) loop = false
+      while (chunk > 0) {
+        seen += wsnd.next()
+        chunk -= 1
+      }
+    }
+    assert(seen == range.take(seen.length), seen + " vs. " + range.take(seen.length))
+    assert(seen.length + wsnd.elementsRemaining == range.length, seen.length + " + " + wsnd.elementsRemaining + " vs. " + range.length + " in " + wsnd.nodeString)
+  }
+
+  testStealing(0 until 64, 1)
+  testStealing(0 until 64, 4)
+  testStealing(0 until 128, 1)
+  testStealing(0 until 128, 4)
+  testStealing(0 until 128, 8)
+  testStealing(0 until 128, 16)
+  testStealing(0 until 128, 32)
+  testStealing(0 until 512, 1)
+  testStealing(0 until 512, 4)
+  testStealing(0 until 512, 8)
+  testStealing(0 until 512, 16)
+  testStealing(0 until 512, 32)
+  testStealing(0 until 512, 64)
+  testStealing(0 until 512, 128)
+  testStealing(0 until 512, 256)
+  testStealing(0 until 1024, 1)
+  testStealing(0 until 1024, 4)
+  testStealing(0 until 1024, 8)
+  testStealing(0 until 1024, 16)
+  testStealing(0 until 1024, 32)
+  testStealing(0 until 1024, 64)
+  testStealing(0 until 1024, 128)
+  testStealing(0 until 1024, 256)
+  testStealing(0 until 2000, 128)
+  testStealing(0 until 2000, 500)
+  testStealing(0 until 2000, 600)
+  testStealing(0 until 2000, 700)
+  testStealing(0 until 2000, 800)
+  testStealing(0 until 2000, 900)
+  testStealing(0 until 2000, 1000)
 
 }
 
