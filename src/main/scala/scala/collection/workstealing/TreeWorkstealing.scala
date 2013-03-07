@@ -387,7 +387,7 @@ object TreeWorkstealing {
     def isLeaf(implicit isTree: IsTree[T]) = isTree.isLeaf(tree)
   }
 
-  def cacheLineSizeMultiple(sz: Int) = (sz / 16 + 1) * 16
+  def cacheLineSizeMultiple(sz: Int) = ((sz - 1) / 16 + 1) * 16
 
   def initializeStack[TreeType >: Null <: AnyRef, S](root: TreeType)(implicit isTree: IsTree[TreeType]): Array[AnyRef] = {
     if (root eq null) Array(SUBTREE_DONE, null)
