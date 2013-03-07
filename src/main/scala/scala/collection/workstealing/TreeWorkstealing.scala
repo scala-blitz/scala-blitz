@@ -19,26 +19,40 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
   implicit val isTree: IsTree[TreeType]
 
-  abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], val totalElems: Int, initialStep: Int)
-  extends Node[S, R](l, r)(initialStep) {
+  abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], val totalElems: Int, initStep: Int)
+  extends Node[S, R](l, r)(initStep) {
     var padding0: Int = 0
     var padding1: Int = 0
-    var padding2: Int = 0
+    //var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
     //var padding5: Int = 0
     var pos: Int = 0
     var current: TreeType = null
-    val iter = new Iteration(isTree.tag.newArray(stack.length), 0, 0)
+    var totalLeft: Int = totalElems
+    val iter = createIterator
 
     override def nodeString = "TreeNode(%s)(%s)".format(
       if (owner == null) "none" else "worker " + owner.index,
       stack.mkString(", ")
     )
 
-    def extractElement(t: TreeType): S
+    def createIterator: TreeIterator[S]
 
-    class Iteration(val stack: Array[TreeType], var depth: Int, var left: Int) {
+    def newTreeNode(l: Ptr[S, R], r: Ptr[S, R])(root: TreeType, stack: Array[AnyRef], totalElems: Int, initStep: Int): TreeNode[S, R]
+
+    trait TreeIterator[@specialized Q] {
+      def initializeWithSubtree(t: TreeType, elems: Int): Unit
+      def next(): Q
+    }
+
+    abstract class DefaultIterator[@specialized Q](val stack: Array[TreeType], var depth: Int, var left: Int)
+    extends TreeIterator[Q] {
+      def this() = this(isTree.tag.newArray(stack.length), 0, 0)
+
+      def extractElement(tree: TreeType): Q
+
+      final def initializeWithSubtree(t: TreeType, elems: Int) = prepare(t, elems)
       def push(v: TreeType) {
         depth += 1
         stack(depth) = v
@@ -49,8 +63,8 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         res
       } else null
       def peek = if (depth >= 0) stack(depth) else null
-      def valuePeek(d: Int): S = extractElement(stack(d))
-      def prepare(chunk: Int, current: TreeType) {
+      def valuePeek(d: Int): Q = extractElement(stack(d))
+      def prepare(current: TreeType, chunk: Int) {
         if (chunk == SINGLE_NODE) {
           left = 1
           depth = SINGLE_NODE
@@ -77,7 +91,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
           }
         }
       }
-      def next() = if (left > 0) {
+      def next(): Q = if (left > 0) {
         left -= 1
         if (depth == SINGLE_NODE) valuePeek(0)
         else {
@@ -91,7 +105,11 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     init()
 
     private def init() {
-      while (READ_STACK(pos) ne null) pos += 1
+      var top = READ_STACK(pos)
+      while ((top ne SUBTREE_DONE) && (top ne null)) {
+        pos += 1
+        top = READ_STACK(pos)
+      }
       pos -= 1
     }
 
@@ -112,8 +130,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       case null =>
         if (READ_STACK(idx - 1) eq STOLEN_RIGHT) CAS_STACK(idx, null, STOLEN_COMPLETED)
         else CAS_STACK(idx, null, STOLEN_NULL)
-      case tree =>
-        CAS_STACK(idx, tree, STOLEN_LEFT)
+      case tree: TreeType =>
+        if (tree.isLeaf) CAS_STACK(idx, tree, STOLEN_NULL)
+        else CAS_STACK(idx, tree, STOLEN_LEFT)
     }
 
     private def push(ov: AnyRef, nv: TreeType): Boolean = if (CAS_STACK(pos + 1, ov, nv)) {
@@ -133,11 +152,19 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     private def peekcurr: AnyRef = READ_STACK(pos)
 
-    private def peekprev: AnyRef = if (pos > 0) READ_STACK(pos - 1) else NO_PARENT
+    private def safeReadStack(idx: Int): AnyRef = if (idx >= 0) READ_STACK(idx) else NO_PARENT
+
+    private def peekprev: AnyRef = safeReadStack(pos - 1)
 
     private def peeknext: AnyRef = READ_STACK(pos + 1)
 
     private def isStolen(v: AnyRef) = v.isInstanceOf[StolenValue]
+
+    private def checkIfLeft(parent: AnyRef) = parent match {
+      case NO_PARENT => true
+      case INNER_DONE => false
+      case tree => true
+    }
 
     @tailrec private def move(step: Int): Int = if (pos < 0) -1 else {
       val next = peeknext
@@ -147,11 +174,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         markStolen()
         return -1
       } // otherwise neither were the other two stolen when they were read!
-      val isLeft = prev match {
-        case NO_PARENT => true
-        case INNER_DONE => false
-        case tree => true
-      }
+      val isLeft = checkIfLeft(prev)
 
       curr match {
         case INNER_DONE => next match {
@@ -163,16 +186,16 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
             else pop(INNER_DONE, null)
             move(step)
         }
-        case tree: TreeType => next match {
+        case tree: TreeType if isTree.check(tree) => next match {
           case SUBTREE_DONE =>
             switch(tree)
-            iter.prepare(SINGLE_NODE, tree)
+            iter.initializeWithSubtree(tree, SINGLE_NODE)
             if (isTree.external) 0 else 1
           case null =>
             val nv = if (isLeft) SUBTREE_DONE else null
             if (tree.isLeaf || tree.size <= step) {
               if (pop(tree, nv)) {
-                iter.prepare(tree.size, tree)
+                iter.initializeWithSubtree(tree, tree.size)
                 tree.size
               } else move(step)
             } else {
@@ -203,8 +226,100 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       case STOLEN_NULL =>
         count + 0
       case STOLEN_LEFT | _ =>
-        if (tree.isLeaf) count + 0
-        else countCompleted(tree.left, depth + 1, count)
+        countCompleted(tree.left, depth + 1, count)
+    }
+
+    @tailrec private def completeStolenRight(tree: TreeType, depth: Int, minForLeft: Int, stack2: Array[AnyRef]): Int = {
+      if (tree.isLeaf) {
+        stack2(depth) = tree
+        0
+      } else {
+        if (tree.left.size >= minForLeft) {
+          stack2(depth) = INNER_DONE
+          stack2(depth + 1) = tree.right
+          val alreadyInLeft = tree.left.size + isTree.innerSize
+          alreadyInLeft
+        } else {
+          stack2(depth) = INNER_DONE
+          val alreadyInLeft = tree.left.size + isTree.innerSize
+          completeStolenRight(tree.right, depth + 1, minForLeft - alreadyInLeft, stack2)
+        }
+      }
+    }
+
+    @tailrec private def completeStolenLeft(tree: TreeType, depth: Int, stack1: Array[AnyRef]): Unit = READ_STACK(depth) match {
+      case STOLEN_LEFT =>
+        stack1(depth) = tree
+        completeStolenLeft(tree.left, depth + 1, stack1)
+      case STOLEN_RIGHT =>
+        stack1(depth) = INNER_DONE
+        completeStolenLeft(tree.left, depth + 1, stack1)
+      case STOLEN_NULL =>
+        val isLeft = checkIfLeft(safeReadStack(depth - 1))
+        if (isLeft) stack1(depth) = null
+        else stack1(depth) = SUBTREE_DONE
+      case STOLEN_COMPLETED =>
+        val isLeft = checkIfLeft(safeReadStack(depth - 1))
+        if (isLeft) stack1(depth) = SUBTREE_DONE
+        else stack1(depth) = null
+    }
+
+    @tailrec protected final def splitStolen(tree: TreeType, depth: Int, minForLeft: Int, stack1: Array[AnyRef], stack2: Array[AnyRef]): Int = READ_STACK(depth) match {
+      case STOLEN_RIGHT =>
+        stack1(depth) = INNER_DONE
+        stack2(depth) = INNER_DONE
+        splitStolen(tree.right, depth + 1, minForLeft, stack1, stack2)
+      case STOLEN_COMPLETED =>
+        val isLeft = checkIfLeft(safeReadStack(depth - 1))
+        if (isLeft) {
+          stack1(depth) = SUBTREE_DONE
+          stack2(depth) = SUBTREE_DONE
+          0
+        } else {
+          stack1(depth) = null
+          stack2(depth) = null
+          0
+        }
+      case STOLEN_NULL =>
+        val isLeft = checkIfLeft(safeReadStack(depth - 1))
+        if (tree.isLeaf) {
+          if (isLeft) {
+            stack1(depth) = tree
+            stack2(depth) = SUBTREE_DONE
+            tree.size
+          } else {
+            stack1(depth) = tree
+            stack2(depth) = null
+            tree.size
+          }
+        } else {
+          if (tree.left.size >= minForLeft) {
+            stack1(depth) = tree
+            stack1(depth + 1) = tree.left
+            stack2(depth) = tree
+            stack2(depth + 1) = SUBTREE_DONE
+            tree.left.size
+          } else {
+            stack1(depth) = tree
+            stack1(depth + 1) = tree.left
+            stack2(depth) = INNER_DONE
+            val alreadyInLeft = tree.left.size + isTree.innerSize
+            alreadyInLeft + completeStolenRight(tree.right, depth + 1, minForLeft - alreadyInLeft, stack2)
+          }          
+        }
+      case STOLEN_LEFT =>
+        val elemsLeftInLeft = countCompleted(tree.left, depth + 1, 0)
+        if (elemsLeftInLeft <= minForLeft) {
+          stack1(depth) = tree
+          stack2(depth) = INNER_DONE
+          completeStolenLeft(tree.left, depth + 1, stack1)
+          val alreadyInLeft = elemsLeftInLeft + isTree.innerSize
+          alreadyInLeft + completeStolenRight(tree.right, depth + 1, minForLeft - alreadyInLeft, stack2)
+        } else {
+          stack1(depth) = tree
+          stack2(depth) = tree
+          splitStolen(tree.left, depth + 1, minForLeft, stack1, stack2)
+        }
     }
 
     /* node interface */
@@ -223,7 +338,11 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         Workstealing.AvailableOrOwned
     }
 
-    final def advance(step: Int): Int = move(step)
+    final def advance(step: Int): Int = if (totalLeft <= 0) -1 else {
+      val chunk = move(math.min(totalLeft, step))
+      totalLeft -= chunk
+      chunk
+    }
 
     final def next(): S = iter.next()
 
@@ -243,6 +362,21 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         markStolen()
     }
 
+    def newExpanded(parent: Ptr[S, R]): TreeNode[S, R] = {
+      val elemsLeft = elementsRemaining
+      val minForLeft = elemsLeft / 2
+      val stack1 = new Array[AnyRef](root.height + 1)
+      val stack2 = new Array[AnyRef](root.height + 1)
+      val inLeft = splitStolen(root, 0, minForLeft, stack1, stack2)
+      val lnode = newTreeNode(null, null)(root, stack1, inLeft, initStep)
+      val rnode = newTreeNode(null, null)(root, stack2, elemsLeft - inLeft, initStep)
+      val lptr = new Ptr[S, R](parent, parent.level + 1)(lnode)
+      val rptr = new Ptr[S, R](parent, parent.level + 1)(rnode)
+      val nnode = newTreeNode(lptr, rptr)(root, stack, totalElems, initStep)
+      nnode.owner = this.owner
+      nnode
+    }
+
   }
 
   abstract class TreeKernel[@specialized S, R] extends Kernel[S, R] {
@@ -253,7 +387,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
 object TreeWorkstealing {
 
-  trait IsTree[TreeType >: Null <: AnyRef] {
+  abstract class IsTree[TreeType >: Null <: AnyRef] {
     def left(tree: TreeType): TreeType
     def right(tree: TreeType): TreeType
     def size(tree: TreeType): Int
@@ -261,6 +395,9 @@ object TreeWorkstealing {
     def isLeaf(tree: TreeType): Boolean
     def tag: ClassTag[TreeType]
     def external: Boolean
+
+    def innerSize = if (external) 0 else 1
+    def check(x: AnyRef) = tag.runtimeClass.isInstance(x)
   }
 
   implicit class TreeOps[T >: Null <: AnyRef](val tree: T) extends AnyVal {
