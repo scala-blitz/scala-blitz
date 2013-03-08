@@ -43,7 +43,7 @@ object TreeWorkstealingTest extends App {
 
   val extworkstealing = new TreeWorkstealing[Int, Tree] {
     val isTree = externalTreeIsTree
-    def config = ???
+    def config = Workstealing.DefaultConfig
     def newRoot[R]: Ptr[Int, R] = ???
     def size: Int = ???
   }
@@ -275,7 +275,7 @@ object TreeWorkstealingTest extends App {
     assert(seen.length + wsnd.elementsRemaining == range.length, seen.length + " + " + wsnd.elementsRemaining + " vs. " + range.length + " in " + wsnd.nodeString)
 
     if (wsnd.state eq Workstealing.StolenOrExpanded) {
-      val expanded = wsnd.newExpanded(ptr)
+      val expanded = wsnd.newExpanded(ptr, null)
       val left = expanded.left.child.repr
       val right = expanded.right.child.repr
   

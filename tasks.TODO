@@ -3,4 +3,4 @@ To fix:
  ☐ parallel arrays need to be specialized
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
- 
+ ☐ allow asynchronous execution

@@ -98,7 +98,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
 
     def isNotRandom = false
 
-    override def workOn(tree: Ptr[S, R]): Boolean = {
+    override def workOn(tree: Ptr[S, R], worker: Workstealing.Worker): Boolean = {
       val rawn = /*READ*/tree.child
       beforeWorkOn(tree, rawn)
       val node = rawn.repr
@@ -139,10 +139,10 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
       completeIteration(rawn)
 
       // complete node information
-      completeNode(lsum, rsum, tree)
+      completeNode(lsum, rsum, tree, worker)
     }
 
-    private def completeNode(lsum: R, rsum: R, tree: Ptr[S, R]): Boolean = {
+    private def completeNode(lsum: R, rsum: R, tree: Ptr[S, R], worker: Workstealing.Worker): Boolean = {
       val work = tree.child.repr
 
       val range_t0 = work.range
@@ -154,7 +154,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
         true
       } else if (stolen(range_t0)) {
         // help expansion if necessary
-        if (tree.child.isLeaf) tree.expand(this)
+        if (tree.child.isLeaf) tree.expand(this, worker)
         tree.child.repr.lresult = lsum
         tree.child.repr.rresult = rsum
         while (tree.child.result == null) tree.child.CAS_RESULT(null, None)

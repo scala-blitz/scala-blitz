@@ -34,12 +34,13 @@ trait Workstealing[T] {
 
     @tailrec final def tryOwn(thiz: Owner): Boolean = {
       val currowner = /*READ*/owner
-      if (currowner != null) false
+      if (currowner eq thiz) true
+      else if (currowner != null) false
       else if (CAS_OWNER(currowner, thiz)) true
       else tryOwn(thiz)
     }
 
-    final def trySteal(parent: AnyRef, kernel: AnyRef): Boolean = parent.asInstanceOf[Ptr[S, R]].expand(kernel.asInstanceOf[Kernel[S, R]])
+    final def trySteal(parent: AnyRef, kernel: AnyRef, worker: Worker): Boolean = parent.asInstanceOf[Ptr[S, R]].expand(kernel.asInstanceOf[Kernel[S, R]], worker)
 
     def workDone = 0
 
@@ -62,7 +63,7 @@ trait Workstealing[T] {
 
     def elementsCompleted: Int
 
-    def newExpanded(parent: Ptr[S, R]): Node[S, R]
+    def newExpanded(parent: Ptr[S, R], worker: Worker): Node[S, R]
 
     def state: State
 
@@ -83,7 +84,7 @@ trait Workstealing[T] {
     /** Try to expand node and return true if node was expanded.
      *  Return false if node was completed.
      */
-    @tailrec def expand(kernel: Kernel[S, R]): Boolean = {
+    @tailrec def expand(kernel: Kernel[S, R], worker: Worker): Boolean = {
       val child_t0 = /*READ*/child
       if (!child_t0.isLeaf) true else { // already expanded
         // first set progress to -progress
@@ -91,14 +92,14 @@ trait Workstealing[T] {
         if (state_t1 eq Completed) false // already completed
         else {
           if (state_t1 ne StolenOrExpanded) {
-            if (child_t0.markStolen()) expand(kernel) // marked stolen - now move on to node creation
-            else expand(kernel) // wasn't marked stolen and failed marking stolen - retry
+            if (child_t0.markStolen()) expand(kernel, worker) // marked stolen - now move on to node creation
+            else expand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
-            val expanded = child_t0.newExpanded(this)
+            val expanded = child_t0.newExpanded(this, worker)
             kernel.afterExpand(child_t0, expanded)
             if (casChild(child_t0, expanded)) true // try to replace with expansion
-            else expand(kernel) // failure (spurious or due to another expand) - retry
+            else expand(kernel, worker) // failure (spurious or due to another expand) - retry
           }
         }
       }
@@ -135,7 +136,7 @@ trait Workstealing[T] {
     val leaf = config.strategy.findWork[T, R](w, root, kernel).asInstanceOf[Ptr[T, R]]
     if (leaf != null) {
       @tailrec def workAndDescend(leaf: Ptr[T, R]) {
-        val nosteals = kernel.workOn(leaf)
+        val nosteals = kernel.workOn(leaf, w)
         if (!nosteals) {
           val subnode = config.strategy.chooseAsVictim[T, R](w.index, w.total, leaf).asInstanceOf[Ptr[T, R]]
           if (subnode.child.tryOwn(w)) workAndDescend(subnode)
@@ -249,18 +250,22 @@ trait Workstealing[T] {
       node.lresult = res
     }
 
+    /** The maximum size a chunk can have.
+     */
+    def maximumChunkSize = config.maxStep
+
     /** Returns true if completed with no stealing.
      *  Returns false if steal occurred.
      *
      *  May be overridden in subclass to specialize for better performance.
      */
-    def workOn(tree: Ptr[S, R]): Boolean = {
+    def workOn(tree: Ptr[S, R], worker: Worker): Boolean = {
       val node = /*READ*/tree.child
       beforeWorkOn(tree, node)
       var lsum = zero
       var incCount = 0
       val incFreq = config.incrementFrequency
-      val ms = config.maxStep
+      val ms = maximumChunkSize
       var looping = true
       while (looping && notTerminated) {
         val currstep = /*READ*/node.step
@@ -281,7 +286,7 @@ trait Workstealing[T] {
       completeIteration(node)
 
       // complete node information
-      completeNode(lsum, tree)
+      completeNode(lsum, tree, worker)
     }
 
     /** Completes the iteration in the node.
@@ -297,7 +302,7 @@ trait Workstealing[T] {
       }
     }
 
-    private def completeNode(lsum: R, tree: Ptr[S, R]): Boolean = {
+    private def completeNode(lsum: R, tree: Ptr[S, R], worker: Worker): Boolean = {
       val work = tree.child
 
       val state_t0 = work.state
@@ -308,7 +313,7 @@ trait Workstealing[T] {
         true
       } else if (state_t0 eq StolenOrExpanded) {
         // help expansion if necessary
-        if (tree.child.isLeaf) tree.expand(this)
+        if (tree.child.isLeaf) tree.expand(this, worker)
         storeLResult(tree.child, lsum)
         while (tree.child.result == null) tree.child.CAS_RESULT(null, None)
         //val work = tree.child
@@ -380,7 +385,7 @@ trait Workstealing[T] {
     dispatchWorkFJ(root, kernel.repr)
 
     // piggy-back the caller into doing work
-    if (!kernel.workOn(root)) workUntilNoWork(Invoker, root, kernel.repr)
+    if (!kernel.workOn(root, Invoker)) workUntilNoWork(Invoker, root, kernel.repr)
 
     // synchronize in case there's some other worker just
     // about to complete work
@@ -409,6 +414,7 @@ object Workstealing {
   val CHILD_OFFSET = Utils.unsafe.objectFieldOffset(classOf[Workstealing[_]#Ptr[_, _]].getDeclaredField("child"))
 
   trait Config {
+    def initialStep: Int
     def maxStep: Int
     def incrementFrequency: Int
     def par: Int
@@ -416,6 +422,7 @@ object Workstealing {
   }
 
   object DefaultConfig extends Config {
+    val initialStep = sys.props("step").toInt
     val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
     val incrementFrequency = 1
     val par = sys.props("par").toInt
@@ -441,8 +448,6 @@ object Workstealing {
   val AvailableOrOwned = new State {
     override def toString = "AvailableOrOwned"
   }
-
-  val initialStep = sys.props("step").toInt
 
   def localRandom = scala.concurrent.forkjoin.ThreadLocalRandom.current
 
@@ -478,11 +483,14 @@ object Workstealing {
       val total = worker.total
       val node = tree.child
       if (node.isLeaf) {
-        if ((node.state eq Completed) && node.owner != null) null // no further expansions
+        if (
+          ((node.state eq Completed) && node.owner != null && node.owner != worker) ||
+          (node.owner != worker && node.elementsRemaining == 1)
+        ) null // no further expansions
         else {
           // more work
           if (node.tryOwn(worker)) tree
-          else if (node.trySteal(tree, kernel)) {
+          else if (node.trySteal(tree, kernel, worker)) {
             val subnode = chooseAsStealer(index, total, tree)
             if (subnode.child.tryOwn(worker)) subnode
             else findWork[S, R](worker, tree, kernel)
@@ -646,10 +654,10 @@ object Workstealing {
       }
 
       val max = search(tree)
-      if (max != null) {
+      if (max != null && !(max.child.owner != worker && max.child.elementsRemaining == 1)) {
         val node = /*READ*/max.child
         if (node.tryOwn(worker)) max
-        else if (node.trySteal(max, kernel)) {
+        else if (node.trySteal(max, kernel, worker)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)
           if (subnode.child.tryOwn(worker)) subnode
           else findWork(worker, tree, kernel)

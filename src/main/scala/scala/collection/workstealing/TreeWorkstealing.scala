@@ -43,6 +43,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     trait TreeIterator[@specialized Q] {
       def initializeWithSubtree(t: TreeType, elems: Int): Unit
+      def subtree: TreeType
+      def isSingle: Boolean
+      def elements: Int
       def next(): Q
     }
 
@@ -52,6 +55,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
       def extractElement(tree: TreeType): Q
 
+      final def subtree = stack(0)
+      final def isSingle = depth == SINGLE_NODE
+      final def elements = if (isSingle) isTree.innerSize else left
       final def initializeWithSubtree(t: TreeType, elems: Int) = prepare(t, elems)
       def push(v: TreeType) {
         depth += 1
@@ -106,13 +112,15 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     private def init() {
       @tailrec def init(tree: TreeType, depth: Int): Int = {
-        val top = READ_STACK(depth)
-        if ((top eq SUBTREE_DONE) || (top eq null) || (top eq STOLEN_COMPLETED) || (top eq STOLEN_NULL)) depth - 1
-        else {
-          val goRight = (top eq STOLEN_RIGHT) || (top eq INNER_DONE)
-          if (goRight) current = tree
-          val child = if (goRight) tree.right else tree.left
-          init(child, depth + 1)
+        READ_STACK(depth) match {
+          case SUBTREE_DONE | null | STOLEN_COMPLETED | STOLEN_NULL =>
+            depth - 1
+          case STOLEN_RIGHT | INNER_DONE =>
+            current = tree
+            init(tree.right, depth + 1)
+          case STOLEN_LEFT | _ =>
+            if (tree.isLeaf) depth
+            else init(tree.left, depth + 1)
         }
       }
       pos = init(root, 0)
@@ -120,11 +128,24 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     final def OFFSET(idx: Int): Long = STACK_BASE_OFFSET + idx * STACK_INDEX_SCALE
 
-    final def READ_STACK(idx: Int) = Utils.unsafe.getObject(stack, OFFSET(idx))
+    private def checkBounds(idx: Int) = {
+      if (idx < 0 || idx >= stack.length) throw new IndexOutOfBoundsException("idx: " + idx + ", length: " + stack.length)
+    }
 
-    final def CAS_STACK(idx: Int, ov: AnyRef, nv: AnyRef) = Utils.unsafe.compareAndSwapObject(stack, OFFSET(idx), ov, nv)
+    final def READ_STACK(idx: Int) = {
+      checkBounds(idx)
+      Utils.unsafe.getObject(stack, OFFSET(idx))
+    }
 
-    final def WRITE_STACK(idx: Int, nv: AnyRef) = Utils.unsafe.putObject(stack, OFFSET(idx), nv)
+    final def CAS_STACK(idx: Int, ov: AnyRef, nv: AnyRef) = {
+      checkBounds(idx)
+      Utils.unsafe.compareAndSwapObject(stack, OFFSET(idx), ov, nv)
+    }
+
+    final def WRITE_STACK(idx: Int, nv: AnyRef) = {
+      checkBounds(idx)
+      Utils.unsafe.putObject(stack, OFFSET(idx), nv)
+    }
 
     private def snatch(idx: Int, v: AnyRef): Boolean = v match {
       case s: StolenValue =>
@@ -234,7 +255,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       }
       v match {
         case INNER_DONE | STOLEN_RIGHT =>
-          val sz = if (isTree.external) 0 else 1
+          val sz = isTree.innerSize
           if (tree.isLeaf) sz
           else countCompletedElements(tree.right, depth + 1, tree.left.size + sz + count)
         case SUBTREE_DONE | null | STOLEN_COMPLETED =>
@@ -242,7 +263,8 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         case STOLEN_NULL =>
           count + 0
         case STOLEN_LEFT | _ =>
-          countCompletedElements(tree.left, depth + 1, count)
+          if (tree.isLeaf) isTree.innerSize
+          else countCompletedElements(tree.left, depth + 1, count)
       }
     }
 
@@ -256,6 +278,8 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
           decode(tree.right, depth + 1)
         case STOLEN_NULL if tree eq null =>
           WRITE_STACK(depth, null)
+        case STOLEN_NULL if depth == 0 =>
+          WRITE_STACK(depth, tree)
         case STOLEN_NULL =>
           val isLeft = checkIfLeft(safeReadStack(depth - 1))
           if (isLeft) WRITE_STACK(depth, null)
@@ -268,6 +292,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         case x =>
           sys.error("unreachable: " + x + " at depth " + depth + ", reread: " + READ_STACK(depth) + " node: " + this.nodeString)
       }
+      assert(!(READ_STACK(0) == STOLEN_NULL && READ_STACK(1) == STOLEN_NULL), stack.toList)
       decode(root, 0)
     }
 
@@ -316,6 +341,11 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     @tailrec final def markStolen(): Boolean = READ_STACK(0) match {
       case cv: Completed =>
         false
+      case SUBTREE_DONE =>
+        markCompleted()
+        markStolen()
+      case STOLEN_NULL =>
+        true
       case sv: StolenValue =>
         steal(1)
         true
@@ -324,11 +354,11 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         markStolen()
     }
 
-    def newExpanded(parent: Ptr[S, R]): TreeNode[S, R] = {
-      val elemsLeft = elementsRemaining
-      var minForLeft = elemsLeft / 2
+    def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker): TreeNode[S, R] = {
+      val elemsRem = elementsRemaining
+      var minForLeft = elemsRem / 2
 
-      val snapshot = newTreeNode(null, null)(root, stack, totalElems, Workstealing.initialStep)
+      val snapshot = newTreeNode(null, null)(root, stack.clone, totalElems, config.initialStep)
       snapshot.decode()
       val lstack = snapshot.stack.clone
       val lpos = snapshot.pos
@@ -339,19 +369,24 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         else inLeft
       } else inLeft
       val totalInLeft = take(0, minForLeft)
+      val totalInRight = elemsRem - totalInLeft
       val rstack = snapshot.stack.clone
       val rpos = snapshot.pos
       val rcurrent = snapshot.current
 
-      val lnode = newTreeNode(null, null)(root, lstack, totalInLeft, Workstealing.initialStep)
+      val lnode = newTreeNode(null, null)(root, lstack, totalInLeft, config.initialStep)
       lnode.current = lcurrent
       lnode.pos = lpos
-      val rnode = newTreeNode(null, null)(root, rstack, elemsLeft - totalInLeft, Workstealing.initialStep)
+      if (totalInLeft == 0) lnode.markCompleted()
+      val rnode = newTreeNode(null, null)(root, rstack, totalInRight, config.initialStep)
       rnode.current = rcurrent
       rnode.pos = rpos
+      if (totalInRight == 0) rnode.markCompleted()
+      if (totalInLeft == 0) rnode.tryOwn(worker)
       val lptr = new Ptr[S, R](parent, parent.level + 1)(lnode)
       val rptr = new Ptr[S, R](parent, parent.level + 1)(rnode)
-      val nnode = newTreeNode(lptr, rptr)(root, stack, totalElems, Workstealing.initialStep)
+      assert(parent.level < 3, parent.up.up.up.toString(0))
+      val nnode = newTreeNode(lptr, rptr)(root, stack, totalElems, step)
       nnode.owner = this.owner
       nnode
     }

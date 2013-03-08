@@ -15,7 +15,6 @@ with ParIterableLike[Int, ParIterable[Int]]
 with IndexedWorkstealing[Int] {
 
   import IndexedWorkstealing._
-  import Workstealing.initialStep
 
   def size = range.size
 
@@ -36,15 +35,15 @@ with IndexedWorkstealing[Int] {
       //rng.start + i * rng.step // does not bring considerable performance gain
     }
 
-    def newExpanded(parent: Ptr[Int, R]): RangeNode[R] = {
+    def newExpanded(parent: Ptr[Int, R], worker: Workstealing.Worker): RangeNode[R] = {
       val r = /*READ*/range
       val p = positiveProgress(r)
       val u = until(r)
       val remaining = u - p
       val firsthalf = remaining / 2
       val secondhalf = remaining - firsthalf
-      val lnode = new RangeNode[R](null, null)(rng, p, p + firsthalf, createRange(p, p + firsthalf), initialStep)
-      val rnode = new RangeNode[R](null, null)(rng, p + firsthalf, u, createRange(p + firsthalf, u), initialStep)
+      val lnode = new RangeNode[R](null, null)(rng, p, p + firsthalf, createRange(p, p + firsthalf), config.initialStep)
+      val rnode = new RangeNode[R](null, null)(rng, p + firsthalf, u, createRange(p + firsthalf, u), config.initialStep)
       val lptr = new Ptr[Int, R](parent, parent.level + 1)(lnode)
       val rptr = new Ptr[Int, R](parent, parent.level + 1)(rnode)
       val nnode = new RangeNode(lptr, rptr)(rng, start, end, r, step)
@@ -69,7 +68,7 @@ with IndexedWorkstealing[Int] {
   }
 
   def newRoot[R] = {
-    val work = new RangeNode[R](null, null)(range, 0, size, createRange(0, size), initialStep)
+    val work = new RangeNode[R](null, null)(range, 0, size, createRange(0, size), config.initialStep)
     val root = new Ptr[Int, R](null, 0)(work)
     root
   }
