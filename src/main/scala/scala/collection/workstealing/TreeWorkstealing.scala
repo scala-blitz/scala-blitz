@@ -19,10 +19,10 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
   implicit val isTree: IsTree[TreeType]
 
-  abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], val totalElems: Int, initStep: Int)
+  abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], val firstElem: Int, val totalElems: Int, initStep: Int)
   extends Node[S, R](l, r)(initStep) {
     var padding0: Int = 0
-    var padding1: Int = 0
+    //var padding1: Int = 0
     //var padding2: Int = 0
     //var padding3: Int = 0
     //var padding4: Int = 0
@@ -32,14 +32,16 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     var totalLeft: Int = totalElems
     val iter = createIterator
 
-    override def nodeString = "TreeNode(%s)(%s)".format(
+    override def nodeString = "TreeNode(%s)(elemsLeft: %d/%d)(%s)".format(
       if (owner == null) "none" else "worker " + owner.index,
+      this.elementsRemaining,
+      this.totalElems,
       stack.mkString(", ")
     )
 
     def createIterator: TreeIterator[S]
 
-    def newTreeNode(l: Ptr[S, R], r: Ptr[S, R])(root: TreeType, stack: Array[AnyRef], totalElems: Int, initStep: Int): TreeNode[S, R]
+    def newTreeNode(l: Ptr[S, R], r: Ptr[S, R])(root: TreeType, stack: Array[AnyRef], firstElem: Int, totalElems: Int, initStep: Int): TreeNode[S, R]
 
     trait TreeIterator[@specialized Q] {
       def initializeWithSubtree(t: TreeType, elems: Int): Unit
@@ -308,7 +310,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     /* node interface */
 
-    final def elementsRemaining = totalElems - elementsCompleted
+    final def elementsRemaining = totalElems - (elementsCompleted - firstElem)
 
     final def elementsCompleted = countCompletedElements(root, 0, 0)
 
@@ -357,8 +359,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker): TreeNode[S, R] = {
       val elemsRem = elementsRemaining
       var minForLeft = elemsRem / 2
+      val elemsCom = totalElems - elemsRem
 
-      val snapshot = newTreeNode(null, null)(root, stack.clone, totalElems, config.initialStep)
+      val snapshot = newTreeNode(null, null)(root, stack.clone, firstElem, totalElems, config.initialStep)
       snapshot.decode()
       val lstack = snapshot.stack.clone
       val lpos = snapshot.pos
@@ -374,19 +377,18 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       val rpos = snapshot.pos
       val rcurrent = snapshot.current
 
-      val lnode = newTreeNode(null, null)(root, lstack, totalInLeft, config.initialStep)
+      val lnode = newTreeNode(null, null)(root, lstack, firstElem + elemsCom, totalInLeft, config.initialStep)
       lnode.current = lcurrent
       lnode.pos = lpos
       if (totalInLeft == 0) lnode.markCompleted()
-      val rnode = newTreeNode(null, null)(root, rstack, totalInRight, config.initialStep)
+      val rnode = newTreeNode(null, null)(root, rstack, firstElem + elemsCom + totalInLeft, totalInRight, config.initialStep)
       rnode.current = rcurrent
       rnode.pos = rpos
       if (totalInRight == 0) rnode.markCompleted()
       if (totalInLeft == 0) rnode.tryOwn(worker)
       val lptr = new Ptr[S, R](parent, parent.level + 1)(lnode)
       val rptr = new Ptr[S, R](parent, parent.level + 1)(rnode)
-      assert(parent.level < 3, parent.up.up.up.toString(0))
-      val nnode = newTreeNode(lptr, rptr)(root, stack, totalElems, step)
+      val nnode = newTreeNode(lptr, rptr)(root, stack, firstElem, totalElems, step)
       nnode.owner = this.owner
       nnode
     }

@@ -68,7 +68,7 @@ with IndexedWorkstealing[T] {
 
 object ParArray {
 
-  private val COMBINER_CHUNK_SIZE_LIMIT = 2048
+  private val COMBINER_CHUNK_SIZE_LIMIT = 4096
 
   trait Tree {
     def level: Int
@@ -103,6 +103,7 @@ object ParArray {
 
     private[ParArray] def closeLast() {
       lasttree.size = lastpos
+      mergeStack()
     }
 
     private[ParArray] def mergeStack() = {
@@ -138,7 +139,6 @@ object ParArray {
         lastarr = lasttree.array
         lastpos = 0
         chunkstack = lasttree :: chunkstack
-        mergeStack()
         +=(elem)
       }
     }
@@ -168,7 +168,7 @@ object ParArray {
       lasttree = createChunk()
       lastarr = lasttree.array
       lastpos = 0
-      chunkstack = List(lasttree)
+      chunkstack = lasttree :: Nil
     }
 
   }
@@ -198,8 +198,8 @@ object ParArray {
 
     type N[R] = ArrayCombinerNode[T, R]
 
-    final class ArrayCombinerNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(rt: Tree, st: Array[AnyRef], te: Int, is: Int)
-    extends TreeNode[S, R](l, r)(rt, st, te, is) {
+    final class ArrayCombinerNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(rt: Tree, st: Array[AnyRef], fe: Int, te: Int, is: Int)
+    extends TreeNode[S, R](l, r)(rt, st, fe, te, is) {
 
       final class ExternalTreeIterator[@specialized Q](var chunk: Array[Q], var pos: Int, var total: Int)
       extends TreeIterator[Q] {
@@ -230,8 +230,8 @@ object ParArray {
 
       def createIterator = new ExternalTreeIterator[S]
 
-      def newTreeNode(l: Ptr[S, R], r: Ptr[S, R])(root: Tree, stack: Array[AnyRef], totalElems: Int, initStep: Int) = {
-        new ArrayCombinerNode(l, r)(root, stack, totalElems, initStep)
+      def newTreeNode(l: Ptr[S, R], r: Ptr[S, R])(root: Tree, stack: Array[AnyRef], firstElem: Int, totalElems: Int, initStep: Int) = {
+        new ArrayCombinerNode(l, r)(root, stack, firstElem, totalElems, initStep)
       }
     }
 
@@ -240,7 +240,7 @@ object ParArray {
     def newRoot[R]: Ptr[T, R] = {
       val root = tree
       val stack = TreeWorkstealing.initializeStack(root)(treeIsTree)
-      val wsnd = new ArrayCombinerNode[T, R](null, null)(tree, stack, tree.size, config.initialStep)
+      val wsnd = new ArrayCombinerNode[T, R](null, null)(tree, stack, 0, tree.size, config.initialStep)
       new Ptr[T, R](null, 0)(wsnd)
     }
 

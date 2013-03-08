@@ -50,30 +50,30 @@ object TreeWorkstealingTest extends App {
 
   def toNode(root: Tree): workstealing.TreeNode[Int, Unit] = {
     val stack = TreeWorkstealing.initializeStack(root)(treeIsTree)
-    class Wsnd(l: workstealing.Ptr[Int, Unit], r: workstealing.Ptr[Int, Unit])(rt: Tree, st: Array[AnyRef], te: Int, is: Int)
-    extends workstealing.TreeNode[Int, Unit](l, r)(rt, st, te, is) {
-      def newTreeNode(l: workstealing.Ptr[Int, Unit], r: workstealing.Ptr[Int, Unit])(root: Tree, stack: Array[AnyRef], totalElems: Int, initStep: Int) = {
-        new Wsnd(l, r)(root, stack, totalElems, initStep)
+    class Wsnd(l: workstealing.Ptr[Int, Unit], r: workstealing.Ptr[Int, Unit])(rt: Tree, st: Array[AnyRef], fe: Int, te: Int, is: Int)
+    extends workstealing.TreeNode[Int, Unit](l, r)(rt, st, fe, te, is) {
+      def newTreeNode(l: workstealing.Ptr[Int, Unit], r: workstealing.Ptr[Int, Unit])(root: Tree, stack: Array[AnyRef], firstElem: Int, totalElems: Int, initStep: Int) = {
+        new Wsnd(l, r)(root, stack, firstElem, totalElems, initStep)
       }
       def createIterator = new DefaultIterator[Int]() {
         def extractElement(t: Tree) = t.element
       }
     }
-    new Wsnd(null, null)(root, stack, root.size, 1)
+    new Wsnd(null, null)(root, stack, 0, root.size, 1)
   }
 
   def toExtNode(root: Tree): extworkstealing.TreeNode[Int, Unit] = {
     val stack = TreeWorkstealing.initializeStack(root)(externalTreeIsTree)
-    class Wsnd(l: extworkstealing.Ptr[Int, Unit], r: extworkstealing.Ptr[Int, Unit])(rt: Tree, st: Array[AnyRef], te: Int, is: Int)
-    extends extworkstealing.TreeNode[Int, Unit](l, r)(rt, st, te, is) {
-      def newTreeNode(l: extworkstealing.Ptr[Int, Unit], r: extworkstealing.Ptr[Int, Unit])(root: Tree, stack: Array[AnyRef], totalElems: Int, initStep: Int) = {
-        new Wsnd(l, r)(root, stack, totalElems, initStep)
+    class Wsnd(l: extworkstealing.Ptr[Int, Unit], r: extworkstealing.Ptr[Int, Unit])(rt: Tree, st: Array[AnyRef], fe: Int, te: Int, is: Int)
+    extends extworkstealing.TreeNode[Int, Unit](l, r)(rt, st, fe, te, is) {
+      def newTreeNode(l: extworkstealing.Ptr[Int, Unit], r: extworkstealing.Ptr[Int, Unit])(root: Tree, stack: Array[AnyRef], firstElem: Int, totalElems: Int, initStep: Int) = {
+        new Wsnd(l, r)(root, stack, firstElem, totalElems, initStep)
       }
       def createIterator = new DefaultIterator[Int]() {
         def extractElement(t: Tree) = t.element
       }
     }
-    new Wsnd(null, null)(root, stack, root.size, 1)
+    new Wsnd(null, null)(root, stack, 0, root.size, 1)
   }
 
   def testChunk(wsnd: workstealing.TreeNode[Int, Unit], chunk: Int, elems: mutable.ArrayBuffer[Int]) {

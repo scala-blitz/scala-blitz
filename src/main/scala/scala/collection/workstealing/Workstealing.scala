@@ -133,8 +133,10 @@ trait Workstealing[T] {
   }
 
   @tailrec final def workUntilNoWork[R](w: Worker, root: Ptr[T, R], kernel: K[R]) {
+    //println(root.toString(0))
     val leaf = config.strategy.findWork[T, R](w, root, kernel).asInstanceOf[Ptr[T, R]]
     if (leaf != null) {
+      //println(leaf.toString(0))
       @tailrec def workAndDescend(leaf: Ptr[T, R]) {
         val nosteals = kernel.workOn(leaf, w)
         if (!nosteals) {
@@ -179,13 +181,15 @@ trait Workstealing[T] {
 
   import scala.concurrent.forkjoin._
 
-  val fjpool = new ForkJoinPool()
-
   class WorkerTask[R](val root: Ptr[T, R], val index: Int, val total: Int, kernel: K[R]) extends RecursiveAction with Worker {
     def getName = "WorkerTask(" + index + ")"
 
     def compute() {
-      workUntilNoWork(this, root, kernel)
+      try {
+        workUntilNoWork(this, root, kernel)
+      } catch {
+        case e: Exception => e.printStackTrace()
+      }
     }
   }
 
@@ -227,7 +231,9 @@ trait Workstealing[T] {
      *  By default does nothing, but some kernels may choose to override this default behaviour
      *  to store operation-specific information into the node.
      */
-    def beforeWorkOn(tree: Ptr[S, R], node: Node[S, R]) {}
+    def beforeWorkOn(tree: Ptr[S, R], node: Node[S, R]) {
+      node.lresult = zero
+    }
 
     /** Initializes the workstealing tree root.
      *
@@ -262,7 +268,7 @@ trait Workstealing[T] {
     def workOn(tree: Ptr[S, R], worker: Worker): Boolean = {
       val node = /*READ*/tree.child
       beforeWorkOn(tree, node)
-      var lsum = zero
+      var lsum = node.lresult
       var incCount = 0
       val incFreq = config.incrementFrequency
       val ms = maximumChunkSize
@@ -400,6 +406,10 @@ trait Workstealing[T] {
 
 
 object Workstealing {
+
+  import scala.concurrent.forkjoin._
+
+  val fjpool = new ForkJoinPool()
 
   type Owner = Worker
 
@@ -639,8 +649,8 @@ object Workstealing {
       def search(current: Tree[S, R]): Tree[S, R] = {
         val node = /*READ*/current.child
         if (node.isLeaf) {
-          if (node.state ne Completed) current
-          else if (node.owner == null) current
+          if ((node.state ne Completed) && !(node.elementsRemaining > 1)) current
+          else if (node.owner == null || (node.owner eq worker)) current
           else null
         } else {
           val left = search(node.left)
@@ -654,7 +664,7 @@ object Workstealing {
       }
 
       val max = search(tree)
-      if (max != null && !(max.child.owner != worker && max.child.elementsRemaining == 1)) {
+      if (max != null) {
         val node = /*READ*/max.child
         if (node.tryOwn(worker)) max
         else if (node.trySteal(max, kernel, worker)) {

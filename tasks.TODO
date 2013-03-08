@@ -3,4 +3,11 @@ To fix:
  ☐ parallel arrays need to be specialized
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
+
+Todo items:
+ ☐ write a comprehensive suite of unit tests
+ ☐ write a comprehensive suite of microbenchmark regression tests
+
+Features to add:
  ☐ allow asynchronous execution
+
