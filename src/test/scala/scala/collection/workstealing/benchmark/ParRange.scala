@@ -377,6 +377,62 @@ object ParRangeFilterPC extends StatisticsBenchmark {
 }
 
 
+object MathUtils {
+  def taylor(x: Int): Double = {
+    var i = 0
+    var num = 1
+    var denom = 1
+    var sum: Double = 1
+    while (i < 10) {
+      i += 1
+      num *= x
+      denom *= i
+      sum += num.toDouble / denom
+    }
+    sum
+  }
+}
+
+
+object ParRangeFilterExpensive extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.filter2(x => MathUtils.taylor(x) > Math.E)
+  }
+
+}
+
+
+object ParRangeFilterExpensiveGeneric extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
+    range.filter(x => MathUtils.taylor(x) > Math.E)
+  }
+
+}
+
+
+object ParRangeFilterExpensivePC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val arr = new Array[Int](size)
+
+  def run() {
+    val range = (0 until size).par
+    range.filter(x => MathUtils.taylor(x) > Math.E)
+  }
+
+}
+
+
 
 
 

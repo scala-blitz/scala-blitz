@@ -68,7 +68,7 @@ with IndexedWorkstealing[T] {
 
 object ParArray {
 
-  private val COMBINER_CHUNK_SIZE_LIMIT = 2048
+  private val COMBINER_CHUNK_SIZE_LIMIT = 4096
 
   trait Tree {
     def level: Int
@@ -99,7 +99,7 @@ object ParArray {
     if (init) clear()
 
     private[ParArray] def createChunk(): Chunk[T] = {
-      chunksize = math.min(chunksize * 2, COMBINER_CHUNK_SIZE_LIMIT)
+      chunksize = math.min(chunksize * 4, COMBINER_CHUNK_SIZE_LIMIT)
       val array = implicitly[ClassTag[T]].newArray(chunksize)
       val chunk = new Chunk[T](array)
       chunk
@@ -214,6 +214,11 @@ object ParArray {
             if (nd.size == 1 && elems == 1) {
               if (nd.left.size == 1) initializeWithSubtree(nd.left, elems)
               else initializeWithSubtree(nd.right, elems)
+            } else if (nd.size == 0 && elems == 0) {
+              chunk = null
+              pos = 0
+              total = 0
+              subtree = null
             } else {
               assert(elems == TreeWorkstealing.SINGLE_NODE, nd.size + ", elems " + elems + " vs. " + TreeWorkstealing.SINGLE_NODE)
               chunk = null
@@ -270,15 +275,15 @@ object ParArray {
           val completed = node.elementsCompleted
           val arrstart = old.lresult.arrayStart + completed
           val leftElemsRemaining = node.left.child.elementsRemaining
-          val oldElemsRemaining = old.elementsRemaining
-          val rightElemsRemaining = node.right.child.elementsRemaining
-          assert(oldElemsRemaining == leftElemsRemaining + rightElemsRemaining,
-            "elems remaining: " + oldElemsRemaining + " != " + leftElemsRemaining + " + " + rightElemsRemaining +
-            "\nold " + old.nodeString +
-            "\nleft " + node.left.toString(0) +
-            "\nright " + node.right.toString(0) + 
-            "\ntree: " + wstree.child.repr.root.nodeString
-          )
+          //val oldElemsRemaining = old.elementsRemaining
+          //val rightElemsRemaining = node.right.child.elementsRemaining
+          //assert(oldElemsRemaining == leftElemsRemaining + rightElemsRemaining,
+          //  "elems remaining: " + oldElemsRemaining + " != " + leftElemsRemaining + " + " + rightElemsRemaining +
+          //  "\nold " + old.nodeString +
+          //  "\nleft " + node.left.toString(0) +
+          //  "\nright " + node.right.toString(0) + 
+          //  "\ntree: " + wstree.child.repr.root.nodeString
+          //)
           val leftarrstart = arrstart
           val rightarrstart = arrstart + leftElemsRemaining
           assert(leftarrstart <= array.length, leftarrstart)

@@ -382,6 +382,8 @@ object ParRange {
       xs.invokeParallelOperation(new xs.RangeKernel[ParIterableLike.CopyToArrayStatus] {
         type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
+        override def beforeWorkOn(tree: xs.Ptr[Int, Status], node: xs.Node[Int, Status]) {
+        }
         override def afterCreateRoot(root: xs.Ptr[Int, Status]) {
           root.child.lresult = new Status(start.splice, start.splice)
         }
@@ -470,7 +472,7 @@ object ParRange {
           val cmb = node.lresult
           var i = from
           while (i <= to) {
-            cmb += i
+            if (p.splice(i)) cmb += i
             i += step
           }
           cmb
@@ -479,7 +481,7 @@ object ParRange {
           val cmb = node.lresult
           var i = from
           while (i <= to) {
-            cmb += i
+            if (p.splice(i)) cmb += i
             i += 1
           }
           cmb
