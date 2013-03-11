@@ -251,7 +251,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         steal(depth)
     }
 
-    @tailrec private def countCompletedElements(tree: TreeType, depth: Int, count: Int): Int = {
+    @tailrec private def countCompletedElements(tree: TreeType, isLeft: Boolean, depth: Int, count: Int): Int = {
       val v = READ_STACK(depth) match {
         case cv: Completed => cv.v
         case x => x
@@ -259,15 +259,21 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       v match {
         case INNER_DONE | STOLEN_RIGHT =>
           val sz = isTree.innerSize
-          if (tree.isLeaf) sz
-          else countCompletedElements(tree.right, depth + 1, tree.left.size + sz + count)
-        case SUBTREE_DONE | null | STOLEN_COMPLETED =>
+          if (tree.isLeaf) count + tree.size
+          else countCompletedElements(tree.right, false, depth + 1, tree.left.size + sz + count)
+        case SUBTREE_DONE =>
+          if (isLeft) count + tree.size
+          else count + 0
+        case null =>
+          if (isLeft) count + 0
+          else count + tree.size
+        case STOLEN_COMPLETED =>
           count + tree.size
         case STOLEN_NULL =>
           count + 0
         case STOLEN_LEFT | _ =>
-          if (tree.isLeaf) isTree.innerSize
-          else countCompletedElements(tree.left, depth + 1, count)
+          if (tree.isLeaf) count + 0
+          else countCompletedElements(tree.left, true, depth + 1, count)
       }
     }
 
@@ -311,9 +317,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
     /* node interface */
 
-    final def elementsRemaining = totalElems - (elementsCompleted - firstElem)
+    final def elementsRemaining = totalElems - elementsCompleted
 
-    final def elementsCompleted = countCompletedElements(root, 0, 0)
+    final def elementsCompleted = countCompletedElements(root, true, 0, 0) - firstElem
 
     final def state = READ_STACK(0) match {
       case s: StolenValue =>

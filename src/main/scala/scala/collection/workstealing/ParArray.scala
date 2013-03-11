@@ -73,16 +73,17 @@ object ParArray {
   trait Tree {
     def level: Int
     def size: Int
+    def nodeString: String
   }
 
   class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree {
     var size = Int.MinValue
     def level = 0
-    override def toString = "Chunk(" + array.take(size).mkString(", ") + ")"
+    override def nodeString = "Chunk(total: " + size + ")"
   }
 
   class Node[@specialized T](val left: Tree, val right: Tree, val level: Int, val size: Int) extends Tree {
-    override def toString = "Node(" + level + ", " + size + ")(" + left + ", " + right + ")"
+    override def nodeString = "Node(" + level + ", " + size + ")(" + left.nodeString + ", " + right.nodeString + ")"
   }
 
   abstract class ChunkCombiner[@specialized T: ClassTag, To](init: Boolean)
@@ -205,7 +206,7 @@ object ParArray {
       extends TreeIterator[Q] {
         def this() = this(null, 0, 0)
   
-        final def subtree = current
+        final var subtree: Chunk[Q] = null
         final def isSingle = chunk eq null
         final def elements = if (isSingle) isTree.innerSize else total - pos
         @tailrec final def initializeWithSubtree(t: Tree, elems: Int) = t match {
@@ -218,12 +219,13 @@ object ParArray {
               chunk = null
               pos = 0
               total = 0
+              subtree = null
             }
           case ch: Chunk[Q] =>
             chunk = ch.array
             pos = 0
             total = ch.size
-
+            subtree = ch
         }
         def next() = if (pos < total) {
           val res = chunk(pos)
@@ -255,13 +257,52 @@ object ParArray {
       closeLast()
       val wstree = newRoot[Unit]
       val array = new Array[T](wstree.child.repr.root.size)
-      
-      val kernel = new TreeKernel[T, Unit] {
+
+      type Status = ParIterableLike.CopyToArrayStatus
+      val kernel = new TreeKernel[T, Status] {
         override def maximumChunkSize = 1
-        def zero = ()
-        def combine(a: Unit, b: Unit) = a
-        def apply(node: N[Unit], chunkSize: Int) {
-          //println("copy: " + chunkSize + ", chunk length: " + node.iter)
+        override def beforeWorkOn(tree: Ptr[T, Status], node: Node[T, Status]) {
+        }
+        override def afterCreateRoot(root: Ptr[T, Status]) {
+          root.child.lresult = new Status(0, 0)
+        }
+        override def afterExpand(old: Node[T, Status], node: Node[T, Status]) {
+          val completed = node.elementsCompleted
+          val arrstart = old.lresult.arrayStart + completed
+          val leftElemsRemaining = node.left.child.elementsRemaining
+          val oldElemsRemaining = old.elementsRemaining
+          val rightElemsRemaining = node.right.child.elementsRemaining
+          assert(oldElemsRemaining == leftElemsRemaining + rightElemsRemaining,
+            "elems remaining: " + oldElemsRemaining + " != " + leftElemsRemaining + " + " + rightElemsRemaining +
+            "\nold " + old.nodeString +
+            "\nleft " + node.left.toString(0) +
+            "\nright " + node.right.toString(0) + 
+            "\ntree: " + wstree.child.repr.root.nodeString
+          )
+          val leftarrstart = arrstart
+          val rightarrstart = arrstart + leftElemsRemaining
+          assert(leftarrstart <= array.length, leftarrstart)
+
+          node.left.child.lresult = new Status(leftarrstart, leftarrstart)
+          node.right.child.lresult = new Status(rightarrstart, rightarrstart)
+        }
+        def zero = null
+        def combine(a: Status, b: Status) = null
+        def apply(node: N[Status], chunkSize: Int): Status = node.iter.subtree match {
+          case null =>
+            // internal node is empty - nothing to do
+            null
+          case ch: Chunk[T] =>
+            val pos = node.lresult.arrayProgress
+            try {
+              if (chunkSize > 0) System.arraycopy(ch.array, 0, array, pos, chunkSize)
+            } catch {
+              case e: Exception =>
+                println(chunkSize + " starting from " + pos)
+                println(node.nodeString)
+            }
+            node.lresult.arrayProgress = pos + chunkSize
+            null
         }
       }
       invokeParallelOperation(kernel)

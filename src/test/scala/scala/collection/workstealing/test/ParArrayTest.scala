@@ -12,8 +12,9 @@ object ParArrayTest extends App {
   def checkFilter(sz: Int) {
     println("For size: " + sz)
     try {
-      val pa = new ParArray[Int](sz, Workstealing.DefaultConfig)
-      pa.filter(_ % 2 == 0)
+      val pa = new ParArray[Int]((0 until sz).toArray, Workstealing.DefaultConfig)
+      val res = pa.filter(x => true)
+      assert(res.array.toList == (0 until sz), "size " + sz)
     } catch {
       case e: Exception =>
         println("Exception for size: " + sz)
@@ -32,7 +33,9 @@ object ParArrayTest extends App {
   checkFilter(2050)
   checkFilter(3000)
   checkFilter(4096)
+  checkFilter(5120)
   for (i <- 4 until 16) checkFilter(1024 * i)
+  for (i <- 4 until 16) checkFilter(16384 * i)
 
 }
 

@@ -16,8 +16,6 @@ trait Workstealing[T] {
 
   type K[R] <: Kernel[T, R]
 
-  def size: Int
-
   def config: Workstealing.Config
 
   abstract class Node[@specialized S, R](val left: Ptr[S, R], val right: Ptr[S, R])(@volatile var step: Int) {
