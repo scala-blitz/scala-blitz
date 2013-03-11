@@ -35,7 +35,7 @@ with IndexedWorkstealing[T] {
       arr(i)
     }
 
-    def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker): ArrayNode[S, R] = {
+    def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker, kernel: Kernel[S, R]): ArrayNode[S, R] = {
       val r = /*READ*/range
       val p = positiveProgress(r)
       val u = until(r)
@@ -68,19 +68,22 @@ with IndexedWorkstealing[T] {
 
 object ParArray {
 
-  private val COMBINER_CHUNK_SIZE_LIMIT = 4096
+  private val COMBINER_CHUNK_SIZE_LIMIT = 2048
 
   trait Tree {
     def level: Int
     def size: Int
   }
 
-  final class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree {
+  class Chunk[@specialized T: ClassTag](val array: Array[T]) extends Tree {
     var size = Int.MinValue
     def level = 0
+    override def toString = "Chunk(" + array.take(size).mkString(", ") + ")"
   }
 
-  final class Node[@specialized T](val left: Tree, val right: Tree, val level: Int, val size: Int) extends Tree
+  class Node[@specialized T](val left: Tree, val right: Tree, val level: Int, val size: Int) extends Tree {
+    override def toString = "Node(" + level + ", " + size + ")(" + left + ", " + right + ")"
+  }
 
   abstract class ChunkCombiner[@specialized T: ClassTag, To](init: Boolean)
   extends Combiner[T, To] with CombinerLike[T, To, ChunkCombiner[T, To]] {
@@ -156,15 +159,12 @@ object ParArray {
       res.lastpos = that.lastpos
       res.lasttree = that.lasttree
       res.chunkstack = that.chunkstack ::: List(this.tree)
-      
-      this.clear()
-      that.clear()
 
       res
     }
 
     def clear(): Unit = {
-      chunksize = 4
+      chunksize = 16
       lasttree = createChunk()
       lastarr = lasttree.array
       lastpos = 0
@@ -208,12 +208,17 @@ object ParArray {
         final def subtree = current
         final def isSingle = chunk eq null
         final def elements = if (isSingle) isTree.innerSize else total - pos
-        final def initializeWithSubtree(t: Tree, elems: Int) = t match {
+        @tailrec final def initializeWithSubtree(t: Tree, elems: Int) = t match {
           case nd: ParArray.Node[q] =>
-            assert(elems == TreeWorkstealing.SINGLE_NODE)
-            chunk = null
-            pos = 0
-            total = 0
+            if (nd.size == 1 && elems == 1) {
+              if (nd.left.size == 1) initializeWithSubtree(nd.left, elems)
+              else initializeWithSubtree(nd.right, elems)
+            } else {
+              assert(elems == TreeWorkstealing.SINGLE_NODE, nd.size + ", elems " + elems + " vs. " + TreeWorkstealing.SINGLE_NODE)
+              chunk = null
+              pos = 0
+              total = 0
+            }
           case ch: Chunk[Q] =>
             chunk = ch.array
             pos = 0
@@ -227,6 +232,8 @@ object ParArray {
         } else throw new NoSuchElementException
         override def toString = s"ExternalTreeIterator(position: $pos, total: $total)"
       }
+
+      override def minimumStealThreshold = COMBINER_CHUNK_SIZE_LIMIT
 
       def createIterator = new ExternalTreeIterator[S]
 
@@ -254,7 +261,7 @@ object ParArray {
         def zero = ()
         def combine(a: Unit, b: Unit) = a
         def apply(node: N[Unit], chunkSize: Int) {
-          println("copy: " + chunkSize + ", chunk length: " + node.iter)
+          //println("copy: " + chunkSize + ", chunk length: " + node.iter)
         }
       }
       invokeParallelOperation(kernel)

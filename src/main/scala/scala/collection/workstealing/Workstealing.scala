@@ -40,7 +40,9 @@ trait Workstealing[T] {
       else tryOwn(thiz)
     }
 
-    final def trySteal(parent: AnyRef, kernel: AnyRef, worker: Worker): Boolean = parent.asInstanceOf[Ptr[S, R]].expand(kernel.asInstanceOf[Kernel[S, R]], worker)
+    final def trySteal(parent: AnyRef, kernel: AnyRef, worker: Worker): Boolean = {
+      parent.asInstanceOf[Ptr[S, R]].expand(kernel.asInstanceOf[Kernel[S, R]], worker)
+    }
 
     def workDone = 0
 
@@ -57,13 +59,24 @@ trait Workstealing[T] {
       } else "\n")
     }
 
+    def minimumStealThreshold = 1
+
+    def isEligible(worker: Worker): Boolean = state match {
+      case Completed =>
+        (owner == null) || ((owner eq worker) && result == null)
+      case StolenOrExpanded =>
+        true
+      case AvailableOrOwned =>
+        elementsRemaining > minimumStealThreshold || (owner == null) || (owner eq worker)
+    }
+
     /* abstract members */
 
     def elementsRemaining: Int
 
     def elementsCompleted: Int
 
-    def newExpanded(parent: Ptr[S, R], worker: Worker): Node[S, R]
+    def newExpanded(parent: Ptr[S, R], worker: Worker, kernel: Kernel[S, R]): Node[S, R]
 
     def state: State
 
@@ -96,7 +109,7 @@ trait Workstealing[T] {
             else expand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen
             // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
-            val expanded = child_t0.newExpanded(this, worker)
+            val expanded = child_t0.newExpanded(this, worker, kernel)
             kernel.afterExpand(child_t0, expanded)
             if (casChild(child_t0, expanded)) true // try to replace with expansion
             else expand(kernel, worker) // failure (spurious or due to another expand) - retry
@@ -493,10 +506,7 @@ object Workstealing {
       val total = worker.total
       val node = tree.child
       if (node.isLeaf) {
-        if (
-          ((node.state eq Completed) && node.owner != null && node.owner != worker) ||
-          (node.owner != worker && node.elementsRemaining == 1)
-        ) null // no further expansions
+        if (!node.isEligible(worker)) null // no further expansions
         else {
           // more work
           if (node.tryOwn(worker)) tree
@@ -649,9 +659,7 @@ object Workstealing {
       def search(current: Tree[S, R]): Tree[S, R] = {
         val node = /*READ*/current.child
         if (node.isLeaf) {
-          if ((node.state ne Completed) && !(node.elementsRemaining > 1)) current
-          else if (node.owner == null || (node.owner eq worker)) current
-          else null
+          if (node.isEligible(worker)) current else null
         } else {
           val left = search(node.left)
           val right = search(node.right)

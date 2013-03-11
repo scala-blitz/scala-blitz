@@ -35,7 +35,7 @@ with IndexedWorkstealing[Int] {
       //rng.start + i * rng.step // does not bring considerable performance gain
     }
 
-    def newExpanded(parent: Ptr[Int, R], worker: Workstealing.Worker): RangeNode[R] = {
+    def newExpanded(parent: Ptr[Int, R], worker: Workstealing.Worker, kernel: Kernel[Int, R]): RangeNode[R] = {
       val r = /*READ*/range
       val p = positiveProgress(r)
       val u = until(r)

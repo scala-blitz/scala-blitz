@@ -32,8 +32,9 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     var totalLeft: Int = totalElems
     val iter = createIterator
 
-    override def nodeString = "TreeNode(%s)(elemsLeft: %d/%d)(%s)".format(
+    override def nodeString = "TreeNode(%s)(first: %d, elemsLeft: %d/%d)(%s)".format(
       if (owner == null) "none" else "worker " + owner.index,
+      this.firstElem,
       this.elementsRemaining,
       this.totalElems,
       stack.mkString(", ")
@@ -356,7 +357,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
         markStolen()
     }
 
-    def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker): TreeNode[S, R] = {
+    def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker, kernel: Kernel[S, R]): TreeNode[S, R] = {
       val elemsRem = elementsRemaining
       var minForLeft = elemsRem / 2
       val elemsCom = totalElems - elemsRem
@@ -367,7 +368,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       val lpos = snapshot.pos
       val lcurrent = snapshot.current
       @tailrec def take(inLeft: Int, request: Int): Int = if (inLeft < minForLeft) {
-        val chunk = snapshot.advance(request)
+        val chunk = snapshot.advance(math.min(kernel.maximumChunkSize, request))
         if (chunk != -1) take(inLeft + chunk, request - chunk)
         else inLeft
       } else inLeft

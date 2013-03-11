@@ -301,6 +301,8 @@ object ParIterableLike {
       xs.invokeParallelOperation(new xs.Kernel[T, ParIterableLike.CopyToArrayStatus] {
         type Status = ParIterableLike.CopyToArrayStatus
         private def mathmin(a: Int, b: Int) = if (a < b) a else b
+        override def beforeWorkOn(tree: xs.Ptr[T, Status], node: xs.Node[T, Status]) {
+        }
         override def afterCreateRoot(root: xs.Ptr[T, Status]) {
           root.child.lresult = new Status(start.splice, start.splice)
         }
@@ -374,7 +376,8 @@ object ParIterableLike {
           var left = chunkSize
           val cmb = node.lresult
           while (left > 0) {
-            cmb += node.next()
+            val elem = node.next()
+            if (p.splice(elem)) cmb += elem
             left -= 1
           }
           cmb
