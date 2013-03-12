@@ -3,6 +3,7 @@ package benchmark
 
 
 
+import annotation.tailrec
 
 
 
@@ -36,6 +37,24 @@ object ConcFoldGeneric extends StatisticsBenchmark {
 
   def run() {
     conc.fold(0)(_ + _)
+  }
+
+}
+
+
+object ConcFoldRecursion extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val conc = ConcUtils.create(size)
+
+  def run() {
+    import Conc._
+    def fold(c: Conc[Int]): Int = c match {
+      case left || right => fold(left) + fold(right)
+      case Nil() => 0
+      case Single(elem) => elem
+    }
+    fold(conc)
   }
 
 }
