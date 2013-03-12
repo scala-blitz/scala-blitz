@@ -7,7 +7,8 @@ import scala.reflect.ClassTag
 
 
 
-trait Conc[T] extends ParIterableLike[T, Conc[T]]
+trait Conc[T] extends ParIterable[T]
+with ParIterableLike[T, Conc[T]]
 with TreeWorkstealing[T, Conc[T]] {
 
   type N[R] = ConcNode[R]
@@ -67,7 +68,7 @@ object Conc {
     private var elements: Conc[T] = Nil
 
     def +=(elem: T): this.type = {
-      elements = elements || elem
+      elements = elements || Single(elem)
       this
     }
 
@@ -100,7 +101,7 @@ object Conc {
 
   case class ||[T](left: Conc[T], right: Conc[T]) extends Conc[T] {
     val size: Int = left.size + right.size
-    val height: Int = math.max(left.height, right.height)
+    val height: Int = math.max(left.height, right.height) + 1
     def element = throw new UnsupportedOperationException
   }
 
