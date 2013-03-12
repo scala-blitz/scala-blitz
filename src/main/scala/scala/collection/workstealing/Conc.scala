@@ -2,7 +2,8 @@ package scala.collection.workstealing
 
 
 
-import scala.annotation.unchecked.{uncheckedVariance => uV}
+import scala.language.experimental.macros
+import scala.reflect.macros._
 import scala.reflect.ClassTag
 
 
@@ -54,6 +55,10 @@ with TreeWorkstealing[T, Conc[T]] {
   def right: Conc[T]
 
   def element: T
+
+  /* operation specializations */
+
+  override def fold[U >: T](z: U)(op: (U, U) => U): U = macro Conc.fold[T, U]
 
 }
 
@@ -118,6 +123,8 @@ object Conc {
     def left = throw new UnsupportedOperationException
     def right = throw new UnsupportedOperationException
     def element = throw new UnsupportedOperationException
+
+    def unapply(x: AnyRef): Boolean = x.isInstanceOf[Nil.type]
   }
 
   implicit class ConcOps[T](val elem: T) extends AnyVal {
@@ -125,5 +132,45 @@ object Conc {
     def ||(that: Conc[T]) = Single(elem) || that
   }
 
+  /* operations */
+
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U]): c.Expr[U] = {
+    import c.universe._
+
+    val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
+    val callee = c.Expr[Conc[T]](c.applyPrefix)
+    val kernel = reify {
+      lv.splice
+      val xs = callee.splice
+      xs.invokeParallelOperation(new xs.ConcKernel[T, U] {
+        val zero = z.splice
+        def combine(a: U, b: U) = oper.splice(a, b)
+        def apply(node: xs.N[U], chunkSize: Int) = {
+          def traverse(conc: Conc[T], remaining: Int, acc: U): U = {
+            if (remaining <= 0) acc
+            else conc match {
+              case Conc.Single(elem) =>
+                op.splice(acc, elem)
+              case Conc.Nil() =>
+                acc
+              case Conc.||(left, right) =>
+                val leftres = traverse(left, remaining, acc)
+                val rightres = traverse(right, remaining - left.size, acc)
+                op.splice(leftres, rightres)
+            }
+          }
+          traverse(node.iter.subtree, chunkSize, zero)
+        }
+      })
+    }
+    c.inlineAndReset(kernel)
+  }
+
 }
+
+
+
+
+
+
 

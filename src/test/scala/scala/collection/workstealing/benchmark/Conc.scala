@@ -17,7 +17,7 @@ object ConcUtils {
 }
 
 
-object ConcSum extends StatisticsBenchmark {
+object ConcFold extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
   val conc = ConcUtils.create(size)
@@ -29,7 +29,7 @@ object ConcSum extends StatisticsBenchmark {
 }
 
 
-object ConcSumGeneric extends StatisticsBenchmark {
+object ConcFoldGeneric extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
   val conc: ParIterable[Int] = ConcUtils.create(size)
@@ -41,7 +41,7 @@ object ConcSumGeneric extends StatisticsBenchmark {
 }
 
 
-object ListSum extends StatisticsBenchmark {
+object ListFold extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
   val list = (0 until size).toList
