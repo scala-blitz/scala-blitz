@@ -53,3 +53,17 @@ object ListFold extends StatisticsBenchmark {
 }
 
 
+object ConcFoldExpensive extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val conc = ConcUtils.create(size)
+
+  def run() {
+    conc.fold(0) {
+      (x, y) => x + MathUtils.taylor(y).toInt
+    }
+  }
+
+}
+
+
