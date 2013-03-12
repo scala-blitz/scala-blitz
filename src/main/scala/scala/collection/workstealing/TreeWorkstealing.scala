@@ -17,7 +17,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
 
   type K[R] <: TreeKernel[T, R]
 
-  implicit val isTree: IsTree[TreeType]
+  implicit def isTree: IsTree[TreeType]
 
   abstract class TreeNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val root: TreeType, val stack: Array[AnyRef], val firstElem: Int, val totalElems: Int, initStep: Int)
   extends Node[S, R](l, r)(initStep) {

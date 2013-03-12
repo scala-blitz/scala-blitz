@@ -10,7 +10,7 @@ import scala.collection._
 object ParArrayTest extends App {
 
   def checkFilter(sz: Int) {
-    println("For size: " + sz)
+    //println("For size: " + sz)
     try {
       val pa = new ParArray[Int]((0 until sz).toArray, Workstealing.DefaultConfig)
       val res = pa.filter(x => true)

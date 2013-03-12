@@ -123,7 +123,7 @@ object ParArray {
       chunkstack = merge(chunkstack)
     }
 
-    private[ParArray] def tree = {
+    private[ParArray] def computeTree = {
       @tailrec def merge(stack: List[Tree]): Tree = stack match {
         case t1 :: t2 :: tail => merge(new Node(t2, t1, math.max(t1.level, t2.level) + 1, t1.size + t2.size) :: tail)
         case t :: Nil => t
@@ -159,7 +159,7 @@ object ParArray {
       res.lastarr = that.lastarr
       res.lastpos = that.lastpos
       res.lasttree = that.lasttree
-      res.chunkstack = that.chunkstack ::: List(this.tree)
+      res.chunkstack = that.chunkstack ::: List(this.computeTree)
 
       res
     }
@@ -195,7 +195,7 @@ object ParArray {
 
     def config = Workstealing.DefaultConfig
 
-    def size = tree.size
+    def size = computeTree.size
 
     type N[R] = ArrayCombinerNode[T, R]
 
@@ -252,9 +252,9 @@ object ParArray {
     def newChunkCombiner(shouldInit: Boolean) = new ArrayCombiner(shouldInit)
     
     def newRoot[R]: Ptr[T, R] = {
-      val root = tree
+      val root = computeTree
       val stack = TreeWorkstealing.initializeStack(root)(treeIsTree)
-      val wsnd = new ArrayCombinerNode[T, R](null, null)(tree, stack, 0, tree.size, config.initialStep)
+      val wsnd = new ArrayCombinerNode[T, R](null, null)(root, stack, 0, root.size, config.initialStep)
       new Ptr[T, R](null, 0)(wsnd)
     }
 
@@ -324,7 +324,7 @@ object ParArray {
     
     def newChunkCombiner(shouldInit: Boolean) = new TreeCombiner(shouldInit)
     
-    def result = tree
+    def result = computeTree
   }
 
 }
