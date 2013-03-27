@@ -11,11 +11,13 @@ object BuildSettings {
     name := "workstealing",
     version := "0.1",
     resolvers += ScalaToolsSnapshots,
-    scalaVersion := "2.10.1-SNAPSHOT",
+    scalaVersion := "2.10.1",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % "2.10.1-SNAPSHOT"
-    )
+      "org.scala-lang" % "scala-reflect" % "2.10.1",
+       "com.github.axel22" %% "scalameter" % "0.3"
+    ),
+  testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework")
   )
 }
 

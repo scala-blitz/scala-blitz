@@ -63,7 +63,8 @@ object ParRangeFoldGeneric extends StatisticsBenchmark {
 
   def run() {
     val range: ParIterable[Int] = new ParRange(0 until size, Workstealing.DefaultConfig)
-    range.fold(0)(_ + _)
+    @volatile var found = false
+    range.foreach(x => if ((x & 0xfffff) == 0) found = true)
   }
 
 }
