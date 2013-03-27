@@ -26,8 +26,6 @@ with IndexedWorkstealing[Int] {
 
   final class RangeNode[R](l: Ptr[Int, R], r: Ptr[Int, R])(val rng: Range, s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[Int, R](l, r)(s, e, rn, st) {
-    var lindex = start
-
     def next(): Int = {
       val i = lindex
       lindex = i + 1

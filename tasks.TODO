@@ -3,11 +3,15 @@ To fix:
  ☐ parallel arrays need to be specialized
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
+ ☐ fix exception handling
 
 Todo items:
  ☐ write a comprehensive suite of unit tests
  ☐ write a comprehensive suite of microbenchmark regression tests
+ ☐ implement HashNode and parallel hash tables
+ ☐ implement LockNode and port hash tries to use it
+ ☐ an interface for thread pools and their configuration
+ ☐ value/implicit class conversion to support parallel operations - an API to convert between normal and parallel operations
 
 Features to add:
  ☐ allow asynchronous execution
-

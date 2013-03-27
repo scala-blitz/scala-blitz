@@ -27,8 +27,6 @@ with IndexedWorkstealing[T] {
 
   final class ArrayNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val arr: Array[S], s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[S, R](l, r)(s, e, rn, st) {
-    var lindex = start
-
     def next(): S = {
       val i = lindex
       lindex = i + 1
