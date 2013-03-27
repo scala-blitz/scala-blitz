@@ -15,6 +15,7 @@ Todo items:
  ☐ an interface for thread pools and their configuration
  ☐ value/implicit class conversion to support parallel operations - an API to convert between normal and parallel operations
  ☐ verify performance on AMD platforms, UltraSPARC, multi-socket Intels
+ ☐ design an API for scheduler configuration (number of threads, pool, chunking size, schedule, stealing strategy, etc.)
 
 Bigger applications:
  ☐ PageRank
