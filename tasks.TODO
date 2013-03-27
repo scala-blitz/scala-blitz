@@ -1,6 +1,7 @@
 To fix:
  ☐ argument expressions need to be assigned to a local var
- ☐ parallel arrays need to be specialized
+ ☐ parallel array operations need to be specialized
+ ☐ specialize parallel operation instances for the other data-structures where it makes sense
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
  ☐ fix exception handling
@@ -12,6 +13,20 @@ Todo items:
  ☐ implement LockNode and port hash tries to use it
  ☐ an interface for thread pools and their configuration
  ☐ value/implicit class conversion to support parallel operations - an API to convert between normal and parallel operations
+ ☐ verify performance on AMD platforms, UltraSPARC, multi-socket Intels
+
+Bigger applications:
+ ☐ PageRank
+ ☐ K-means
+ ☐ Barnes-Hut
+ ☐ Smith-Waterman
+ ☐ Mandelbrot set computation
+ ☐ genetic algorithm optimization
+ ☐ flocking
+ ☐ some linear algebra applications
+ ☐ raytracing
+ ☐ adjoint convolution
+ ☐ finding anagrams
 
 Features to add:
  ☐ allow asynchronous execution
