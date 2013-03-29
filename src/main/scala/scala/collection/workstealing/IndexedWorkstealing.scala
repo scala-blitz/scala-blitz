@@ -21,6 +21,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
   abstract class IndexNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val start: Int, val end: Int, @volatile var range: Long, st: Int)
   extends Node[S, R](l, r)(st) {
     @volatile var rresult: R = null.asInstanceOf[R]
+    var lindex = start
     var padding0: Int = 0 // <-- war story
     var padding1: Int = 0
     //var padding2: Int = 0
@@ -74,8 +75,10 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
         val p = progress(range_t0)
         val u = until(range_t0)
         val newp = math.min(u, p + step)
-        if (CAS_RANGE(range_t0, createRange(newp, u))) newp - p
-        else -1
+        if (CAS_RANGE(range_t0, createRange(newp, u))) {
+          lindex = p
+          newp - p
+        } else -1
       }
     }
 
