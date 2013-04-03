@@ -361,10 +361,10 @@ object ParArrayFilterIrregularPC extends StatisticsBenchmark {
 object ParRangeFilterIrregularSpecific extends StatisticsBenchmark {
 
   val size = sys.props("size").toInt
-  val array = new ParArray((0 until size).toArray, Workstealing.DefaultConfig)
+  val range = new ParRange(0 until size, Workstealing.DefaultConfig)
 
   def run() {
-    val result = array.filter(IrregularWorkloads.exp)
+    val result = range.filter(IrregularWorkloads.exp)
   }
 
 }
@@ -375,18 +375,57 @@ object ParRangeFilterIrregularPC extends StatisticsBenchmark {
   val size = sys.props("size").toInt
   val parlevel = sys.props("par").toInt
   val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
-  val array = (0 until size).toArray.par
-  array.tasksupport = fj
+  val range = (0 until size).par
+  range.tasksupport = fj
 
   def run() {
-    val result = array.filter(IrregularWorkloads.exp)
+    val result = range.filter(IrregularWorkloads.exp)
   }
 
 }
 
 
+/* standard deviation computation */
+
+object StandardDeviationSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val numbers = new Array[Double](size)
+  for (i <- 0 until size) numbers(i) = 10.0 + (i - size / 2.0) / size
+  
+  val measurements = new ParArray(numbers, Workstealing.DefaultConfig)
+
+  def run() {
+    val mean = measurements.fold(0.0)(_ + _) / measurements.size
+    val variance = measurements.aggregate(0.0)(_ + _) {
+      (acc, x) => acc + (x - mean) * (x - mean)
+    }
+    val stdev = math.sqrt(variance)
+  }
+
+}
 
 
+object StandardDeviationPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val numbers = new Array[Double](size)
+  for (i <- 0 until size) numbers(i) = 10.0 + (i - size / 2.0) / size
+
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+  val measurements = numbers.par
+  measurements.tasksupport = fj
+
+  def run() {
+    val mean = measurements.fold(0.0)(_ + _) / measurements.size
+    val variance = measurements.aggregate(0.0)({
+      (acc, x) => acc + (x - mean) * (x - mean)
+    }, _ + _)
+    val stdev = math.sqrt(variance)
+  }
+
+}
 
 
 
