@@ -149,14 +149,14 @@ object Conc {
           def traverse(conc: Conc[T], remaining: Int, acc: U): U = {
             if (remaining <= 0) acc
             else conc match {
-              case Conc.Single(elem) =>
-                op.splice(acc, elem)
-              case Conc.Nil() =>
-                acc
               case Conc.||(left, right) =>
                 val leftres = traverse(left, remaining, acc)
                 val rightres = traverse(right, remaining - left.size, acc)
                 op.splice(leftres, rightres)
+              case Conc.Single(elem) =>
+                op.splice(acc, elem)
+              case Conc.Nil() =>
+                acc
             }
           }
           traverse(node.iter.subtree, chunkSize, zero)

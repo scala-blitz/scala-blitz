@@ -82,6 +82,8 @@ trait Workstealing[T] {
 
     def next(): S
 
+    def hasNext: Boolean
+
     def markCompleted(): Boolean
 
     def markStolen(): Boolean

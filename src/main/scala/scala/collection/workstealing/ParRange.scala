@@ -27,11 +27,12 @@ with IndexedWorkstealing[Int] {
   final class RangeNode[R](l: Ptr[Int, R], r: Ptr[Int, R])(val rng: Range, s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[Int, R](l, r)(s, e, rn, st) {
     def next(): Int = {
-      val i = lindex
-      lindex = i + 1
-      rng.apply(i)
-      //rng.start + i * rng.step // does not bring considerable performance gain
+      val r = rng.apply(nextProgress)
+      nextProgress += 1
+      r
     }
+
+    def hasNext: Boolean = nextProgress < nextUntil
 
     def newExpanded(parent: Ptr[Int, R], worker: Workstealing.Worker, kernel: Kernel[Int, R]): RangeNode[R] = {
       val r = /*READ*/range
