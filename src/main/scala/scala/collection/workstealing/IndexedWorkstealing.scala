@@ -80,7 +80,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
           nextProgress = p
           nextUntil = newp
           newp - p
-        } else -1
+        } else advance(step)
       }
     }
 

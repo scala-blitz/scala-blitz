@@ -73,7 +73,8 @@ object ParRangeFoldCheapSpecific extends StatisticsBenchmark {
 
   def run() {
     val range = new ParRange(0 until size, Workstealing.DefaultConfig)
-    range.fold(0)(_ + _)
+    val result = range.fold(0)(_ + _)
+    println(result)
   }
 
 }
@@ -240,7 +241,148 @@ object SeqListFold extends StatisticsBenchmark {
 }
 
 
-/* irregular range fold - 15M */
+/* irregular range fold - 50k */
+
+object IrregularWorkloads {
+
+  def peakAtEnd(x: Int, percent: Double, size: Int) = if (x < percent * size) x else {
+    var sum = 0
+    var i = 1
+    while (i < size) {
+      sum += i
+      i += 1
+    }
+    sum
+  }
+
+  def isPrime(x: Int): Boolean = {
+    var i = 2
+    val to = math.sqrt(x).toInt + 2
+    while (i <= to) {
+      if (x % i == 0) return false
+      i += 1
+    }
+    true
+  }
+
+  def exp(x: Int): Boolean = {
+    var i = 0
+    val until = 1 << (x / 100)
+    var sum = 0
+    while (i < until) {
+      sum += i
+      i += 1
+    }
+    sum % 2 == 0
+  }
+
+}
+
+object ParRangeFoldIrregularSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+
+  def run() {
+    val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+    val result = range.aggregate(0)(_ + _) {
+      (acc, x) => acc + IrregularWorkloads.peakAtEnd(x, 0.97, size)
+    }
+  }
+
+}
+
+
+object ParRangeFoldIrregularPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+
+  def run() {
+    val range = (0 until size).par
+    range.tasksupport = fj
+    val result = range.aggregate(0)({
+      (acc, x) => acc + IrregularWorkloads.peakAtEnd(x, 0.97, size)
+    }, _ + _)
+  }
+
+}
+
+
+object ParRangeFoldIrregularLoop extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  var result = 0
+
+  def run() {
+    var sum = 0
+    var i = 0
+    while (i < size) {
+      sum += IrregularWorkloads.peakAtEnd(i, 0.97, size)
+      i += 1
+    }
+    result = sum
+  }
+
+}
+
+
+/* irregular array filter - 1M */
+
+object ParArrayFilterIrregularSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val array = new ParArray((0 until size).toArray, Workstealing.DefaultConfig)
+
+  def run() {
+    val result = array.filter(IrregularWorkloads.isPrime)
+  }
+
+}
+
+
+object ParArrayFilterIrregularPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+  val array = (0 until size).toArray.par
+  array.tasksupport = fj
+
+  def run() {
+    val result = array.filter(IrregularWorkloads.isPrime)
+  }
+
+}
+
+
+/* irregular range filter - 2500 */
+
+object ParRangeFilterIrregularSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val array = new ParArray((0 until size).toArray, Workstealing.DefaultConfig)
+
+  def run() {
+    val result = array.filter(IrregularWorkloads.exp)
+  }
+
+}
+
+
+object ParRangeFilterIrregularPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+  val array = (0 until size).toArray.par
+  array.tasksupport = fj
+
+  def run() {
+    val result = array.filter(IrregularWorkloads.exp)
+  }
+
+}
 
 
 
