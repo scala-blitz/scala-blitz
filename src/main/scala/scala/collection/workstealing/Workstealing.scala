@@ -447,7 +447,7 @@ object Workstealing {
   object DefaultConfig extends Config {
     val initialStep = sys.props("step").toInt
     val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
-    val incrementFrequency = 1
+    val incrementFrequency = sys.props.getOrElse("incFreq", "1").toInt
     val par = sys.props("par").toInt
     val strategy: Strategy = strategies(sys.props("strategy"))
   }

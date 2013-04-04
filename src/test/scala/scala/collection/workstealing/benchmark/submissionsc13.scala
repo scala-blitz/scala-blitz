@@ -385,7 +385,7 @@ object ParRangeFilterIrregularPC extends StatisticsBenchmark {
 }
 
 
-/* standard deviation computation */
+/* standard deviation computation - 15M */
 
 object StandardDeviationSpecific extends StatisticsBenchmark {
 
@@ -427,6 +427,153 @@ object StandardDeviationPC extends StatisticsBenchmark {
 
 }
 
+
+/* Mandelbrot set computation
+ *
+ * -2.0,-2.0,2.0,2.0, 1000x1000, 1000
+ * -48.0,-48.0,0.0,0.0, 3000x3000, 10000
+ * -100.0,-100.0,0.0,0.0 10000x10000, 1000
+ * -2.0,-1.0,1.0,32.0 10000x10000, 10000
+ */
+
+object Mandelbrot {
+
+  def compute(xc: Double, yc: Double, threshold: Int): Int = {
+    var i = 0
+    var x = 0.0
+    var y = 0.0
+    while (x * x + y * y < 2 && i < threshold) {
+      val xt = x * x - y * y + xc
+      val yt = 2 * x * y + yc
+
+      x = xt
+      y = yt
+
+      i += 1
+    }
+    i
+  }
+
+}
+
+object MandelbrotSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val threshold = sys.props("threshold").toInt
+  val bounds = sys.props("bounds").split(",").map(_.toDouble)
+  val image = new Array[Int](size * size)
+
+  def run() {
+    val range = new ParRange(0 until (size * size), Workstealing.DefaultConfig)
+    val xlo = bounds(0)
+    val ylo = bounds(1)
+    val xhi = bounds(2)
+    val yhi = bounds(3)
+
+    for (idx <- range) {
+      val x = idx % size
+      val y = idx / size
+      val xc = xlo + (x - xlo) / (xhi - xlo)
+      val yc = ylo + (x - ylo) / (yhi - ylo)
+
+      image(idx) = Mandelbrot.compute(xc, yc, threshold)
+    }
+  }
+
+}
+
+
+object MandelbrotPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val threshold = sys.props("threshold").toInt
+  val bounds = sys.props("bounds").split(",").map(_.toDouble)
+  val image = new Array[Int](size * size)
+
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+
+  def run() {
+    val range = (0 until (size * size)).par
+    range.tasksupport = fj
+    val xlo = bounds(0)
+    val ylo = bounds(1)
+    val xhi = bounds(2)
+    val yhi = bounds(3)
+
+    for (idx <- range) {
+      val x = idx % size
+      val y = idx / size
+      val xc = xlo + (x - xlo) / (xhi - xlo)
+      val yc = ylo + (x - ylo) / (yhi - ylo)
+
+      image(idx) = Mandelbrot.compute(xc, yc, threshold)
+    }
+  }
+
+}
+
+
+/* word segmentation */
+
+object WordSegmentationSpecific extends StatisticsBenchmark {
+
+  val inputText = "therearemanythingsiknoworthatiwouldliketolearnsomehow"
+  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/share/dict/words").getLines
+
+  def isWord(r: Range) = dictionary(inputText.substring(r.head, r.last))
+
+  def decode(subrange: Range): Int = {
+    (if (isWord(subrange)) 1 else 0) + subrange.tail.aggregate(0)({ (acc, idx) =>
+      val prefix = subrange.head until idx
+      if (isWord(prefix)) acc + decode(idx until inputText.length)
+      else acc
+    }, _ + _)
+  }
+
+  def run() {
+    val range = new ParRange(1 until inputText.length, Workstealing.DefaultConfig)
+    val results = range.aggregate(0)(_ + _) { (acc, idx) =>
+      val prefix = 0 until idx
+      if (isWord(prefix)) acc + decode(idx until inputText.length)
+      else acc
+    }
+    println(results)
+  }
+
+}
+
+
+object WordSegmentationPC extends StatisticsBenchmark {
+
+  val inputText = "therearemanythingsiknoworthatiwouldliketolearnsomehow"
+  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/share/dict/words").getLines
+
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+
+  def isWord(r: Range) = dictionary(inputText.substring(r.head, r.last))
+
+  def decode(subrange: Range): Int = {
+    (if (isWord(subrange)) 1 else 0) + subrange.tail.aggregate(0)({ (acc, idx) =>
+      val prefix = subrange.head until idx
+      if (isWord(prefix)) acc + decode(idx until inputText.length)
+      else acc
+    }, _ + _)
+  }
+
+  def run() {
+    val range = (1 until inputText.length).par
+    range.tasksupport = fj
+    val results = range.aggregate(0)({ (acc, idx) =>
+      val prefix = 0 until idx
+      if (isWord(prefix)) acc + decode(idx until inputText.length)
+      else acc
+    }, _ + _)
+    println(results)
+  }
+
+}
 
 
 
