@@ -74,7 +74,6 @@ object ParRangeFoldCheapSpecific extends StatisticsBenchmark {
   def run() {
     val range = new ParRange(0 until size, Workstealing.DefaultConfig)
     val result = range.fold(0)(_ + _)
-    println(result)
   }
 
 }

@@ -103,7 +103,7 @@ trait IndexedWorkstealing[T] extends Workstealing[T] {
 
     def apply(node: N[R], chunkSize: Int) = ???
 
-    def isNotRandom = true
+    def isNotRandom = false
 
     override def workOn(tree: Ptr[S, R], worker: Workstealing.Worker): Boolean = {
       val rawn = /*READ*/tree.child
