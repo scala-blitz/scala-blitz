@@ -514,7 +514,7 @@ object MandelbrotPC extends StatisticsBenchmark {
 }
 
 
-/* word segmentation */
+/* word segmentation - incFreq = 2 */
 
 object WordSegmentationSpecific extends StatisticsBenchmark {
 
@@ -574,6 +574,102 @@ object WordSegmentationPC extends StatisticsBenchmark {
   }
 
 }
+
+
+/* triangular matrix multiplication */
+
+object TriMatrixMultSpecific extends StatisticsBenchmark {
+  val sz = sys.props("size").toInt
+
+  type Big = java.math.BigDecimal
+
+  class Vector(val size: Int) {
+    val array = new Array[Big](size)
+    for (i <- 0 until size) array(i) = new Big("1.2345678e322")
+  }
+
+  class Matrix(val size: Int) {
+    val arrays = new Array[Array[Big]](size)
+    for (i <- 1 to size) {
+      arrays(i - 1) = new Array[Big](i)
+      for (j <- 0 until i) arrays(i - 1)(j) = new Big("1.2345678e322")
+    }
+
+    def inPlaceMult(v: Vector, result: Vector) {
+      val rows = new ParRange(0 until size, Workstealing.DefaultConfig)
+
+      for (row <- rows) {
+        val marr = arrays(row)
+        val varr = v.array
+        var sum = new Big(0.0)
+        var col = 0
+        while (col <= row) {
+          sum = sum add (marr(col) multiply varr(col))
+          col += 1
+        }
+        result.array(row) = sum
+      }
+    }
+  }
+
+  val m = new Matrix(sz)
+  val v = new Vector(sz)
+  val r = new Vector(sz)
+
+  def run() {
+    m.inPlaceMult(v, r)
+  }
+
+}
+
+
+object TriMatrixMultPC extends StatisticsBenchmark {
+  val sz = sys.props("size").toInt
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+
+  type Big = java.math.BigDecimal
+
+  class Vector(val size: Int) {
+    val array = new Array[Big](size)
+    for (i <- 0 until size) array(i) = new Big("1.2345678e322")
+  }
+
+  class Matrix(val size: Int) {
+    val arrays = new Array[Array[Big]](size)
+    for (i <- 1 to size) {
+      arrays(i - 1) = new Array[Big](i)
+      for (j <- 0 until i) arrays(i - 1)(j) = new Big("1.2345678e322")
+    }
+
+    def inPlaceMult(v: Vector, result: Vector) {
+      val rows = (0 until size).par
+      rows.tasksupport = fj
+
+      for (row <- rows) {
+        val marr = arrays(row)
+        val varr = v.array
+        var sum = new Big(0.0)
+        var col = 0
+        while (col <= row) {
+          sum = sum add (marr(col) multiply varr(col))
+          col += 1
+        }
+        result.array(row) = sum
+      }
+    }
+  }
+
+  val m = new Matrix(sz)
+  val v = new Vector(sz)
+  val r = new Vector(sz)
+
+  def run() {
+    m.inPlaceMult(v, r)
+  }
+
+}
+
 
 
 
