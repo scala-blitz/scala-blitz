@@ -575,7 +575,7 @@ object WordSegmentationPC extends StatisticsBenchmark {
 }
 
 
-/* triangular matrix multiplication */
+/* triangular matrix multiplication - 350 */
 
 object TriMatrixMultSpecific extends StatisticsBenchmark {
   val sz = sys.props("size").toInt
