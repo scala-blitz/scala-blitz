@@ -124,7 +124,7 @@ object ParRangeFoldCheapLoop extends StatisticsBenchmark {
 }
 
 
-/* cheap, uniform array fold - 75M */
+/* cheap, uniform array fold - 50M */
 
 object ParArrayFoldCheapSpecific extends StatisticsBenchmark {
 
@@ -355,6 +355,18 @@ object ParArrayFilterIrregularPC extends StatisticsBenchmark {
 }
 
 
+object ParArrayFilterIrregularSeq extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val array = (0 until size).toArray
+
+  def run() {
+    array.filter(IrregularWorkloads.isPrime)
+  }
+
+}
+
+
 /* irregular range filter - 2500 */
 
 object ParRangeFilterIrregularSpecific extends StatisticsBenchmark {
@@ -376,6 +388,18 @@ object ParRangeFilterIrregularPC extends StatisticsBenchmark {
   val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
   val range = (0 until size).par
   range.tasksupport = fj
+
+  def run() {
+    val result = range.filter(IrregularWorkloads.exp)
+  }
+
+}
+
+
+object ParRangeFilterIrregularSeq extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val range = (0 until size)
 
   def run() {
     val result = range.filter(IrregularWorkloads.exp)
