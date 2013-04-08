@@ -496,8 +496,8 @@ object MandelbrotSpecific extends StatisticsBenchmark {
     for (idx <- range) {
       val x = idx % size
       val y = idx / size
-      val xc = xlo + (x - xlo) / (xhi - xlo)
-      val yc = ylo + (x - ylo) / (yhi - ylo)
+      val xc = xlo + (xhi - xlo) * x / size
+      val yc = ylo + (yhi - ylo) * y / size
 
       image(idx) = Mandelbrot.compute(xc, yc, threshold)
     }
@@ -527,8 +527,8 @@ object MandelbrotPC extends StatisticsBenchmark {
     for (idx <- range) {
       val x = idx % size
       val y = idx / size
-      val xc = xlo + (x - xlo) / (xhi - xlo)
-      val yc = ylo + (x - ylo) / (yhi - ylo)
+      val xc = xlo + (xhi - xlo) * x / size
+      val yc = ylo + (yhi - ylo) * y / size
 
       image(idx) = Mandelbrot.compute(xc, yc, threshold)
     }
@@ -542,7 +542,7 @@ object MandelbrotPC extends StatisticsBenchmark {
 object WordSegmentationSpecific extends StatisticsBenchmark {
 
   val inputText = "therearemanythingsiknoworthatiwouldliketolearnsomehow"
-  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/share/dict/words").getLines
+  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/dict/words").getLines
 
   def isWord(r: Range) = dictionary(inputText.substring(r.head, r.last))
 
@@ -570,7 +570,7 @@ object WordSegmentationSpecific extends StatisticsBenchmark {
 object WordSegmentationPC extends StatisticsBenchmark {
 
   val inputText = "therearemanythingsiknoworthatiwouldliketolearnsomehow"
-  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/share/dict/words").getLines
+  val dictionary = collection.mutable.HashSet() ++= io.Source.fromFile("/usr/dict/words").getLines
 
   val parlevel = sys.props("par").toInt
   val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
