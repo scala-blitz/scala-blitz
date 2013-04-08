@@ -760,18 +760,12 @@ object Raytracing {
   }
 
   val lights = Seq(
-    Vector(10.0, 10.0, 10.0)
+    Vector(10.0, 10.0, 10.0),
+    Vector(5.0, 5.0, 15.0),
+    Vector(-5.0, 5.0, -10.0)
   )
 
-  val objects = Seq(
-    Sphere(Vector(5.4, 5.4, 0.1), 0.4),
-    Sphere(Vector(6.5, 5.5, 0.0), 0.2),
-    Sphere(Vector(5.4, 6.4, -0.4), 0.2),
-    Sphere(Vector(4.0, 5.0, -3.0), 0.8),
-    Sphere(Vector(5.0, 6.0, 1.2), 0.1),
-    Sphere(Vector(5.2, 5.2, -0.5), 0.1),
-    Sphere(Vector(5.6, 4.5, -2.0), 0.3)
-  )
+  val objects = for (i <- 0 until 1000) yield Sphere(Vector(99.5 + util.Random.nextDouble() / 4, 99.5 + util.Random.nextDouble() / 4, -20.0 + util.Random.nextDouble() * 20.0), 0.1 + util.Random.nextDouble() / 4)
 
   import collection.mutable.ArrayBuffer
 
@@ -783,40 +777,53 @@ object Raytracing {
     def sector(x: Int, y: Int): Seq[Obj] = array(y * size + x)
   }
 
-  val objectGrid = new ObjectGrid(50)  
+  val objectGrid = new ObjectGrid(100)
   for (obj <- objects) objectGrid.add(obj.center.x.toInt, obj.center.y.toInt, obj)
 
   def compute(x: Double, y: Double, threshold: Int): Int = {
     var finalcolor = Color(0, 0, 0)
-    var raystart = Vector(x, y, -10.0)
-    var raydir = Vector(x, y, 0.0)
+    var raystart: Vector = null
+    var raydir: Vector = null
     var depth = 0
     var reflection_factor = 1.0
     while (depth < threshold && reflection_factor > 0.0) {
       // prune
-      val considered = if (depth == 0) objectGrid.sector(raystart.x.toInt, raystart.y.toInt) else objects
+      val considered = if (depth == 0) objectGrid.sector(x.toInt, y.toInt) else objects
       
-      // find closest
-      val solution = considered.foldLeft(null: (Obj, (Vector, Vector))) {
-        (acc, obj) =>
-        val x = obj.intersect(raystart, raydir)
-        if (x == null) acc
-        else if (acc == null) (obj, x)
-        else if ((x._1 - raystart).length < (acc._2._1 - raystart).length) (obj, x)
-        else acc
-      }
+      if (considered.isEmpty) depth = threshold else {
+        if (raystart == null) raystart = Vector(x, y, 0.0)
+        if (raydir == null) raydir = Vector(x, y, -10.0)
+  
+        // find closest
+        val solution = considered.foldLeft(null: (Obj, (Vector, Vector))) {
+          (acc, obj) =>
+          val x = obj.intersect(raystart, raydir)
+          if (x == null) acc
+          else if (acc == null) (obj, x)
+          else if ((x._1 - raystart).length < (acc._2._1 - raystart).length) (obj, x)
+          else acc
+        }
 
-      if (solution == null) depth = threshold
-      else {
-        val (closest, (intersection, direction)) = solution
-        finalcolor = finalcolor + (closest.color * reflection_factor)
+        if (solution == null) depth = threshold
+        else {
+          val (closest, (intersection, direction)) = solution
 
-        raystart = intersection
-        raydir = direction
-        reflection_factor = reflection_factor * closest.reflection
+          // light contributions
+          var computedColor = Color(0, 0, 0)
+          for (light <- lights) {
+            val dirlight = light - intersection
+            if (!considered.exists(obj => obj.intersect(intersection, dirlight) != null)) computedColor = computedColor + closest.color * 0.8
+          }
 
-        // increase depth
-        depth += 1
+          finalcolor = finalcolor + (computedColor * reflection_factor)
+  
+          raystart = intersection
+          raydir = direction
+          reflection_factor = reflection_factor * closest.reflection
+  
+          // increase depth
+          depth += 1
+        }
       }
     }
 
@@ -837,8 +844,8 @@ object RaytracingSpecific extends StatisticsBenchmark {
     for (idx <- range) {
       val x = idx % size
       val y = idx / size
-      val x0 = 10.0 * x / size
-      val y0 = 10.0 * y / size
+      val x0 = 100.0 * x / size
+      val y0 = 100.0 * y / size
 
       image(idx) = Raytracing.compute(x0, y0, threshold)
     }
@@ -862,8 +869,8 @@ object RaytracingPC extends StatisticsBenchmark {
     for (idx <- range) {
       val x = idx % size
       val y = idx / size
-      val x0 = 50.0 * x / size
-      val y0 = 50.0 * y / size
+      val x0 = 100.0 * x / size
+      val y0 = 100.0 * y / size
 
       image(idx) = Raytracing.compute(x0, y0, threshold)
     }
