@@ -694,7 +694,182 @@ object TriMatrixMultPC extends StatisticsBenchmark {
 }
 
 
+/* raytracing */
 
+object Raytracing {
+
+  case class Vector(x: Double, y: Double, z: Double) {
+    def length = math.sqrt(x * x + y * y + z * z)
+    def *(s: Double) = Vector(x * s, y * s, z * s)
+    def +(v: Vector) = Vector(x + v.x, y + v.y, z + v.z)
+    def -(v: Vector) = Vector(x - v.x, y - v.y, z - v.z)
+  }
+
+  trait Obj {
+    def center: Vector
+    def intersect(orig: Vector, dir: Vector): (Vector, Vector)
+    def color: Color
+    def reflection: Double
+  }
+
+  case class Sphere(center: Vector, radius: Double) extends Obj {
+    def intersect(x0: Vector, x1: Vector): (Vector, Vector) = {
+      val dx = x0.x - center.x
+      val dy = x0.y - center.y
+      val dz = x0.z - center.z
+      val a = x1.x * x1.x + x1.y * x1.y + x1.z * x1.z
+      val b = 2 * (dx + dy + dz)
+      val c = dx * dx + dy * dy + dz * dz - radius * radius
+
+      val discrim = b * b - 4 * a * c
+      if (discrim < 0) null
+      else {
+        val ipoint = {
+          val t1 = (-b - math.sqrt(discrim)) / (2 * a)
+          val t2 = (-b + math.sqrt(discrim)) / (2 * a)
+          val p1 = Vector(x0.x + x1.x * t1, x0.y + x1.y * t1, x0.z + x1.z * t1)
+          val p2 = Vector(x0.x + x1.x * t2, x0.y + x1.y * t2, x0.z + x1.z * t2)
+          val d1 = (p1.x - x0.x) * (p1.x - x0.x) + (p1.y - x0.y) * (p1.y - x0.y) + (p1.z - x0.z) * (p1.z - x0.z)
+          val d2 = (p2.x - x0.x) * (p2.x - x0.x) + (p2.y - x0.y) * (p2.y - x0.y) + (p2.z - x0.z) * (p2.z - x0.z)
+          if (d1 < d2) p1 else p2
+        }
+        val normal = Vector(ipoint.x - center.x, ipoint.y - center.y, ipoint.z - center.z)
+        val n0 = normal * (1 / normal.length)
+        val reflected = x1 - (n0 * (2 * (x1.x * n0.x + x1.y * n0.y + x1.z * n0.z)))
+        (ipoint, reflected)
+      }
+    }
+    def color = Color(0xbb, 0, 0)
+    def reflection = 0.2
+  }
+
+  class Color(val col: Int) extends AnyVal {
+    def r = (col >> 16) & 0xff
+    def g = (col >> 8) & 0xff
+    def b = (col >> 0) & 0xff
+    def +(other: Color) = Color(
+      math.min(255, r + other.r),
+      math.min(255, g + other.g),
+      math.min(255, b + other.b)
+    )
+    def *(factor: Double) = Color((r * factor).toInt, (g * factor).toInt, (b * factor).toInt)
+  }
+
+  object Color {
+    def apply(r: Int, g: Int, b: Int) = new Color((r << 16) + (g << 8) + b)
+  }
+
+  val lights = Seq(
+    Vector(10.0, 10.0, 10.0)
+  )
+
+  val objects = Seq(
+    Sphere(Vector(5.4, 5.4, 0.1), 0.4),
+    Sphere(Vector(6.5, 5.5, 0.0), 0.2),
+    Sphere(Vector(5.4, 6.4, -0.4), 0.2),
+    Sphere(Vector(4.0, 5.0, -3.0), 0.8),
+    Sphere(Vector(5.0, 6.0, 1.2), 0.1),
+    Sphere(Vector(5.2, 5.2, -0.5), 0.1),
+    Sphere(Vector(5.6, 4.5, -2.0), 0.3)
+  )
+
+  import collection.mutable.ArrayBuffer
+
+  class ObjectGrid(val size: Int) {
+    val array = new Array[ArrayBuffer[Obj]](size * size)
+    for (x <- 0 until size; y <- 0 until size) array(y * size + x) = new ArrayBuffer[Obj]()
+
+    def add(x: Int, y: Int, obj: Obj) = array(y * size + x) += obj
+    def sector(x: Int, y: Int): Seq[Obj] = array(y * size + x)
+  }
+
+  val objectGrid = new ObjectGrid(50)  
+  for (obj <- objects) objectGrid.add(obj.center.x.toInt, obj.center.y.toInt, obj)
+
+  def compute(x: Double, y: Double, threshold: Int): Int = {
+    var finalcolor = Color(0, 0, 0)
+    var raystart = Vector(x, y, -10.0)
+    var raydir = Vector(x, y, 0.0)
+    var depth = 0
+    var reflection_factor = 1.0
+    while (depth < threshold && reflection_factor > 0.0) {
+      // prune
+      val considered = if (depth == 0) objectGrid.sector(raystart.x.toInt, raystart.y.toInt) else objects
+      
+      // find closest
+      val solution = considered.foldLeft(null: (Obj, (Vector, Vector))) {
+        (acc, obj) =>
+        val x = obj.intersect(raystart, raydir)
+        if (x == null) acc
+        else if (acc == null) (obj, x)
+        else if ((x._1 - raystart).length < (acc._2._1 - raystart).length) (obj, x)
+        else acc
+      }
+
+      if (solution == null) depth = threshold
+      else {
+        val (closest, (intersection, direction)) = solution
+        finalcolor = finalcolor + (closest.color * reflection_factor)
+
+        raystart = intersection
+        raydir = direction
+        reflection_factor = reflection_factor * closest.reflection
+
+        // increase depth
+        depth += 1
+      }
+    }
+
+    finalcolor.col
+  }
+
+}
+
+object RaytracingSpecific extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val threshold = sys.props("threshold").toInt
+  val image = new Array[Int](size * size)
+
+  def run() {
+    val range = new ParRange(0 until (size * size), Workstealing.DefaultConfig)
+
+    for (idx <- range) {
+      val x = idx % size
+      val y = idx / size
+      val x0 = 10.0 * x / size
+      val y0 = 10.0 * y / size
+
+      image(idx) = Raytracing.compute(x0, y0, threshold)
+    }
+  }
+
+}
+
+object RaytracingPC extends StatisticsBenchmark {
+
+  val size = sys.props("size").toInt
+  val threshold = sys.props("threshold").toInt
+  val image = new Array[Int](size * size)
+
+  val parlevel = sys.props("par").toInt
+  val fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parlevel))
+
+  def run() {
+    val range = (0 until (size * size)).par
+    range.tasksupport = fj
+
+    for (idx <- range) {
+      val x = idx % size
+      val y = idx / size
+      val x0 = 50.0 * x / size
+      val y0 = 50.0 * y / size
+
+      image(idx) = Raytracing.compute(x0, y0, threshold)
+    }
+  }
+
+}
 
 
 
