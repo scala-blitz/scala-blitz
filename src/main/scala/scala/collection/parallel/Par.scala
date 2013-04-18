@@ -11,7 +11,7 @@ class Par[Repr](val data: Repr) extends AnyVal
 object Par {
 
   implicit class Ops[Repr](val xs: Repr) extends AnyVal {
-    def data: Par[Repr] = new Par(xs)
+    def toPar: Par[Repr] = new Par(xs)
   }
 
 }
