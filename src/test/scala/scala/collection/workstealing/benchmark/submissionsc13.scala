@@ -465,7 +465,7 @@ object Mandelbrot {
     var i = 0
     var x = 0.0
     var y = 0.0
-    while (x * x + y * y < 2 && i < threshold) {
+    while (x * x + y * y < 4 && i < threshold) {
       val xt = x * x - y * y + xc
       val yt = 2 * x * y + yc
 
