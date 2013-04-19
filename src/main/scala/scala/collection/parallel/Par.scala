@@ -14,35 +14,45 @@ object Par {
     def toPar[T](implicit isTraversable: Repr <:< TraversableOnce[T]): Par[T, Repr] = new Par(xs)
   }
 
-  trait CanReduce[T, Repr] {
-    type Sch <: Scheduler
-    type Ops <: ReducableOps[T, Repr, Sch]
-    def reducableOps(repr: Repr): Ops
-    def scheduler: Sch
-  }
+  implicit def reducableOps[T, Repr](p: Par[T, Repr])(implicit cr: CanReduce[T, Repr]): cr.Ops = cr.reducableOps(p.data)
 
-  @inline implicit def reducableOps[T, Repr](p: Par[T, Repr])(implicit cr: CanReduce[T, Repr]): cr.Ops = cr.reducableOps(p.data)
+  implicit def context[T, Repr](implicit c: CanReduce[T, Repr]): c.Ctx = c.context
 
-  @inline implicit def scheduler[T, Repr](implicit c: CanReduce[T, Repr]): c.Sch = c.scheduler
+}
 
+
+trait CanReduce[T, Repr] extends Any {
+  type Ctx <: Context
+  type Ops <: ReducableOps[T, Repr, Ctx]
+  def reducableOps(repr: Repr): Ops
+  def context: Ctx
+}
+
+
+trait CanZip[T, Repr] extends CanReduce[T, Repr] {
+  type Ctx <: Context
+  type Ops <: ZippableOps[T, Repr, Ctx]
+  def zippableOps(repr: Repr): Ops
 }
 
 
 object Test {
   import Par._
 
-  implicit val s: Scheduler = null
+  implicit val s: Context = null
 
-  class RangeReduceOps(val r: Range) extends AnyVal with ReducableOps[Int, Range, Scheduler] {
-    def reduce[U >: Int](op: (U, U) => U)(implicit req: Scheduler): U = null.asInstanceOf[U]
+  class RangeZippableOps(val r: Range) extends AnyVal with ZippableOps[Int, Range, Context] {
+    def reduce[U >: Int](op: (U, U) => U)(implicit ctx: Context): U = null.asInstanceOf[U]
+    def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int): Unit = ()
   }
 
-  implicit def rangeCanReduce(implicit s: Scheduler = null) = new CanReduce[Int, Range] {
-    type Sch = Scheduler
-    type Ops = RangeReduceOps
+  class RangeCanReduce(val context: Context) extends AnyVal with CanReduce[Int, Range] {
+    type Ctx = Context
+    type Ops = RangeZippableOps
     def reducableOps(r: Range) = new Ops(r)
-    def scheduler = s
   }
+
+  implicit def rangeCanReduce(implicit s: Context) = new RangeCanReduce(s)
 
   val pr = (0 until 10).toPar
   pr.reduce(_ + _)

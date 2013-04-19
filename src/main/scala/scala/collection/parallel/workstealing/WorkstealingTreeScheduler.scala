@@ -2,11 +2,11 @@ package scala.collection.parallel.workstealing
 
 
 
-import scala.collection.parallel.Scheduler
+import scala.collection.parallel.Context
 
 
 
-class WorkstealingTreeScheduler extends Scheduler {
+class WorkstealingTreeScheduler extends Context {
 
   def parallelism = 0
 

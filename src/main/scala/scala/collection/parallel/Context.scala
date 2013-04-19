@@ -5,7 +5,7 @@ package scala.collection.parallel
 
 
 
-trait Scheduler {
+trait Context {
   def parallelism: Int
 }
 
