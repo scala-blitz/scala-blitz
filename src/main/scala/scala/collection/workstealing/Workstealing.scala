@@ -445,18 +445,18 @@ object Workstealing {
   }
 
   object DefaultConfig extends Config {
-    val initialStep = sys.props("step").toInt
+    val initialStep = sys.props.getOrElse("step","64").toInt
     val maxStep = sys.props.getOrElse("maxStep", "1024").toInt
     val incrementFrequency = sys.props.getOrElse("incFreq", "1").toInt
-    val par = sys.props("par").toInt
-    val strategy: Strategy = strategies(sys.props("strategy"))
+    val par = sys.props.getOrElse("par","4").toInt
+    val strategy: Strategy = strategies(sys.props.getOrElse("strategy","FindMax$"))
   }
 
   val strategies = List(FindMax, AssignTopLeaf, AssignTop, Assign, RandomWalk, RandomAll, Predefined) map (x => (x.getClass.getSimpleName, x)) toMap
   var lastroot: Workstealing[_]#Ptr[_, _] = _
-  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until sys.props("par").toInt) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
+  val imbalance = collection.mutable.Map[Int, collection.mutable.ArrayBuffer[Int]]((0 until DefaultConfig.par) map (x => (x, collection.mutable.ArrayBuffer[Int]())): _*)
   val treesizes = collection.mutable.ArrayBuffer[Int]()
-  var debugMode = sys.props("debug").toBoolean
+  var debugMode = sys.props.getOrElse("debug","false").toBoolean
 
   trait State
 
