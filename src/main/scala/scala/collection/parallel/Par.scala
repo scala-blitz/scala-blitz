@@ -29,7 +29,7 @@ trait CanReduce[T, Repr] extends Any {
 }
 
 
-trait CanZip[T, Repr] extends CanReduce[T, Repr] {
+trait CanZip[T, Repr] extends Any with CanReduce[T, Repr] {
   type Ctx <: Context
   type Ops <: ZippableOps[T, Repr, Ctx]
   def zippableOps(repr: Repr): Ops
@@ -46,13 +46,14 @@ object Test {
     def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int): Unit = ()
   }
 
-  class RangeCanReduce(val context: Context) extends AnyVal with CanReduce[Int, Range] {
+  class RangeCanZip(val context: Context) extends AnyVal with CanZip[Int, Range] {
     type Ctx = Context
     type Ops = RangeZippableOps
     def reducableOps(r: Range) = new Ops(r)
+    def zippableOps(r: Range) = new Ops(r)
   }
 
-  implicit def rangeCanReduce(implicit s: Context) = new RangeCanReduce(s)
+  implicit def rangeCanZip(implicit s: Context) = new RangeCanZip(s)
 
   val pr = (0 until 10).toPar
   pr.reduce(_ + _)
