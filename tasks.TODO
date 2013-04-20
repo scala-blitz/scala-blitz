@@ -29,6 +29,8 @@ Bigger applications:
  ☐ raytracing
  ☐ adjoint convolution
  ☐ finding anagrams
+ ☐ brute-force TSP
+ ☐ triangular matrix multiplication
 
 Features to add:
  ☐ allow asynchronous execution

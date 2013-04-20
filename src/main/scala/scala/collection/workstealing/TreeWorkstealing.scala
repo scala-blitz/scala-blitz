@@ -50,6 +50,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       def isSingle: Boolean
       def elements: Int
       def next(): Q
+      def hasNext: Boolean
     }
 
     abstract class DefaultIterator[@specialized Q](val stack: Array[TreeType], var depth: Int, var left: Int)
@@ -75,7 +76,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
       def valuePeek(d: Int): Q = extractElement(stack(d))
       def prepare(current: TreeType, chunk: Int) {
         if (chunk == SINGLE_NODE) {
-          left = 1
+          left = chunk
           depth = SINGLE_NODE
           stack(0) = current
         } else {
@@ -109,6 +110,7 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
           res
         }
       } else throw new NoSuchElementException
+      def hasNext = left > 0
     }
 
     init()
@@ -341,6 +343,8 @@ trait TreeWorkstealing[T, TreeType >: Null <: AnyRef] extends Workstealing[T] {
     }
 
     final def next(): S = iter.next()
+
+    final def hasNext: Boolean = iter.hasNext
 
     final def markCompleted(): Boolean = {
       while (state eq Workstealing.AvailableOrOwned) advance(Int.MaxValue)

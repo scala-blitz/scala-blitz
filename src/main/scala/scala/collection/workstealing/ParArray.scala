@@ -5,11 +5,13 @@ package scala.collection.workstealing
 import sun.misc.Unsafe
 import annotation.tailrec
 import scala.collection._
+import scala.language.experimental.macros
+import scala.reflect.macros._
 import scala.reflect.ClassTag
 
 
 
-class ParArray[@specialized T: ClassTag](val array: Array[T], val config: Workstealing.Config) extends ParIterable[T]
+class ParArray[T: ClassTag](val array: Array[T], val config: Workstealing.Config) extends ParIterable[T]
 with ParIterableLike[T, ParArray[T]]
 with IndexedWorkstealing[T] {
 
@@ -28,10 +30,12 @@ with IndexedWorkstealing[T] {
   final class ArrayNode[@specialized S, R](l: Ptr[S, R], r: Ptr[S, R])(val arr: Array[S], s: Int, e: Int, rn: Long, st: Int)
   extends IndexNode[S, R](l, r)(s, e, rn, st) {
     def next(): S = {
-      val i = lindex
-      lindex = i + 1
+      val i = nextProgress
+      nextProgress = i + 1
       arr(i)
     }
+
+    def hasNext = nextProgress < nextUntil
 
     def newExpanded(parent: Ptr[S, R], worker: Workstealing.Worker, kernel: Kernel[S, R]): ArrayNode[S, R] = {
       val r = /*READ*/range
@@ -55,11 +59,29 @@ with IndexedWorkstealing[T] {
     override def isNotRandom = true
   }
 
+  private def instantiateNonGenericArrayNode[R]() = (array: AnyRef) match {
+    case a: Array[AnyRef] => new ArrayNode[AnyRef, R](null, null)(a, 0, size, createRange(0, size), config.initialStep) // this one still results in `ScalaRunTime.array_apply`, but what can we do?
+    case a: Array[Int] => new ArrayNode[Int, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Double] => new ArrayNode[Double, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Long] => new ArrayNode[Long, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Float] => new ArrayNode[Float, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Char] => new ArrayNode[Char, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Byte] => new ArrayNode[Byte, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Short] => new ArrayNode[Short, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Boolean] => new ArrayNode[Boolean, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case a: Array[Unit] => new ArrayNode[Unit, R](null, null)(a, 0, size, createRange(0, size), config.initialStep)
+    case _ => ???
+  }
+
   def newRoot[R] = {
-    val work = new ArrayNode[T, R](null, null)(array, 0, size, createRange(0, size), config.initialStep)
-    val root = new Ptr[T, R](null, 0)(work)
+    val work = instantiateNonGenericArrayNode[R]()
+    val root = new Ptr[T, R](null, 0)(work.asInstanceOf[ArrayNode[T, R]])
     root
   }
+
+  /* until macro issues are fixed */
+
+  override def fold[U >: T](z: U)(op: (U, U) => U): U = macro ParArray.fold[T, U]
 
 }
 
@@ -67,6 +89,36 @@ with IndexedWorkstealing[T] {
 object ParArray {
 
   private val COMBINER_CHUNK_SIZE_LIMIT = 4096
+
+  /* macro implementations */
+
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U]): c.Expr[U] = {
+    import c.universe._
+
+    val (l, oper) = c.functionExpr2Local[(U, U) => U](op)
+    val callee = c.Expr[ParArray[T]](c.applyPrefix)
+    val kernel = reify {
+      l.splice
+      val xs = callee.splice
+      xs.invokeParallelOperation(new xs.ArrayKernel[T, U] {
+        val zero = z.splice
+        def combine(a: U, b: U) = oper.splice(a, b)
+        def applyIndex(n: xs.ArrayNode[T, U], from: Int, until: Int): U = {
+          var i = from
+          var sum = z.splice
+          val array = xs.array
+          while (i < until) {
+            sum = oper.splice(sum, array(i))
+            i += 1
+          }
+          sum
+        }
+      })
+    }
+    c.inlineAndReset(kernel)
+  }
+
+  /* combiner infrastructure */
 
   trait Tree {
     def level: Int
@@ -235,6 +287,7 @@ object ParArray {
           pos += 1
           res
         } else throw new NoSuchElementException
+        def hasNext = pos < total
         override def toString = s"ExternalTreeIterator(position: $pos, total: $total)"
       }
 
@@ -314,8 +367,6 @@ object ParArray {
     }
 
   }
-
-
 
   final class TreeCombiner[@specialized T: ClassTag](init: Boolean) extends ChunkCombiner[T, Tree](init) {
     def this() = this(true)

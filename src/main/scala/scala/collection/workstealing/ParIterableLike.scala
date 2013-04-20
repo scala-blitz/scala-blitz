@@ -81,10 +81,8 @@ object ParIterableLike {
         def zero = ()
         def combine(a: Unit, b: Unit) = a
         def apply(node: xs.N[Unit], chunkSize: Int) = {
-          var left = chunkSize
-          while (left > 0) {
+          while (node.hasNext) {
             func.splice(node.next())
-            left -= 1
           }
         }
       })
@@ -104,11 +102,9 @@ object ParIterableLike {
         val zero = z.splice
         def combine(a: U, b: U) = oper.splice(a, b)
         def apply(node: xs.N[U], chunkSize: Int) = {
-          var left = chunkSize
           var sum = zero
-          while (left > 0) {
+          while (node.hasNext) {
             sum = oper.splice(sum, node.next())
-            left -= 1
           }
           sum
         }
@@ -135,16 +131,14 @@ object ParIterableLike {
           else oper.splice(a.asInstanceOf[U], b.asInstanceOf[U])
         }
         def apply(node: xs.N[Any], chunkSize: Int) = {
-          if (chunkSize == 0) zero
-          else {
+          if (node.hasNext) {
             var left = chunkSize - 1
             var sum: U = node.next()
-            while (left > 0) {
+            while (node.hasNext) {
               sum = oper.splice(sum, node.next())
-              left -= 1
             }
             sum
-          }
+          } else zero
         }
       })
       if (rs == ParIterableLike.nil) throw new java.lang.UnsupportedOperationException
@@ -167,11 +161,9 @@ object ParIterableLike {
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice(a, b)
         def apply(node: xs.N[S], chunkSize: Int) = {
-          var left = chunkSize
           var sum = zero
-          while (left > 0) {
+          while (node.hasNext) {
             sum = seqoper.splice(sum, node.next())
-            left -= 1
           }
           sum
         }
@@ -249,16 +241,13 @@ object ParIterableLike {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.nonEmpty) a else b
         def apply(node: xs.N[Option[T]], chunkSize: Int) = {
-          var left = chunkSize
           var found: Option[T] = None
-          while (left > 0) {
+          while (node.hasNext && (found eq None)) {
             val elem = node.next()
             if (pred.splice(elem)) {
               found = Some(elem)
               notTermFlag = false
-              left = 0
             }
-            left -= 1
           }
           found
         }
@@ -319,8 +308,8 @@ object ParIterableLike {
         def combine(a: Status, b: Status) = null
         def apply(node: xs.N[Status], chunkSize: Int) = {
           var i = node.lresult.arrayProgress
-          var limit = mathmin(i + chunkSize, mathmin(arr.splice.length, start.splice + len.splice))
-          while (i < limit) {
+          var limit = mathmin(arr.splice.length, start.splice + len.splice)
+          while (i < limit && node.hasNext) {
             arr.splice(i) = node.next()
             i += 1
           }
@@ -373,12 +362,10 @@ object ParIterableLike {
           else if (a eq b) a
           else a combine b
         def apply(node: xs.N[Combiner[T, Repr]], chunkSize: Int) = {
-          var left = chunkSize
           val cmb = node.lresult
-          while (left > 0) {
+          while (node.hasNext) {
             val elem = node.next()
             if (p.splice(elem)) cmb += elem
-            left -= 1
           }
           cmb
         }
