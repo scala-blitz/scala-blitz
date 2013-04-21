@@ -5,14 +5,14 @@ import org.scalameter.persistence.SerializationPersistor
 import org.scalameter.api._
 import java.awt.Color
 import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporter }
-import collection.workstealing.{ Workstealing, ParRange }
+import collection.workstealing._
 import collection.workstealing.benchmark.MathUtils
 
 /**
  * Author: Dmitry Petrashko
  * Date: 21.03.13
  *
- * PageRank test app
+ * PageRank test
  */
 
 object PageRank extends PerformanceTest.Regression {
@@ -20,15 +20,15 @@ object PageRank extends PerformanceTest.Regression {
   /* configuration */
 
   lazy val persistor = new SerializationPersistor
-
   lazy val colorsTestSample = List(Color.RED, Color.GREEN, Color.BLUE) //, new Color(14, 201, 198), new Color(212, 71, 11))
 
   /* inputs */
 
-  val data = Gen.single("SamplePageRank")(sampleData)
+  val data = Gen.enumeration("SamplePageRank")(generateData(1000), generateData(5000))
 
   /* tests  */
 
+  println("initializing")
   val seriesNames = Array("a", "b", "3", "4")
 
   override val reporter: Reporter = org.scalameter.Reporter.Composite(
@@ -36,7 +36,7 @@ object PageRank extends PerformanceTest.Regression {
     new HtmlReporter(HtmlReporter.Renderer.Info(),
       HtmlReporter.Renderer.Chart(ChartReporter.ChartFactory.TrendHistogram(), "Trend Histogram", colorsTestSample)))
 
-  performance of "PageRank" config (exec.independentSamples -> 8, exec.benchRuns -> 50, exec.jvmflags -> "-Xms256M -Xmx256M") in {
+  performance of "PageRank" config (exec.independentSamples -> 4, exec.benchRuns -> 20, exec.jvmflags -> "-Xms1024M -Xmx1024M") in {
 
     measure method "time" in {
 
@@ -48,19 +48,16 @@ object PageRank extends PerformanceTest.Regression {
 
   }
 
-  def sampleData = Map("A" -> Nil,
-    "B" -> List("C"),
-    "C" -> List("B"),
-    "D" -> List("A", "B"),
-    "E" -> List("D", "B", "F"),
-    "F" -> List("E", "B"),
-    "P1" -> List("B", "E"),
-    "P2" -> List("B", "E"),
-    "P3" -> List("B", "E"),
-    "P4" -> List("E"),
-    "P5" -> List("E"))
 
-  def getPageRankOld(graph: Map[String, List[String]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-6) = {
+  def generateData(size:Int, prob:Double = 0.05):Array[Array[Int]] = {
+    val generator = new java.util.Random(42)
+    println("generating "+size +" data")
+    (for(i<-0 until size) 
+      yield (for(j<-0 until size; if (j!=i&& generator.nextFloat()<prob)) yield (j)).toArray
+    ).toArray
+  }
+
+  def getPageRankOld(graph: Array[Array[Int]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
 
     // Precompute some values that will be used often for the updates.
     val numVertices = graph.size
@@ -70,14 +67,13 @@ object PageRank extends PerformanceTest.Regression {
 
     // Create the vertex actors, and put in a map so we can
     // get them by ID.
-    val idsToActors = graph.par.map {
-      case (vertexId, adjacencyList) =>
+    val vertices = graph.zipWithIndex.par.map {
+      case (adjacencyList, vertexId) =>
         val vertex = new Vertex(adjacencyList, uniformProbability, vertexId)
-        (vertexId, vertex)
-    }.toMap
+        vertex
+    }
 
     // The list of vertex actors, used for dispatching messages to all.
-    val vertices = idsToActors.values.toList.par
 
     var done = false
     var currentIteration = 1
@@ -92,8 +88,8 @@ object PageRank extends PerformanceTest.Regression {
 
       val totalMissingMass = missingAndRedistributedMass._1
       val eachVertexRedistributedMass = totalMissingMass / numVertices
-      val redistributedMass = missingAndRedistributedMass._2.par.groupBy(x => x._1).map { x => (x._1, x._2.aggregate(0.)({ (x, y) => x + y._2 }, _ + _)) }
-      redistributedMass.par.foreach { x => idsToActors(x._1).takeMass(x._2) }
+      val redistributedMass = missingAndRedistributedMass._2.par.groupBy(x => x._1).map { x => (x._1, x._2.aggregate(0.0)({ (x, y) => x + y._2 }, _ + _)) }
+      redistributedMass.par.foreach { x => vertices(x._1).takeMass(x._2) }
       val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
 
       val averageDiff =
@@ -119,7 +115,7 @@ object PageRank extends PerformanceTest.Regression {
   /**
    * An actor for a vertex in the graph.
    */
-  class Vertex(var neighbors: List[String], var pagerank: Double, id: String) {
+  class Vertex(var neighbors: Array[Int], var pagerank: Double, id: Int) {
 
     //  var neighbors: List[ActorRef] = List[ActorRef]()
     //  var pagerank = 0.0
@@ -130,7 +126,7 @@ object PageRank extends PerformanceTest.Regression {
       if (outdegree == 0) (pagerank, Nil)
       else {
         val amountPerNeighbor = pagerank / outdegree
-        (0.0, neighbors.map((_, amountPerNeighbor)))
+        (0.0, neighbors.map((_, amountPerNeighbor)).toList)
       }
     }
 
