@@ -16,5 +16,11 @@ object Ops {
 
   implicit def rangeOps(r: Par[collection.immutable.Range]) = new Range.Ops(r.xs)
 
+  implicit def range2zippable(r: Par[collection.immutable.Range]): Zippable[Int] = ???
+
+  implicit def arrayOps[T](a: Par[Array[T]]) = ???
+
+  implicit def array2zippable[T](a: Par[Array[T]]) = ???
+
 }
 

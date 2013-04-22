@@ -26,17 +26,3 @@ package object workstealing {
 }
 
 
-object Test {
-  import Par._
-  import workstealing.Ops._
-
-  implicit val ws: Scheduler = null
-
-  val z: Zippable[Int] = null
-  z.reduce(_ + _)
-
-  val r: Par[Range] = (0 until 10).toPar
-  r.reduce(_ + _)
-
-}
-
