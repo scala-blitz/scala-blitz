@@ -2,17 +2,13 @@ package scala.collection.parallel.workstealing
 
 
 
-import scala.collection.parallel.Context
 
 
 
-class WorkstealingTreeScheduler extends Context {
+trait WorkstealingTreeScheduler {
 
-  def parallelism = 0
-
-}
-
-
-object WorkstealingTreeScheduler {
   
+
 }
+
+
