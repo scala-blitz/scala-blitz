@@ -185,6 +185,9 @@ object ParRange {
     val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
     val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
+      import scala._
+      import collection._
+      import workstealing._
       lv.splice
       val xs = callee.splice
       val rs = xs.invokeParallelOperation(new xs.RangeKernel[Any] {
@@ -454,6 +457,9 @@ object ParRange {
     val (lv, oper) = c.functionExpr2Local[Int => Boolean](p)
     val callee = c.Expr[ParRange](c.applyPrefix)
     val kernel = reify {
+      import scala._
+      import collection._
+      import workstealing._
       lv.splice
       val xs = callee.splice
       val cmb = xs.invokeParallelOperation(new xs.RangeKernel[Combiner[Int, ParIterable[Int]]] {
