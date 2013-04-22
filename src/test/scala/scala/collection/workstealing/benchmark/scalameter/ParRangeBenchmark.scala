@@ -68,10 +68,9 @@ object ParRangeBenchmark extends PerformanceTest.Regression {
         case range => val res = range.fold(0)(_ + _)
       }
 
-      //FIXME: compile error in macro
-      //       using(testTarget) curve ("reduce") in {
-      //          case range => range.reduce(_+_)
-      //        }
+      using(testTarget) curve ("reduce") in {
+        case range => range.reduce(_ + _)
+      }
 
       using(testTarget) curve ("aggregate") in {
         case range => val res = range.aggregate(0)(_ + _)(_ + _)
@@ -105,16 +104,14 @@ object ParRangeBenchmark extends PerformanceTest.Regression {
         case range => range.find(x => 10 * x < 0)
       }
 
-      //FIXME: compile error in macro
-      /*        using(testTarget) curve ("filter") in {
-                case range => range.filter(x => true)
-              }
+      using(testTarget) curve ("filter") in {
+        case range => range.filter2(x => true)
+      }
 
-      
-              using(testTarget) curve ("filterExpensive") in {
-          case range => range.filter(x => MathUtils.taylor(x) > Math.E)
-        }
-       */
+      using(testTarget) curve ("filterExpensive") in {
+        case range => range.filter2(x => MathUtils.taylor(x) > Math.E)
+      }
+
     }
 
   }
