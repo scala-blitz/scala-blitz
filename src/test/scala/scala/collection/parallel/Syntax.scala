@@ -26,6 +26,19 @@ object Syntax {
     foo(r)
   }
 
+  def zippableMap() {
+    import Par._
+    import workstealing.Ops._
+
+    implicit val ws: Scheduler = null
+
+    val z: Zippable[Int] = null
+    z.map(_ + 1)
+
+    val r: Par[Range] = (0 until 10).toPar
+    r.map(_ + 1)
+  }
+
 }
 
 

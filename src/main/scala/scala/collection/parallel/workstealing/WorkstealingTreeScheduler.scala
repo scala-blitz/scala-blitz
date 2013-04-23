@@ -3,7 +3,7 @@ package workstealing
 
 
 
-import annotation.tailrec
+import scala.annotation.tailrec
 
 
 

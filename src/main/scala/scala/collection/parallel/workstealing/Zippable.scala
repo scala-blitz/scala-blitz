@@ -3,6 +3,7 @@ package workstealing
 
 
 
+import scala.collection.parallel.generic._
 
 
 
@@ -13,6 +14,12 @@ object Zippable {
   }
 
   class Ops[T](val z: Zippable[T]) extends AnyVal with OpsLike[T, Zippable[T]]
+
+  trait Scope extends Reducable.Scope {
+    implicit def zippableOps[T](z: Zippable[T]) = new collection.parallel.workstealing.Zippable.Ops[T](z)
+
+    implicit def canMergeZippable[T]: CanMergeFrom[Zippable[_], Int, Zippable[T]] = ???
+  }
 
 }
 
