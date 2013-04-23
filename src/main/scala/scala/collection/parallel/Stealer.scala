@@ -21,6 +21,10 @@ trait Stealer[@specialized T] {
 
   def split: (Stealer[T], Stealer[T])
 
+  def elementsRemainingEstimate: Int
+
+  def minimumStealThreshold: Int = 1
+
 }
 
 
