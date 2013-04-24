@@ -40,7 +40,7 @@ abstract class WorkstealingTreeScheduler {
     }
   }
 
-  def invokeParallelOperation[T, R](kernel: Kernel[T, R], stealer: Stealer[T]): R = {
+  def invokeParallelOperation[T, R](stealer: Stealer[T], kernel: Kernel[T, R]): R = {
     // create workstealing tree
     val node = new Node[T, R](null, null)(stealer)
     val root = new Ref[T, R](null, 0)(node)
@@ -82,8 +82,8 @@ object WorkstealingTreeScheduler {
   }
 
   object Config {
-    object Default extends Config {
-      val parallelismLevel = Runtime.getRuntime.availableProcessors
+    class Default(val parallelismLevel: Int) extends Config {
+      def this() = this(Runtime.getRuntime.availableProcessors)
       def incrementStepFrequency = 1
       def maximumStep = 2048
       def stealingStrategy = FindMax
@@ -95,9 +95,9 @@ object WorkstealingTreeScheduler {
   class ForkJoin(val config: Config) extends WorkstealingTreeScheduler {
     import scala.concurrent.forkjoin._
 
-    def this() = this(Config.Default)
+    def this() = this(new Config.Default())
 
-    val fjpool = new ForkJoinPool(config.parallelismLevel)
+    val pool = new ForkJoinPool(config.parallelismLevel)
 
     class WorkerTask[T, R](val root: Ref[T, R], val index: Int, val total: Int, kernel: Kernel[T, R])
     extends RecursiveAction with Worker {
@@ -117,7 +117,7 @@ object WorkstealingTreeScheduler {
       var par = config.parallelismLevel
       while (i < par) {
         val w = new WorkerTask(root, i, par, kernel)
-        fjpool.execute(w)
+        pool.execute(w)
         i += 1
       }
     }

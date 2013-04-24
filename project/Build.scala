@@ -13,10 +13,14 @@ object BuildSettings {
     resolvers += ScalaToolsSnapshots,
     scalaVersion := "2.10.1",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
+    resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % "2.10.1",
-      "org.scalatest" %% "scalatest" % "1.9.1" % "test"
-    )
+      "org.scalatest" %% "scalatest" % "1.9.1" % "test",
+      "com.github.axel22" %% "scalameter" % "0.3"
+    ),
+    testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
+    logBuffered := false
   )
 }
 
