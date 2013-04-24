@@ -63,7 +63,6 @@ abstract class WorkstealingTreeScheduler {
     r.asInstanceOf[R]
   }
 
-
 }
 
 
@@ -81,6 +80,50 @@ object WorkstealingTreeScheduler {
     def maximumStep: Int
     def stealingStrategy: Strategy
   }
+
+  /* concrete implementations */
+
+  class ForkJoin(val config: Config) extends WorkstealingTreeScheduler {
+    import scala.concurrent.forkjoin._
+
+    val fjpool = new ForkJoinPool(config.parallelismLevel)
+
+    class WorkerTask[T, R](val root: Ref[T, R], val index: Int, val total: Int, kernel: Kernel[T, R])
+    extends RecursiveAction with Worker {
+      def name = "WorkerTask(" + index + ")"
+  
+      def compute() {
+        try {
+          workUntilNoWork(this, root, kernel)
+        } catch {
+          case e: Exception => e.printStackTrace()
+        }
+      }
+    }
+  
+    def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
+      var i = 1
+      var par = config.parallelismLevel
+      while (i < par) {
+        val w = new WorkerTask(root, i, par, kernel)
+        fjpool.execute(w)
+        i += 1
+      }
+    }
+
+    def joinWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
+      var r = root.READ.READ_RESULT
+      if (r == NO_RESULT || r == INTERMEDIATE_READY) root.synchronized {
+        r = root.READ.READ_RESULT
+        while (r == NO_RESULT || r == INTERMEDIATE_READY) {
+          root.wait()
+          r = root.READ.READ_RESULT
+        }
+      }
+    }
+  }
+
+  /* internals */
 
   trait Worker {
     def index: Int
