@@ -29,7 +29,7 @@ class RangeBench extends PerformanceTest.Regression {
     measure method "reduce" in {
       using(schedulers) in { implicit s =>
         import workstealing.Ops._
-        parRange.reduce(_ + _)
+        //parRange.reduce(_ + _)
         s.pool.shutdown()
       }
     }

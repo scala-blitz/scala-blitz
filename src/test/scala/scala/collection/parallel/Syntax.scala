@@ -2,13 +2,13 @@ package scala.collection.parallel
 
 
 
+import Par._
 
 
 
 object Syntax {
 
   def zippableReduce() {
-    import Par._
     import workstealing.Ops._
 
     implicit val ws: Scheduler = null
@@ -27,7 +27,6 @@ object Syntax {
   }
 
   def zippableMap() {
-    import Par._
     import workstealing.Ops._
 
     implicit val ws: Scheduler = null

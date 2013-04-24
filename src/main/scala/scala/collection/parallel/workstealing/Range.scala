@@ -52,7 +52,8 @@ object Range {
     import c.universe._
 
     val (lv, oper) = c.functionExpr2Local[(U, U) => U](op)
-    val calleeExpression = c.Expr[Par[Range]](c.applyPrefix)
+    val calleeExpression = c.Expr[Par[collection.immutable.Range]](c.applyPrefix)
+    println(c.applyPrefix)
     val kernel = reify {
       lv.splice
       val callee = calleeExpression.splice
