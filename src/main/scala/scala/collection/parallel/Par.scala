@@ -14,5 +14,7 @@ object Par {
     def toPar = new Par(xs)
   }
 
+  implicit def range2zippable(r: Par[collection.immutable.Range]): Zippable[Int] = ???
+
 }
 

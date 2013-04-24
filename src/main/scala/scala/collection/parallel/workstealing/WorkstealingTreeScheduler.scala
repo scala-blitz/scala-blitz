@@ -81,10 +81,21 @@ object WorkstealingTreeScheduler {
     def stealingStrategy: Strategy
   }
 
+  object Config {
+    object Default extends Config {
+      val parallelismLevel = Runtime.getRuntime.availableProcessors
+      def incrementStepFrequency = 1
+      def maximumStep = 2048
+      def stealingStrategy = FindMax
+    }
+  }
+
   /* concrete implementations */
 
   class ForkJoin(val config: Config) extends WorkstealingTreeScheduler {
     import scala.concurrent.forkjoin._
+
+    def this() = this(Config.Default)
 
     val fjpool = new ForkJoinPool(config.parallelismLevel)
 
