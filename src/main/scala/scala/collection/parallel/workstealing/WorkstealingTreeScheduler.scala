@@ -321,15 +321,14 @@ object WorkstealingTreeScheduler {
       val child_t0 = READ
       val stealer_t0 = child_t0.stealer
       if (!child_t0.isLeaf) true else { // already expanded
-        // first set progress to -progress
         val state_t1 = stealer_t0.state
         if (state_t1 eq Completed) false // already completed
         else {
-          if (state_t1 ne StolenOrExpanded) {
+          if (state_t1 ne StolenOrExpanded) { // mark it stolen
             if (stealer_t0.markStolen()) markExpand(kernel, worker) // marked stolen - now move on to node creation
             else markExpand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
-          } else { // already marked stolen
-            // node effectively immutable (except for `lresult`, `rresult` and `result`) - expand it
+          } else { // already marked stolen - expand
+            // node effectively immutable (except for `intermediateResult` and `result`) - expand it
             val expanded = child_t0.newExpanded(this, worker)
             kernel.afterExpand(child_t0, expanded)
             if (CAS(child_t0, expanded)) true // try to replace with expansion
