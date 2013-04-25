@@ -9,7 +9,7 @@ package workstealing
 object Ops 
 extends Zippable.Scope
 with Arrays.Scope
-with Range.Scope {
+with Ranges.Scope {
 
   type Scheduler = WorkstealingTreeScheduler
 

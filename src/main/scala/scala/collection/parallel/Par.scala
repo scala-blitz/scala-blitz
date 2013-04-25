@@ -16,5 +16,9 @@ object Par {
 
   implicit def range2zippable(r: Par[collection.immutable.Range]): Zippable[Int] = ???
 
+  /* aliases */
+
+  val WorkstealingRanges = workstealing.Ranges
+
 }
 
