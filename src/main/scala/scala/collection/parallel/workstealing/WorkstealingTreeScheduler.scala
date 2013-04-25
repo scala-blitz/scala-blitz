@@ -89,7 +89,7 @@ object WorkstealingTreeScheduler {
     class Default(val parallelismLevel: Int) extends Config {
       def this() = this(Runtime.getRuntime.availableProcessors)
       def incrementStepFrequency = 1
-      def maximumStep = 2048
+      def maximumStep = 4096
       def stealingStrategy = FindMax
     }
   }
@@ -150,7 +150,7 @@ object WorkstealingTreeScheduler {
     def validateResult[R](r: R): R
   }
 
-  trait Kernel[@specialized T, R] {
+  trait Kernel[@specialized T, @specialized R] {
     /** Used for cancelling operations early (e.g. due to exceptions).
      *  Holds information on why the operation failed
      */
@@ -257,7 +257,7 @@ object WorkstealingTreeScheduler {
      *  Some parallel operations do not traverse all the elements in a chunk or a node. The purpose of this
      *  method is to bring the node into a Completed or Stolen state before proceeding.
      */
-    private def completeNode(intermediate: R, tree: Ref[T, R], worker: Worker): Boolean = {
+    protected def completeNode(intermediate: R, tree: Ref[T, R], worker: Worker): Boolean = {
       import Stealer._
       val node_t0 = tree.READ
       val state_t1 = node_t0.stealer.state
@@ -281,7 +281,7 @@ object WorkstealingTreeScheduler {
       wasCompleted
     }
     
-    @tailrec private def pushUp(tree: Ref[T, R], worker: Worker) {
+    @tailrec protected final def pushUp(tree: Ref[T, R], worker: Worker) {
       val node_t0 = tree.READ
       val r_t1 = node_t0.READ_RESULT
       r_t1 match {
@@ -520,6 +520,8 @@ object WorkstealingTreeScheduler {
             else findWork[T, R](worker, tree, kernel)
           } else findWork[T, R](worker, tree, kernel)
         }
+      } else if (node.isInnerEligibleForWork(worker)) {
+        tree
       } else {
         // descend deeper
         if (choose(index, total, tree)) {

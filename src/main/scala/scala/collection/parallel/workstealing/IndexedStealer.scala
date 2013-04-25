@@ -92,7 +92,58 @@ abstract class IndexedStealer[@specialized T](val startIndex: Int, val untilInde
 
 
 object IndexedStealer {
+  import WorkstealingTreeScheduler._
 
   val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[IndexedStealer[_]].getDeclaredField("progress"))
 
+  trait IndexedKernel[@specialized T, @specialized R] extends Kernel[T, R] {
+    override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {
+      import Stealer._
+
+      // atomically read the current node and initialize
+      val node = tree.READ
+      val stealer = node.stealer.asInstanceOf[IndexedStealer[T]]
+      beforeWorkOn(tree, node)
+      var intermediate = node.READ_INTERMEDIATE
+      var incCount = 0
+      val incFreq = config.incrementStepFrequency
+      val ms = config.maximumStep
+
+      // commit to processing chunks of the collection and process them until termination
+      val until = stealer.untilIndex
+      var looping = true
+      while (looping && notTerminated) {
+        val currstep = node.READ_STEP
+        val currprog = stealer.READ_PROGRESS
+  
+        if (currprog >= 0 && currprog < until) {
+          // reserve some work
+          val nprog = math.min(currprog + currstep, until)
+          
+          if (stealer.CAS_PROGRESS(currprog, nprog)) {
+            stealer.nextProgress = currprog
+            stealer.nextUntil = nprog
+            intermediate = combine(intermediate, apply(node, nprog - currprog))
+
+            // update step
+            node.WRITE_STEP(math.min(ms, currstep * 2))
+          }
+        } else looping = false
+      }
+
+      completeIteration(node.stealer)
+
+      // store into the `intermediateResult` field of the node and push result up
+      completeNode(intermediate, tree, worker)
+    }
+  }
+
 }
+
+
+
+
+
+
+
+
