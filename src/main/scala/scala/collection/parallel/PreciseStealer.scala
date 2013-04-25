@@ -15,7 +15,7 @@ trait PreciseStealer[@specialized T] extends Stealer[T] {
 
   def split: (PreciseStealer[T], PreciseStealer[T])
 
-  def psplit(leftSize: Int, rightSize: Int): (PreciseStealer[T], PreciseStealer[T])
+  def psplit(leftSize: Int): (PreciseStealer[T], PreciseStealer[T])
 
 }
 

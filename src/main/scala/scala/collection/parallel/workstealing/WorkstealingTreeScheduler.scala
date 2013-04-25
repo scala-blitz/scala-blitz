@@ -10,11 +10,13 @@ import scala.annotation.tailrec
 abstract class WorkstealingTreeScheduler {
   import WorkstealingTreeScheduler._
 
-  val invoker = new Worker {
+  final class Invoker extends Worker {
     def index = 0
     def total = config.parallelismLevel
     def name = "Invoker"
   }
+
+  val invoker = new Invoker
 
   def config: Config
 
@@ -68,11 +70,13 @@ abstract class WorkstealingTreeScheduler {
 
 object WorkstealingTreeScheduler {
 
+  sealed trait Constant
+
   val CHILD_OFFSET = unsafe.objectFieldOffset(classOf[Ref[_, _]].getDeclaredField("child"))
   val OWNER_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("owner"))
   val RESULT_OFFSET = unsafe.objectFieldOffset(classOf[Node[_, _]].getDeclaredField("result"))
-  val NO_RESULT = new AnyRef
-  val INTERMEDIATE_READY = new AnyRef
+  object NO_RESULT extends Constant { override def toString = "NO_RESULT" }
+  object INTERMEDIATE_READY extends Constant { override def toString = "INTERMEDIATE_READY" }
 
   trait Config {
     def parallelismLevel: Int
@@ -272,35 +276,40 @@ object WorkstealingTreeScheduler {
       } else sys.error("unreachable: " + state_t1 + ", " + node_t0.toString(0))
   
       // push result up as far as possible
-      pushUp(tree)
+      pushUp(tree, worker)
   
       wasCompleted
     }
     
-    @tailrec private def pushUp(tree: Ref[T, R]) {
+    @tailrec private def pushUp(tree: Ref[T, R], worker: Worker) {
       val node_t0 = tree.READ
-      val r_t1 = /*READ*/node_t0.result
+      val r_t1 = node_t0.READ_RESULT
       r_t1 match {
         case NO_RESULT =>
           // we're done, owner did not finish his work yet
         case INTERMEDIATE_READY =>
-          if (node_t0.isLeaf) node_t0.READ_INTERMEDIATE
-          else {
-            // check if result already set for children
-            def available(r: AnyRef) = r != NO_RESULT && r != INTERMEDIATE_READY
-            val lr = node_t0.left.READ.READ_RESULT
-            val rr = node_t0.right.READ.READ_RESULT
-            if (available(lr) && available(rr)) {
-              val subr = combine(lr.asInstanceOf[R], rr.asInstanceOf[R])
-              val r = combine(node_t0.READ_INTERMEDIATE, subr).asInstanceOf[AnyRef]
-              if (node_t0.CAS_RESULT(r_t1, r)) {
-                // if at root, notify completion, otherwise go one level up
-                if (tree.up == null) tree.synchronized {
-                  tree.notifyAll()
-                } else pushUp(tree.up)
-              } else pushUp(tree) // retry
+          val combinedResult = {
+            if (node_t0.isLeaf) node_t0.READ_INTERMEDIATE.asInstanceOf[AnyRef]
+            else {
+              // check if result already set for children
+              def available(r: AnyRef) = r != NO_RESULT && r != INTERMEDIATE_READY
+              val lr = node_t0.left.READ.READ_RESULT
+              val rr = node_t0.right.READ.READ_RESULT
+              if (available(lr) && available(rr)) {
+                val subr = combine(lr.asInstanceOf[R], rr.asInstanceOf[R])
+                combine(node_t0.READ_INTERMEDIATE, subr).asInstanceOf[AnyRef]
+              } else NO_RESULT
             }
           }
+
+          if (combinedResult != NO_RESULT) {
+            if (node_t0.CAS_RESULT(r_t1, combinedResult)) {
+              // if at root, notify completion, otherwise go one level up
+              if (tree.up == null) tree.synchronized {
+                tree.notifyAll()
+              } else pushUp(tree.up, worker)
+            } else pushUp(tree, worker) // retry
+          } // one of the children is not ready yet
         case _ =>
           // we're done, somebody else already pushed up
       }
@@ -404,16 +413,23 @@ object WorkstealingTreeScheduler {
       nnode
     }
   
-    def isEligibleForWork(worker: Worker): Boolean = {
+    def isLeafEligibleForWork(worker: Worker): Boolean = {
       import Stealer._
-      stealer.state match {
+      val decision = stealer.state match {
         case Completed =>
-          (owner == null) || ((owner eq worker) && result == null)
+          (owner == null) || ((owner eq worker) && result == NO_RESULT)
         case StolenOrExpanded =>
           true
         case AvailableOrOwned =>
           stealer.elementsRemainingEstimate > stealer.minimumStealThreshold || (owner == null) || (owner eq worker)
       }
+      decision
+    }
+
+    def isInnerEligibleForWork(worker: Worker): Boolean = {
+      import Stealer._
+      // we know it is StolenOrExpanded, so we do not have to check this
+      (owner eq worker) && READ_RESULT == NO_RESULT
     }
 
     final def toString(lev: Int): String = {
@@ -449,7 +465,9 @@ object WorkstealingTreeScheduler {
       def search(current: Ref[T, R]): Ref[T, R] = {
         val node = current.READ
         if (node.isLeaf) {
-          if (node.isEligibleForWork(worker)) current else null
+          if (node.isLeafEligibleForWork(worker)) current else null
+        } else if (node.isInnerEligibleForWork(worker)) {
+          current
         } else {
           val left = search(node.left)
           val right = search(node.right)
@@ -470,7 +488,9 @@ object WorkstealingTreeScheduler {
           if (subnode.child.tryOwn(worker)) subnode
           else findWork(worker, tree, kernel)
         } else findWork(worker, tree, kernel)
-      } else null
+      } else {
+        null
+      }
     }
 
     def choose[T, R](index: Int, total: Int, tree: Ref[T, R]) = sys.error("never called")
@@ -490,7 +510,7 @@ object WorkstealingTreeScheduler {
       val total = worker.total
       val node = tree.READ
       if (node.isLeaf) {
-        if (!node.isEligibleForWork(worker)) null // no further expansions
+        if (!node.isLeafEligibleForWork(worker)) null // no further expansions
         else {
           // more work
           if (node.tryOwn(worker)) tree
