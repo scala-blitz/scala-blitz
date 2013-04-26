@@ -21,12 +21,15 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
   val sizes = Gen.enumeration("size")(25000000, 50000000, 100000000, 150000000)
   val ranges = for (size <- sizes) yield 0 until size
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
+  @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
+  @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
+  @transient lazy val s8 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(8))
 
   performance of "Par[Range]" in {
 
     measure method "fold" config(
-      exec.benchRuns -> 10,
-      exec.independentSamples -> 4,
+      exec.benchRuns -> 25,
+      exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
     ) in {
       using(ranges) curve("Sequential") in { r =>
@@ -43,6 +46,27 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       using(ranges) curve("Par-1") in { r =>
         import workstealing.Ops._
         implicit val s = s1
+        val pr = r.toPar
+        pr.fold(0)(_ + _)
+      }
+
+      using(ranges) curve("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.fold(0)(_ + _)
+      }
+
+      using(ranges) curve("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.fold(0)(_ + _)
+      }
+
+      using(ranges) curve("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
         val pr = r.toPar
         pr.fold(0)(_ + _)
       }
