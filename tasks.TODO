@@ -1,3 +1,55 @@
+Reducable interface:
+ ☐ go through all operations in standard collections and filter them for the Reducable interface
+ ☐ fold
+ ☐ reduce
+ ☐ aggregate
+ ☐ max
+ ☐ min
+ ☐ sum
+ ☐ product
+ ☐ map
+ ☐ filter
+ ☐ flatMap
+ ☐ foreach
+
+Parallel ranges:
+ ☐ every operation in the Reducable interface
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Reducable:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Zippable:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Parallel arrays:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Parallel hash tables:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Parallel n-ary tree operations:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Synchronized stealers (non-lock free):
+ ☐ see if we can do generically
+
+Splitting package:
+ ☐ same interface for old parallel collections (implicit conversions in the same style as the workstealing package)
+
+
+
 To fix:
  ☐ argument expressions need to be assigned to a local var
  ☐ parallel array operations need to be specialized
@@ -5,7 +57,7 @@ To fix:
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
  ☐ fix exception handling
- ☐ replace volatile reads with unsafe calls
+ ✔ replace volatile reads with unsafe calls @done (13-04-26 13:49)
 
 Todo items:
  ☐ write a comprehensive suite of unit tests
