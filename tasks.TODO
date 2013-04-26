@@ -13,6 +13,17 @@ Reducable interface:
  ☐ foreach
 
 Parallel ranges:
+ ☐ fold
+ ☐ reduce
+ ☐ aggregate
+ ☐ max
+ ☐ min
+ ☐ sum
+ ☐ foreach
+ ☐ product
+ ☐ map
+ ☐ filter
+ ☐ flatMap
  ☐ every operation in the Reducable interface
  ☐ unit tests
  ☐ microbenchmarks
