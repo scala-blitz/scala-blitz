@@ -34,7 +34,7 @@ class RangeTest extends FunSuite with Timeouts {
   }
 
   def testReduce(sz: Int): Unit = try {
-    failAfter(1000 seconds) {
+    failAfter(1 seconds) {
       val r = 0 until sz
       val x = r.reduce(_ + _)
 
@@ -56,7 +56,7 @@ class RangeTest extends FunSuite with Timeouts {
   }
 
   def testFold(sz: Int): Unit = try {
-    failAfter(1000 seconds) {
+    failAfter(1 seconds) {
       val r = 0 until sz
       val x = r.fold(0)(_ + _)
 

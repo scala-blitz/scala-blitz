@@ -16,9 +16,9 @@ abstract class IndexedStealer[@specialized T](val startIndex: Int, val untilInde
   var nextProgress: Int = _
   var nextUntil: Int = _
 
-  def READ_PROGRESS = unsafe.getIntVolatile(this, PROGRESS_OFFSET)
-  def WRITE_PROGRESS(nv: Int) = unsafe.putIntVolatile(this, PROGRESS_OFFSET, nv)
-  def CAS_PROGRESS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, PROGRESS_OFFSET, ov, nv)
+  final def READ_PROGRESS = unsafe.getIntVolatile(this, PROGRESS_OFFSET)
+  final def WRITE_PROGRESS(nv: Int) = unsafe.putIntVolatile(this, PROGRESS_OFFSET, nv)
+  final def CAS_PROGRESS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, PROGRESS_OFFSET, ov, nv)
 
   def newStealer(start: Int, until: Int): StealerType
 

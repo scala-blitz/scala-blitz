@@ -245,11 +245,7 @@ object WorkstealingTreeScheduler {
      *  method is to bring the node into a Completed or Stolen state before proceeding.
      */
     protected final def completeIteration(stealer: Stealer[T]) {
-      var state = stealer.state
-      while (state eq Stealer.AvailableOrOwned) {
-        stealer.markCompleted()
-        state = stealer.state
-      }
+      stealer.markCompleted()
     }
 
     /** Completes the iteration in the node.
