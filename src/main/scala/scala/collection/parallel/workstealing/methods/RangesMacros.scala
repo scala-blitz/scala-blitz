@@ -40,15 +40,11 @@ object RangesMacros {
 
     val (seqlv, seqoper) = c.functionExpr2Local[(S, Int) => S](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(S, S) => S](combop)
-    val init = reify {
-      seqlv.splice
-      comblv.splice
-    }
     
-    makeKernel_Impl[Int, S, S](c)(init)(z)(comboper)(A0_RETURN_ZERO(c), A1_SUM[S](c)(seqoper), AN_SUM[S](c)(seqoper))(ctx)(true)
+    makeKernel_Impl[Int, S, S](c)(seqlv,comblv)(z)(comboper)(A0_RETURN_ZERO(c), A1_SUM[S](c)(seqoper), AN_SUM[S](c)(seqoper))(ctx)(true)
   }
 
-  def sum[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def sum[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
     
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
@@ -59,15 +55,12 @@ object RangesMacros {
       (x: U, y: U) => numg.splice.plus(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
-    val init = reify {
-      lv.splice
-      numv.splice
-    }
 
-    makeKernel_Impl[U, U, U](c)(init)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
+
+    makeKernel_Impl[U, U, U](c)(lv,numv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
   }
 
-  def product[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def product[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
@@ -78,12 +71,9 @@ object RangesMacros {
       (x: U, y: U) => numg.splice.times(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
-    val init = reify {
-      lv.splice
-      numv.splice
-    }
 
-    makeKernel_Impl[U, U, U](c)(init)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
+
+    makeKernel_Impl[U, U, U](c)(lv,numv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
   }
 
   def count(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
@@ -100,16 +90,12 @@ object RangesMacros {
     }
     val (seqlv, seqoper) = c.functionExpr2Local[(Int, Int) => Int](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(Int, Int) => Int](combop)
-    val init = reify {
-      predicv.splice
-      seqlv.splice
-      comblv.splice
-    }
 
-    makeKernel_Impl[Int, Int, Int](c)(init)(zero)(comboper)(A0_RETURN_ZERO(c), A1_SUM[Int](c)(seqoper), AN_SUM[Int](c)(seqoper))(ctx)(true)
+
+    makeKernel_Impl[Int, Int, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(A0_RETURN_ZERO(c), A1_SUM[Int](c)(seqoper), AN_SUM[Int](c)(seqoper))(ctx)(true)
   }
 
-  def min[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+  def min[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (ordv, ordg) = c.functionExpr2Local[Ordering[U]](ord)
@@ -125,19 +111,15 @@ object RangesMacros {
         else oper.splice(a.asInstanceOf[Int], b.asInstanceOf[Int])
       }
     }
-    val init = reify {
-      lv.splice
-      ordv.splice
-    }
 
-    makeKernel_Impl[Int, Any, Int](c)(init)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
+    makeKernel_Impl[Int, Any, Int](c)(lv,ordv)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
   }
 
-  def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+  def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
     val nOrd = reify { ord.splice.reverse }
-    min[U](c)(nOrd)(ctx)
+    min[U](c)(nOrd,ctx)
   }
 
 }

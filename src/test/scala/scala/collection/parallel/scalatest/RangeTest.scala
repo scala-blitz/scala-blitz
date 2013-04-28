@@ -63,6 +63,7 @@ class RangeTest extends FunSuite with Timeouts {
       val pr = r.toPar
       val px = pr.fold(0)(_ + _)
 
+
       assert(x == px, x + ", " + px)
     }
   } catch {
@@ -74,6 +75,47 @@ class RangeTest extends FunSuite with Timeouts {
     testFold(0)
     runForSizes(testFold)
   }
+
+ /* def testSum(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.sum
+
+      val pr = r.toPar
+      val px = pr.sum
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("sum") {
+    testSum(0)
+    runForSizes(testSum)
+  }
+
+ def testMin(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.min
+
+      val pr = r.toPar
+      val px = pr.min
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("min") {
+    testMin(0)
+    runForSizes(testMin)
+  }
+   */
 
 }
 

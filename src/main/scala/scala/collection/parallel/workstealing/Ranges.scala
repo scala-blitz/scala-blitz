@@ -18,10 +18,10 @@ object Ranges {
     override def reduce[U >: Int](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
-    def sum[U >: Int](num: Numeric[U])(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
-    def product[U >: Int](num: Numeric[U])(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
-    def min[U >: Int](ord: Ordering[U])(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
-    def max[U >: Int](ord: Ordering[U])(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
+    def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
+    def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
+    def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
+    def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
 
   }
 
@@ -102,16 +102,20 @@ object RangeKernel {
     }
   }
 
-  def makeKernel_Impl[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag, RR: c.WeakTypeTag](c: Context)(initilizers: c.Expr[Unit])(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, R) => R], applyer1: c.Expr[(Int, Int, R) => R], applyerN: c.Expr[(Int, Int, Int, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler])(allowZeroRezult: Boolean = true): c.Expr[RR] = {
+  def makeKernel_Impl[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag, RR: c.WeakTypeTag](c: Context)(initilizers: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, R) => R], applyer1: c.Expr[(Int, Int, R) => R], applyerN: c.Expr[(Int, Int, Int, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler])(allowZeroRezult: Boolean = true): c.Expr[RR] = {
     import c.universe._
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
-    val result =
+    val resultWithoutInit =
       reify {
+        import scala._
+        import collection.parallel
+        import parallel._
+        import workstealing._
         val callee = calleeExpression.splice
         val stealer = callee.stealer
         val kernel =
-          new Ranges.RangeKernel[R] {
-            initilizers.splice
+          new scala.collection.parallel.workstealing.Ranges.RangeKernel[R] {
+
             def zero = z.splice
             def combine(a: R, b: R) = combiner.splice.apply(a, b)
             def apply0(at: Int) = applyer0.splice.apply(at, zero)
@@ -121,6 +125,13 @@ object RangeKernel {
         val result = ctx.splice.invokeParallelOperation(stealer, kernel)
         (kernel, result)
       }
+    val newChildren = initilizers.flatMap{initilizer=> initilizer.tree.children}.toList
+    val resultTree = resultWithoutInit.tree match {
+      case Block((children,expr))=> Block(newChildren::: children,expr)
+      case _=> c.abort(resultWithoutInit.tree.pos , "failed to get kernel as block "+resultWithoutInit.isInstanceOf[Block].toString)
+    }
+    val result = c.Expr[Tuple2[Ranges.RangeKernel[R], R]](resultTree)
+
     val operation = if (allowZeroRezult) reify { result.splice._2.asInstanceOf[RR] }
     else reify {
       val res = result.splice
