@@ -7,6 +7,7 @@ import scala.reflect.macros._
 
 
 
+
 package object workstealing {
 
   /* utilities */
@@ -84,6 +85,7 @@ package object workstealing {
         prefix
       case Apply(Select(prefix, name), args) =>
         prefix
+
     }
 
     /** Used to generate a local val for a function expression,

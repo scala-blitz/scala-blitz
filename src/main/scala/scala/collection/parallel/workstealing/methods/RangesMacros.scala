@@ -47,33 +47,33 @@ object RangesMacros {
   def sum[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
     
-    val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
+    //val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
     val zero = reify {
-      numg.splice.zero
+      num.splice.zero
     }
     val op = reify {
-      (x: U, y: U) => numg.splice.plus(x, y)
+      (x: U, y: U) => num.splice.plus(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
 
 
-    makeKernel_Impl[U, U, U](c)(lv,numv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
+    makeKernel_Impl[U, U, U](c)(lv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
   }
 
   def product[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
-    val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
+   // val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
     val zero = reify {
-      numg.splice.one
+      num.splice.one
     }
     val op = reify {
-      (x: U, y: U) => numg.splice.times(x, y)
+      (x: U, y: U) => num.splice.times(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
 
 
-    makeKernel_Impl[U, U, U](c)(lv,numv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
+    makeKernel_Impl[U, U, U](c)(lv)(zero)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
   }
 
   def count(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
@@ -98,7 +98,7 @@ object RangesMacros {
   def min[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
-    val (ordv, ordg) = c.functionExpr2Local[Ordering[U]](ord)
+    //val (ordv, ordg) = c.functionExpr2Local[Ordering[U]](ord)
     val op = reify {
       (x: Int, y: Int) => if (ord.splice.compare(x, y) <= 0) x else y
     }
@@ -112,7 +112,7 @@ object RangesMacros {
       }
     }
 
-    makeKernel_Impl[Int, Any, Int](c)(lv,ordv)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
+    makeKernel_Impl[Int, Any, Int](c)(lv)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
   }
 
   def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
