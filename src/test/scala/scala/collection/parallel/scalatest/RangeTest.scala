@@ -70,11 +70,6 @@ class RangeTest extends FunSuite with Timeouts {
     testFold(0)
     runForSizes(testFold)
   }
-  /*
-[error] scala.MatchError: workstealing.Ops.rangeOps(pr).aggregate[Int](0)(((x$13: Int, x$14: Int) => x$13.+(x$14)))(((x$15: Int, x$16: Int) => x$15.+(x$16)))(RangeTest.this.scheduler) (of class scala.reflect.internal.Trees$ApplyToImplicitArgs)
-[error] 	at scala.collection.parallel.workstealing.package$Util.applyPrefix(package.scala:78)
-[error] 	at scala.collection.parallel.workstealing.RangeKernel$.makeKernel_Impl(Ranges.scala:107)
-[error] 	at scala.collection.parallel.workstealing.methods.RangesMacros$.aggregate(RangesMacros.scala:44)
 
   def testAggregate(sz: Int): Unit = try {
     failAfter(1 seconds) {
@@ -98,7 +93,7 @@ class RangeTest extends FunSuite with Timeouts {
     runForSizes(testAggregate)
   }
 
- */
+
   def testSum(sz: Int): Unit = try {
     failAfter(1 seconds) {
       val r = 0 until sz
