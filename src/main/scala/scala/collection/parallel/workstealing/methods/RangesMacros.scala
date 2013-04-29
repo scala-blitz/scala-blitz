@@ -1,10 +1,14 @@
 package scala.collection.parallel.workstealing.methods
 
+
+
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.collection.parallel.generic._
 import collection.parallel.Par
 import collection.parallel.workstealing._
+
+
 
 object RangesMacros {
   import RangeKernel._
@@ -14,8 +18,7 @@ object RangesMacros {
   def fold[U >: Int: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
 
-   makeKernel_Impl[U, U, U](c)(lv)(z)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
-
+    makeKernel_Impl[U, U, U](c)(lv)(z)(oper)(A0_RETURN_ZERO(c), A1_SUM[U](c)(oper), AN_SUM[U](c)(oper))(ctx)(true)
   }
 
   def reduce[U >: Int: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
@@ -32,7 +35,6 @@ object RangesMacros {
     }
 
     makeKernel_Impl[U, Any, U](c)(lv)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
-
   }
 
   def aggregate[S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, Int) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {

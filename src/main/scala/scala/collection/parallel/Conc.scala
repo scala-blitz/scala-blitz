@@ -86,7 +86,6 @@ object Conc {
   object <> {
     def unapply[T](c: Conc[T]): Option[(Conc[T], Conc[T])] = c match {
       case c: <>[T] => Some((c.left, c.right))
-      case l: Lazy[T] => ???
       case _ => None
     }
     def apply[T](left: Conc[T], right: Conc[T]): Conc[T] = {
