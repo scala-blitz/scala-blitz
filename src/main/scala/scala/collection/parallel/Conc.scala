@@ -152,7 +152,9 @@ object Conc {
   object Append {
     def apply[T](left: Conc[T], right: Single[T]): Conc[T] = left match {
       case a: Append[T] =>
-        construct(a, right)
+        val alev = a.right.level
+        if (alev > 0) new Append(a, right)
+        else construct1(a, right, alev, 0)
       case s: Leaf[T] =>
         new <>(s, right)
       case c: <>[T] =>
@@ -166,7 +168,10 @@ object Conc {
       val rlev = r.level
       val alev = a.right.level
       if (alev > rlev) new Append(a, r)
-      else a.left match {
+      else construct1(a, r, alev, rlev)
+    }
+    private def construct1[T](a: Append[T], r: Conc[T], alev: Int, rlev: Int): Append[T] = {
+      a.left match {
         case al: Append[T] =>
           val allev = al.right.level
           if (allev > alev) new Append(a, r)
