@@ -12,7 +12,7 @@ class ConcTest extends FunSuite {
 
   test("construct") {
     var conc: Conc[Int] = Zero
-    for (i <- 0 until 10) conc = conc <> i
+    for (i <- 0 until 100) conc = conc <> Single(i)
   }
 
 }

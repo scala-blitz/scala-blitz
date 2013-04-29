@@ -22,7 +22,7 @@ import scala.annotation.unchecked.uncheckedVariance
  *  `Chunk` nodes can be used for the conc lists to serve as ropes.
  *  Note that these ropes are balanced only if the chunk sizes differ up to a constant factor.
  */
-sealed trait Conc[+T] {
+sealed abstract class Conc[+T] {
   
   def level: Int
   
@@ -32,36 +32,52 @@ sealed trait Conc[+T] {
   
   def right: Conc[T]
 
-  final def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(this, that)
+  def evaluated: Conc[T] = this
 
-  final def <>(elem: T @uncheckedVariance): Conc[T] = Conc.<>.apply(this, elem)
+  final def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(this, that)
 
 }
 
 
 object Conc {
 
-  case object Zero extends Conc[Nothing] {
+  implicit class intOps(val elem: Int) extends AnyVal {
+    def <>(that: Conc[Int]) = ???
+  }
+
+  implicit class anyrefOps[T <: AnyRef](val elem: T) extends AnyVal {
+    def <>(that: Conc[T]) = ???
+  }
+
+  implicit class concIntOps(val conc: Conc[Int]) extends AnyVal {
+    def <>(elem: Int) = ???
+  }
+
+  implicit class concAnyRefOps[T <: AnyRef](val conc: Conc[T]) extends AnyVal {
+    def <>(elem: T) = ???
+  }
+
+  final case object Zero extends Conc[Nothing] {
     def left = throw new UnsupportedOperationException("Zero.left")
     def right = throw new UnsupportedOperationException("Zero.right")
     def size = 0
     def level = 0
   }
 
-  case class Single[@specialized T](elem: T) extends Conc[T] {
+  final case class Single[@specialized T](elem: T) extends Conc[T] {
     def left = throw new UnsupportedOperationException("Single.left")
     def right = throw new UnsupportedOperationException("Single.right")
-    def level = 0
     def size = 1
+    def level = 0
   }
 
-  class Chunk[@specialized T](val elems: Array[T], val size: Int) extends Conc[T] {
+  final class Chunk[@specialized T](val elems: Array[T], val size: Int) extends Conc[T] {
     def left = throw new UnsupportedOperationException("Chunk.left")
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
   }
 
-  class <>[T] private (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
+  final class <>[T] private (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
     val level = math.max(left.level, right.level) + 1
     val size = left.size + right.size
     override def toString = "<>(%s, %s)".format(left, right)
@@ -70,14 +86,17 @@ object Conc {
   object <> {
     def unapply[T](c: Conc[T]): Option[(Conc[T], Conc[T])] = c match {
       case c: <>[T] => Some((c.left, c.right))
+      case l: Lazy[T] => ???
       case _ => None
     }
-    def apply[@specialized T](left: T, right: Conc[T]): Conc[T] = apply(Single(left), right)
-    def apply[@specialized T](left: Conc[T], right: T): Conc[T] = apply(left, Single(right))
     def apply[T](left: Conc[T], right: Conc[T]): Conc[T] = {
       if (left == Zero) right
       else if (right == Zero) left
-      else construct(left, right)
+      else {
+        val lefteval = left.evaluated
+        val righteval = right.evaluated
+        construct(lefteval, righteval)
+      }
     }
     private def construct[T](left: Conc[T], right: Conc[T]): Conc[T] = {
       val llev = left.level
@@ -117,6 +136,10 @@ object Conc {
   }
 
 }
+
+
+
+
 
 
 
