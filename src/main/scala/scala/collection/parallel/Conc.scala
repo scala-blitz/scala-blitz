@@ -34,27 +34,21 @@ sealed abstract class Conc[+T] {
 
   def evaluated: Conc[T] = this
 
-  final def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(this, that)
+  def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
 
 }
 
 
 object Conc {
 
-  implicit class intOps(val elem: Int) extends AnyVal {
-    def <>(that: Conc[Int]) = ???
-  }
-
-  implicit class anyrefOps[T <: AnyRef](val elem: T) extends AnyVal {
-    def <>(that: Conc[T]) = ???
-  }
-
   implicit class concIntOps(val conc: Conc[Int]) extends AnyVal {
-    def <>(elem: Int) = ???
+    final def <>[U >: Int](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Int) = Append.apply(conc, new Single(elem))
   }
 
   implicit class concAnyRefOps[T <: AnyRef](val conc: Conc[T]) extends AnyVal {
-    def <>(elem: T) = ???
+    final def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: T) = Append.apply(conc, new Single(elem))
   }
 
   final case object Zero extends Conc[Nothing] {
@@ -62,30 +56,41 @@ object Conc {
     def right = throw new UnsupportedOperationException("Zero.right")
     def size = 0
     def level = 0
+    override def toString(depth: Int) = (" " * depth) + this
   }
 
-  final case class Single[@specialized T](elem: T) extends Conc[T] {
+  abstract class Leaf[T] extends Conc[T] {
+    override def toString(depth: Int) = (" " * depth) + this
+  }
+
+  final case class Single[@specialized T](elem: T) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Single.left")
     def right = throw new UnsupportedOperationException("Single.right")
     def size = 1
     def level = 0
   }
 
-  final class Chunk[@specialized T](val elems: Array[T], val size: Int) extends Conc[T] {
+  final class Chunk[@specialized T](val elems: Array[T], val size: Int) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Chunk.left")
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
+    override def toString = "Chunk(%s, %d)".format(elems, size)
   }
 
-  final class <>[T] private (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
-    val level = math.max(left.level, right.level) + 1
+  final class <>[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
+    val level = {
+      val llev = left.level
+      val rlev = right.level
+      1 + (if (llev > rlev) llev else rlev)
+    }
     val size = left.size + right.size
-    override def toString = "<>(%s, %s)".format(left, right)
+    override def toString = "<>(%d, %d)".format(level, size)
   }
 
   object <> {
     def unapply[T](c: Conc[T]): Option[(Conc[T], Conc[T])] = c match {
       case c: <>[T] => Some((c.left, c.right))
+      case a: Append[T] => Some((c.left, c.right))
       case _ => None
     }
     def apply[T](left: Conc[T], right: Conc[T]): Conc[T] = {
@@ -130,6 +135,56 @@ object Conc {
           val rlr_rr = new <>(right.left.right, right.right)
           new <>(l_rll, rlr_rr)
         }
+      }
+    }
+  }
+
+  final class Append[T] private (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
+    val level = {
+      val llev = left.level
+      val rlev = right.level
+      1 + (if (llev > rlev) llev else rlev)
+    }
+    val size = left.size + right.size
+    override def toString = "Append(%d, %d)".format(level, size)
+  }
+
+  object Append {
+    def apply[T](left: Conc[T], right: Single[T]): Conc[T] = left match {
+      case a: Append[T] =>
+        construct(a, right)
+      case s: Leaf[T] =>
+        new <>(s, right)
+      case c: <>[T] =>
+        new Append(c, right)
+      case Zero =>
+        right
+      case _ =>
+        ???
+    }
+    private def construct[T](a: Append[T], r: Conc[T]): Append[T] = {
+      val rlev = r.level
+      val alev = a.right.level
+      if (alev > rlev) new Append(a, r)
+      else a.left match {
+        case al: Append[T] =>
+          val allev = al.right.level
+          if (allev > alev) new Append(a, r)
+          else {
+            val merged = new <>(al.right, a.right)
+            al.left match {
+              case all: Append[T] =>
+                val pushed = construct(all, merged)
+                new Append(pushed, r)
+              case c: <>[T] =>
+                val pushed = new Append(c, merged)
+                new Append(pushed, r)
+              case _ => ???
+            }
+          }
+        case _: <>[T] =>
+          new Append(a, r)
+        case _ => ???
       }
     }
   }
