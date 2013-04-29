@@ -85,7 +85,7 @@ package object workstealing {
         prefix
       case Apply(Select(prefix, name), args) =>
         prefix
-
+      case _ => c.prefix.tree
     }
 
     /** Used to generate a local val for a function expression,

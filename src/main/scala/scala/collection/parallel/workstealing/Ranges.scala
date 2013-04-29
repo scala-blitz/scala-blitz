@@ -125,10 +125,14 @@ object RangeKernel {
         val result = ctx.splice.invokeParallelOperation(stealer, kernel)
         (kernel, result)
       }
-    val newChildren = initilizers.flatMap{initilizer=> initilizer.tree.children}.toList
+    val newChildren = initilizers.flatMap { initilizer =>
+      val origTree = initilizer.tree
+      if (origTree.isDef) List(origTree) else origTree.children
+    }.toList
+
     val resultTree = resultWithoutInit.tree match {
-      case Block((children,expr))=> Block(newChildren::: children,expr)
-      case _=> c.abort(resultWithoutInit.tree.pos , "failed to get kernel as block "+resultWithoutInit.isInstanceOf[Block].toString)
+      case Block((children, expr)) => Block(newChildren ::: children, expr)
+      case _ => c.abort(resultWithoutInit.tree.pos, "failed to get kernel as block " + resultWithoutInit.isInstanceOf[Block].toString)
     }
     val result = c.Expr[Tuple2[Ranges.RangeKernel[R], R]](resultTree)
 
