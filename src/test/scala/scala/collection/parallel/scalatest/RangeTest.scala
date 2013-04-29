@@ -1,15 +1,11 @@
 package scala.collection.parallel
 package scalatest
 
-
-
 import org.scalatest._
 import org.scalatest.concurrent.Timeouts
 import org.scalatest.time.SpanSugar._
 import Par._
 import workstealing.Ops._
-
-
 
 class RangeTest extends FunSuite with Timeouts {
 
@@ -74,13 +70,120 @@ class RangeTest extends FunSuite with Timeouts {
     testFold(0)
     runForSizes(testFold)
   }
+  /*
+[error] scala.MatchError: workstealing.Ops.rangeOps(pr).aggregate[Int](0)(((x$13: Int, x$14: Int) => x$13.+(x$14)))(((x$15: Int, x$16: Int) => x$15.+(x$16)))(RangeTest.this.scheduler) (of class scala.reflect.internal.Trees$ApplyToImplicitArgs)
+[error] 	at scala.collection.parallel.workstealing.package$Util.applyPrefix(package.scala:78)
+[error] 	at scala.collection.parallel.workstealing.RangeKernel$.makeKernel_Impl(Ranges.scala:107)
+[error] 	at scala.collection.parallel.workstealing.methods.RangesMacros$.aggregate(RangesMacros.scala:44)
+
+  def testAggregate(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.aggregate(0)(_+_,_+_)
+
+      val pr = r.toPar
+      val px = pr.aggregate(0)(_+_)(_+_)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("aggregate") {
+    intercept[UnsupportedOperationException] {
+      testAggregate(0)
+    }
+    runForSizes(testAggregate)
+  }
+
+ */
+  def testSum(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.sum
+
+      val pr = r.toPar
+      val px = pr.sum
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("sum") {
+    testSum(0)
+    runForSizes(testSum)
+  }
+
+  def testProduct(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.product
+
+      val pr = r.toPar
+      val px = pr.product
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("product") {
+    testSum(0)
+    runForSizes(testProduct)
+  }
+
+  def testMin(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.min
+
+      val pr = r.toPar
+      val px = pr.min
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("min") {
+  /*  intercept[UnsupportedOperationException] {
+      testMin(0)
+    } */
+
+
+    runForSizes(testMin)
+  }
+
+  def testMax(sz: Int): Unit = try {
+    failAfter(1 seconds) {
+      val r = 0 until sz
+      val x = r.max
+
+      val pr = r.toPar
+      val px = pr.max
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for size: " + sz)
+  }
+
+  test("max") {
+  /*  intercept[UnsupportedOperationException] {
+      testMax(0)
+    } */
+    runForSizes(testMax)
+  }
 
 }
-
-
-
-
-
-
-
 

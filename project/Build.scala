@@ -12,7 +12,7 @@ object BuildSettings {
     version := "0.1",
     resolvers += ScalaToolsSnapshots,
     scalaVersion := "2.10.1",
-    scalacOptions ++= Seq("-deprecation", "-optimise"),
+    scalacOptions ++= Seq("-deprecation", "-optimise", "-Ymacro-debug-lite"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % "2.10.1",

@@ -12,6 +12,15 @@ Reducable interface:
  ☐ flatMap
  ☐ foreach
 
+ ☐ contains\exists\containsSlice
+ ☐ corresponds
+ ☐ distinct
+ ☐ forall
+ ☐ groupBy
+ ☐ intersect
+ ☐ sort
+
+
 Parallel ranges:
  ☐ fold
  ☐ reduce
