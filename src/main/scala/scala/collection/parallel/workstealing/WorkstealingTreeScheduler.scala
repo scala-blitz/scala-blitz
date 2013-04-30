@@ -102,8 +102,7 @@ object WorkstealingTreeScheduler {
       def maximumStep = {
         if (
           scala.util.Properties.isJavaAtLeast("1.7") &&
-          runtimeParameters.contains("-XX:+UseCondCardMark") &&
-          parallelismLevel > 2
+          runtimeParameters.contains("-XX:+UseCondCardMark")
         ) 4096 else 1000000
       }
 
