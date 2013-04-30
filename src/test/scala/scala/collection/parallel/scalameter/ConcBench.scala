@@ -36,6 +36,15 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
+      using(sizes) curve("Vector") in { sz =>
+        var v = collection.immutable.Vector[Unit]()
+        var i = 0
+        while (i < sz) {
+          v = v :+ ()
+          i += 1
+        }
+      }
+
       using(sizes) curve("Conc") in { sz =>
         import Conc._
         var conc: Conc[Int] = Zero
