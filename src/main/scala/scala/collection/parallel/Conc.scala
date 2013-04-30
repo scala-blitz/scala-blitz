@@ -3,6 +3,7 @@ package scala.collection.parallel
 
 
 import scala.annotation.unchecked.uncheckedVariance
+import scala.reflect.ClassTag
 
 
 
@@ -35,19 +36,58 @@ sealed abstract class Conc[+T] {
   def evaluated: Conc[T] = this
 
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
-
 }
 
 
 object Conc {
 
+  implicit class concBooleanOps(val conc: Conc[Boolean]) extends AnyVal {
+    def <>[U >: Boolean](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Boolean) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concByteOps(val conc: Conc[Byte]) extends AnyVal {
+    def <>[U >: Byte](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Byte) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concCharOps(val conc: Conc[Char]) extends AnyVal {
+    def <>[U >: Char](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Char) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concShortOps(val conc: Conc[Short]) extends AnyVal {
+    def <>[U >: Short](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Short) = Append.apply(conc, new Single(elem))
+  }
+
   implicit class concIntOps(val conc: Conc[Int]) extends AnyVal {
-    final def <>[U >: Int](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>[U >: Int](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Int) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concAnyRefOps[T <: AnyRef](val conc: Conc[T]) extends AnyVal {
-    final def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+  implicit class concLongOps(val conc: Conc[Long]) extends AnyVal {
+    def <>[U >: Long](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Long) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concFloatOps(val conc: Conc[Float]) extends AnyVal {
+    def <>[U >: Float](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Float) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concDoubleOps(val conc: Conc[Double]) extends AnyVal {
+    def <>[U >: Double](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Double) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concUnitOps(val conc: Conc[Unit]) extends AnyVal {
+    def <>[U >: Unit](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
+    def <>(elem: Unit) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class concAnyRefOps[T](val conc: Conc[T]) extends AnyVal {
+    def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: T) = Append.apply(conc, new Single(elem))
   }
 
@@ -70,7 +110,7 @@ object Conc {
     def level = 0
   }
 
-  final class Chunk[@specialized T](val elems: Array[T], val size: Int) extends Leaf[T] {
+  final case class Chunk[@specialized T](elems: Array[T], size: Int) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Chunk.left")
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
@@ -154,7 +194,7 @@ object Conc {
       case a: Append[T] =>
         val alev = a.right.level
         if (alev > 0) new Append(a, right)
-        else construct1(a, right, alev, 0)
+        else constructDeep(a, right, alev, 0)
       case s: Leaf[T] =>
         new <>(s, right)
       case c: <>[T] =>
@@ -168,9 +208,9 @@ object Conc {
       val rlev = r.level
       val alev = a.right.level
       if (alev > rlev) new Append(a, r)
-      else construct1(a, r, alev, rlev)
+      else constructDeep(a, r, alev, rlev)
     }
-    private def construct1[T](a: Append[T], r: Conc[T], alev: Int, rlev: Int): Append[T] = {
+    private def constructDeep[T](a: Append[T], r: Conc[T], alev: Int, rlev: Int): Append[T] = {
       a.left match {
         case al: Append[T] =>
           val allev = al.right.level
@@ -191,6 +231,57 @@ object Conc {
           new Append(a, r)
         case _ => ???
       }
+    }
+  }
+
+  class Buffer[@specialized T: ClassTag](c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
+    private var conc: Conc[T] = c
+    private var lastChunk: Array[T] = ch
+    private var lastSize: Int = sz
+
+    def this() = this(Zero, new Array[T](8), 0)
+
+    private def pack() {
+      if (lastSize > 0) conc = conc <> new Chunk(lastChunk, lastSize)
+    }
+
+    def clear() = {
+      lastChunk = new Array[T](8)
+      lastSize = 0
+      conc = Zero
+    }
+
+    final def +=(elem: T) = if (lastSize < lastChunk.length) {
+      lastChunk(lastSize) = elem
+      lastSize += 1
+      this
+    } else {
+      val oldlength = lastChunk.length
+      val newlength = math.min(2048, oldlength * 2)
+      pack()
+      lastChunk = new Array[T](newlength)
+      lastSize = 0
+      this += elem
+    }
+
+    def result = {
+      pack()
+      val res = conc
+      clear()
+      res
+    }
+
+    def combine(that: Buffer[T]) = {
+      this.pack()
+      that.pack()
+
+      val resconc = this.conc <> that.conc
+      val res = new Buffer(resconc, new Array[T](8), 0)
+
+      this.clear()
+      that.clear()
+
+      res
     }
   }
 
