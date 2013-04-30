@@ -3,6 +3,7 @@ package scala.collection.parallel
 
 
 import scala.annotation.unchecked.uncheckedVariance
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 
@@ -33,7 +34,7 @@ sealed abstract class Conc[+T] {
   
   def right: Conc[T]
 
-  def evaluated: Conc[T] = this
+  def normalized: Conc[T] = this
 
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
 }
@@ -137,8 +138,8 @@ object Conc {
       if (left == Zero) right
       else if (right == Zero) left
       else {
-        val lefteval = left.evaluated
-        val righteval = right.evaluated
+        val lefteval = left.normalized
+        val righteval = right.normalized
         construct(lefteval, righteval)
       }
     }
@@ -186,6 +187,50 @@ object Conc {
       1 + (if (llev > rlev) llev else rlev)
     }
     val size = left.size + right.size
+    override def normalized: Conc[T] = {
+      def squeeze(l: Conc[T]): Conc[T] = l match {
+        case a: Append[T] =>
+          a.left match {
+            case al: Append[T] =>
+              if (al.right.level > a.right.level) a
+              else {
+                val merged = new <>(al.right, a.right)
+                val squeezed = squeeze(al.left)
+                new Append(squeezed, merged)
+              }
+            case c: <>[T] =>
+              a
+            case _ => ???
+          }
+        case c: <>[T] =>
+          c
+        case _ => ???
+      }
+      @tailrec def fold(l: Conc[T], tree: Conc[T]): Conc[T] = l match {
+        case a: Append[T] =>
+          val alev = a.right.level
+          val tlev = tree.level
+          if (alev > tlev) fold(a.left, new <>(a.right, tree))
+          else a.left match {
+            case al: Append[T] =>
+              val allev = al.right.level
+              if (allev > alev) fold(a.left, new <>(a.right, tree))
+              else {
+                val squeezed = squeeze(a)
+                fold(squeezed, tree)
+              }
+            case c: <>[T] =>
+              val merged = new <>(a.right, tree)
+              c <> merged
+            case _ => ???
+          }
+        case c: <>[T] =>
+          c <> tree
+        case _ => ???
+      }
+
+      fold(this.left, this.right)
+    }
     override def toString = "Append(%d, %d)".format(level, size)
   }
 
@@ -234,12 +279,15 @@ object Conc {
     }
   }
 
+  val INITIAL_SIZE = 8
+  val MAX_SIZE = 4096
+
   class Buffer[@specialized T: ClassTag](c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
     private var conc: Conc[T] = c
     private var lastChunk: Array[T] = ch
     private var lastSize: Int = sz
 
-    def this() = this(Zero, new Array[T](8), 0)
+    def this() = this(Zero, new Array[T](INITIAL_SIZE), 0)
 
     private def pack() {
       if (lastSize > 0) conc = conc <> new Chunk(lastChunk, lastSize)
@@ -257,7 +305,7 @@ object Conc {
       this
     } else {
       val oldlength = lastChunk.length
-      val newlength = math.min(2048, oldlength * 2)
+      val newlength = math.min(MAX_SIZE, oldlength * 2)
       pack()
       lastChunk = new Array[T](newlength)
       lastSize = 0
@@ -271,12 +319,12 @@ object Conc {
       res
     }
 
-    def combine(that: Buffer[T]) = {
+    def merge(that: Buffer[T]) = {
       this.pack()
       that.pack()
 
       val resconc = this.conc <> that.conc
-      val res = new Buffer(resconc, new Array[T](8), 0)
+      val res = new Buffer(resconc, new Array[T](INITIAL_SIZE), 0)
 
       this.clear()
       that.clear()

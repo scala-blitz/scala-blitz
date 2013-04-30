@@ -29,7 +29,19 @@ class ConcTest extends FunSuite {
     val level = c.level
     val size = c.size
     val depthBound = 4 * math.log(size) / math.log(2)
+
     assert(level < depthBound)
+
+    def assertBalanceProperty(c: Conc[Int]): Unit = c match {
+      case Zero => // done
+      case Single(x) => // done
+      case Chunk(xs, sz) => // done
+      case left <> right =>
+        assert(c.level == math.max(left.level, right.level) + 1)
+        assert(math.abs(right.level - left.level) <= 1)
+        assertBalanceProperty(left)
+        assertBalanceProperty(right)
+    }
   }
 
   test("<> Single trees") {
@@ -74,6 +86,31 @@ class ConcTest extends FunSuite {
     val conc = cb.result
 
     testTraverse(conc, elems)
+  }
+
+  test("append and normalize") {
+    val size = 20000
+    val elems = 0 until size
+    var conc: Conc[Int] = Zero
+    for (i <- elems) conc = conc <> i
+    conc = conc.normalized
+
+    testTraverse(conc, elems)
+    testBalance(conc)
+  }
+
+  test("Buffer.merge") {
+    val size = 200000
+    val elems = 0 until size
+    val cb1 = new Conc.Buffer[Int]
+    for (i <- elems) cb1 += i
+    val cb2 = new Conc.Buffer[Int]
+    for (i <- elems) cb2 += i
+    val cb = cb1 merge cb2
+    val conc = cb.result
+
+    testTraverse(conc, elems ++ elems)
+    testBalance(conc)
   }
 
 }
