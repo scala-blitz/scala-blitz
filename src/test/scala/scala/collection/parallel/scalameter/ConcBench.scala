@@ -59,6 +59,16 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
           i += 1
         }
       }
+
+      using(sizes) curve("Conc.toTop") in { sz =>
+        import Conc._
+        var conc: Conc[Int] = Zero.toTop
+        var i = 0
+        while (i < sz) {
+          conc = conc <> i
+          i += 1
+        }
+      }
     }
 
     performance of "Buffer" config(
@@ -78,14 +88,14 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       using(sizes) curve("Conc.Buffer") in { sz =>
         val cb = new Conc.Buffer[Int]
         var i = 0
-        while (i < sz * 2) {
+        while (i < sz) {
           cb += i
           i += 1
         }
       }
     }
 
-    measure method "<>(Conc)" config(
+    measure method "<>(Conc[T])" config(
       exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"

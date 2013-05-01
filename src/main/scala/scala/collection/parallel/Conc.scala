@@ -36,60 +36,107 @@ sealed abstract class Conc[+T] {
 
   def normalized: Conc[T] = this
 
+  def toTop: Conc.Top[T] = new Conc.Top(Conc.Zero, this, Conc.Zero)
+
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
 }
 
 
 object Conc {
 
-  implicit class concBooleanOps(val conc: Conc[Boolean]) extends AnyVal {
+  implicit class ConcBooleanOps(val conc: Conc[Boolean]) extends AnyVal {
     def <>[U >: Boolean](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Boolean) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concByteOps(val conc: Conc[Byte]) extends AnyVal {
+  implicit class ConcByteOps(val conc: Conc[Byte]) extends AnyVal {
     def <>[U >: Byte](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Byte) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concCharOps(val conc: Conc[Char]) extends AnyVal {
+  implicit class ConcCharOps(val conc: Conc[Char]) extends AnyVal {
     def <>[U >: Char](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Char) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concShortOps(val conc: Conc[Short]) extends AnyVal {
+  implicit class ConcShortOps(val conc: Conc[Short]) extends AnyVal {
     def <>[U >: Short](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Short) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concIntOps(val conc: Conc[Int]) extends AnyVal {
+  implicit class ConcIntOps(val conc: Conc[Int]) extends AnyVal {
     def <>[U >: Int](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Int) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concLongOps(val conc: Conc[Long]) extends AnyVal {
+  implicit class ConcLongOps(val conc: Conc[Long]) extends AnyVal {
     def <>[U >: Long](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Long) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concFloatOps(val conc: Conc[Float]) extends AnyVal {
+  implicit class ConcFloatOps(val conc: Conc[Float]) extends AnyVal {
     def <>[U >: Float](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Float) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concDoubleOps(val conc: Conc[Double]) extends AnyVal {
+  implicit class ConcDoubleOps(val conc: Conc[Double]) extends AnyVal {
     def <>[U >: Double](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Double) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concUnitOps(val conc: Conc[Unit]) extends AnyVal {
+  implicit class ConcUnitOps(val conc: Conc[Unit]) extends AnyVal {
     def <>[U >: Unit](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: Unit) = Append.apply(conc, new Single(elem))
   }
 
-  implicit class concAnyRefOps[T](val conc: Conc[T]) extends AnyVal {
+  implicit class ConcAnyOps[T](val conc: Conc[T]) extends AnyVal {
     def <>[U >: T](that: Conc[U]): Conc[U] = Conc.<>.apply(conc, that)
     def <>(elem: T) = Append.apply(conc, new Single(elem))
+  }
+
+  implicit class BooleanConcOps(val elem: Boolean) extends AnyVal {
+    def <>[U >: Boolean](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Boolean) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class ByteConcOps(val elem: Byte) extends AnyVal {
+    def <>[U >: Byte](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Byte) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class CharConcOps(val elem: Char) extends AnyVal {
+    def <>[U >: Char](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Char) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class ShortConcOps(val elem: Short) extends AnyVal {
+    def <>[U >: Short](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Short) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class IntConcOps(val elem: Int) extends AnyVal {
+    def <>[U >: Int](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Int) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class LongConcOps(val elem: Long) extends AnyVal {
+    def <>[U >: Long](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Long) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class FloatConcOps(val elem: Float) extends AnyVal {
+    def <>[U >: Float](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Float) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class DoubleConcOps(val elem: Double) extends AnyVal {
+    def <>[U >: Double](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: Double) = Append.apply(new Single(elem), new Single(that))
+  }
+
+  implicit class AnyConcOps[T](val elem: T) extends AnyVal {
+    def <>[U >: T](that: Conc[U]): Conc[U] = Prepend.apply(new Single(elem), that)
+    def <>(that: T) = Append.apply(new Single(elem), new Single(that))
   }
 
   final case object Zero extends Conc[Nothing] {
@@ -100,7 +147,7 @@ object Conc {
     override def toString(depth: Int) = (" " * depth) + this
   }
 
-  abstract class Leaf[T] extends Conc[T] {
+  abstract class Leaf[+T] extends Conc[T] {
     override def toString(depth: Int) = (" " * depth) + this
   }
 
@@ -132,6 +179,8 @@ object Conc {
     def unapply[T](c: Conc[T]): Option[(Conc[T], Conc[T])] = c match {
       case c: <>[T] => Some((c.left, c.right))
       case a: Append[T] => Some((c.left, c.right))
+      case p: Prepend[T] => Some((c.left, c.right))
+      case t: Top[T] => Some((c.left, c.right))
       case _ => None
     }
     def apply[T](left: Conc[T], right: Conc[T]): Conc[T] = {
@@ -180,13 +229,26 @@ object Conc {
     }
   }
 
-  final class Append[T] private (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
+  abstract class Lazy[+T] extends Conc[T]
+
+  final class Append[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Lazy[T] {
     val level = {
       val llev = left.level
       val rlev = right.level
       1 + (if (llev > rlev) llev else rlev)
     }
     val size = left.size + right.size
+    override lazy val toTop = {
+      @tailrec def fold(l: Conc[T], tree: Conc[T]): Top[T] = l match {
+        case a: Append[T] =>
+          fold(a.left, a.right <> tree)
+        case c: <>[T] =>
+          new Top(Zero, c, tree)
+        case _ => ???
+      }
+
+      fold(this.left, this.right)
+    }
     override def normalized: Conc[T] = {
       @tailrec def fold(l: Conc[T], tree: Conc[T]): Conc[T] = l match {
         case a: Append[T] =>
@@ -202,17 +264,27 @@ object Conc {
   }
 
   object Append {
-    def apply[T](left: Conc[T], right: Single[T]): Conc[T] = left match {
+    def apply[T](left: Conc[T], right: Leaf[T]): Conc[T] = left match {
       case a: Append[T] =>
         val alev = a.right.level
         if (alev > 0) new Append(a, right)
         else construct(a, right)
+      case _ =>
+        slowpath(left, right)
+    }
+    private def slowpath[T](left: Conc[T], right: Leaf[T]): Conc[T] = left match {
       case s: Leaf[T] =>
         new <>(s, right)
       case c: <>[T] =>
         new Append(c, right)
       case Zero =>
         right
+      case p: Prepend[T] =>
+        val top = p.toTop
+        Append.apply(top, right)
+      case t: Top[T] =>
+        val appended = Append.apply(t.suffix, right)
+        new Top(t.prefix, t.tree, appended)
       case _ =>
         ???
     }
@@ -228,6 +300,87 @@ object Conc {
         case _ => ???
       }
     }
+  }
+
+  final class Prepend[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Lazy[T] {
+    val level = {
+      val llev = left.level
+      val rlev = right.level
+      1 + (if (llev > rlev) llev else rlev)
+    }
+    val size = left.size + right.size
+    override lazy val toTop: Top[T] = {
+      @tailrec def fold(tree: Conc[T], r: Conc[T]): Top[T] = r match {
+        case p: Prepend[T] =>
+          fold(tree <> p.left, p.right)
+        case c: <>[T] =>
+          new Top(tree, c, Zero)
+        case _ => ???
+      }
+
+      fold(this.left, this.right)
+    }
+    override def normalized: Conc[T] = {
+      @tailrec def fold(tree: Conc[T], r: Conc[T]): Conc[T] = r match {
+        case p: Prepend[T] =>
+          fold(tree <> p.left, p.right)
+        case c: <>[T] =>
+          tree <> r
+        case _ => ???
+      }
+
+      fold(this.left, this.right)
+    }
+    override def toString = "Prepend(%d, %d)".format(level, size)
+  }
+
+  object Prepend {
+    def apply[T](left: Leaf[T], right: Conc[T]): Conc[T] = right match {
+      case p: Prepend[T] =>
+        val plev = p.left.level
+        if (plev > 0) new Prepend(left, p)
+        else construct(left, p)
+      case _ =>
+        slowpath(left, right)
+    }
+    private def slowpath[T](left: Leaf[T], right: Conc[T]): Conc[T] = right match {
+      case s: Leaf[T] =>
+        new <>(left, s)
+      case c: <>[T] =>
+        new Prepend(left, c)
+      case Zero =>
+        left
+      case a: Append[T] =>
+        val top = a.toTop
+        Prepend.apply(left, top)
+      case t: Top[T] =>
+        val prepended = Prepend.apply(left, t.prefix)
+        new Top(prepended, t.tree, t.suffix)
+      case _ =>
+        ???
+    }
+    @tailrec private def construct[T](l: Conc[T], p: Prepend[T]): Conc[T] = {
+      val merged = new <>(l, p.left)
+      p.right match {
+        case pr: Prepend[T] =>
+          val prlev = pr.left.level
+          if (prlev > merged.level) new Prepend(merged, pr)
+          else construct(merged, pr)
+        case c: <>[T] =>
+          new Prepend(merged, c)
+        case _ => ???
+      }
+    }
+  }
+
+  final class Top[+T] private[Conc] (val prefix: Conc[T], val tree: Conc[T], val suffix: Conc[T]) extends Lazy[T] {
+    def left = if (prefix != Zero) prefix else tree
+    def right = if (prefix != Zero) new Top(Zero, tree, suffix) else suffix
+    val level = 1 + math.max(tree.level, math.max(prefix.level, suffix.level))
+    val size = prefix.size + tree.size + suffix.size
+    override def toTop = this
+    override def normalized = left.normalized <> right.normalized
+    override def toString = "Top(%d, %d)".format(level, size)
   }
 
   val INITIAL_SIZE = 8

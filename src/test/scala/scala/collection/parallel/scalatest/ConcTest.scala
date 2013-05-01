@@ -32,19 +32,21 @@ class ConcTest extends FunSuite {
 
     assert(level < depthBound)
 
-    def assertBalanceProperty(c: Conc[Int]): Unit = c match {
+    def assertBalanceProperty(c: Conc[T]): Unit = c match {
       case Zero => // done
       case Single(x) => // done
       case Chunk(xs, sz) => // done
       case left <> right =>
-        assert(c.level == math.max(left.level, right.level) + 1)
-        assert(math.abs(right.level - left.level) <= 1)
+        if (c.isInstanceOf[<>[_]]) assert(c.level == math.max(left.level, right.level) + 1)
+        if (c.isInstanceOf[<>[_]]) assert(math.abs(right.level - left.level) <= 1)
         assertBalanceProperty(left)
         assertBalanceProperty(right)
     }
+
+    assertBalanceProperty(c)
   }
 
-  test("<> Single trees") {
+  test("<>(Single[T])") {
     val size = 20000
     val elems = 0 until size
     var conc: Conc[Int] = Zero
@@ -54,7 +56,7 @@ class ConcTest extends FunSuite {
     testBalance(conc)
   }
 
-  test("<> trees") {
+  test("<>(Conc[T])") {
     val size = 20000
     val elems1 = 0 until size
     val elems2 = size until (10 * size)
@@ -68,7 +70,7 @@ class ConcTest extends FunSuite {
     testBalance(conc)
   }
 
-  test("<> elems") {
+  test("<>(T)") {
     val size = 20000
     val elems = 0 until size
     var conc: Conc[Int] = Zero
@@ -88,7 +90,7 @@ class ConcTest extends FunSuite {
     testTraverse(conc, elems)
   }
 
-  test("append and normalize") {
+  test("append; normalize") {
     val size = 20000
     val elems = 0 until size
     var conc: Conc[Int] = Zero
@@ -110,6 +112,61 @@ class ConcTest extends FunSuite {
     val conc = cb.result
 
     testTraverse(conc, elems ++ elems)
+    testBalance(conc)
+  }
+
+  test("(T)<>") {
+    val size = 20000
+    val elems = 0 until size
+    var conc: Conc[Int] = Zero
+    for (i <- elems) conc = i <> conc
+
+    testTraverse(conc, elems.reverse)
+    testBalance(conc)
+  }
+
+  test("prepend; normalize") {
+    val size = 40000
+    val elems = 0 until size
+    var conc: Conc[Int] = Zero
+    for (i <- elems) conc = i <> conc
+    conc = conc.normalized
+
+    testTraverse(conc, elems.reverse)
+    testBalance(conc)
+  }
+
+  test("append; prepend; normalize") {
+    val size = 15000
+    val elems = 0 until size
+    var conc: Conc[Int] = Zero
+    for (i <- elems) conc = conc <> i
+    for (i <- elems) conc = i <> conc
+
+    testTraverse(conc, elems.reverse ++ elems)
+    testBalance(conc)
+
+    conc = conc.normalized
+
+    testTraverse(conc, elems.reverse ++ elems)
+    testBalance(conc)
+  }
+
+  test("prepend/append; normalize") {
+    val size = 24000
+    val elems = 0 until size
+    var conc: Conc[Int] = Zero
+    for (i <- elems) {
+      conc = i <> conc
+      conc = conc <> i
+    }
+
+    testTraverse(conc, elems.reverse ++ elems)
+    testBalance(conc)
+
+    conc = conc.normalized
+
+    testTraverse(conc, elems.reverse ++ elems)
     testBalance(conc)
   }
 
