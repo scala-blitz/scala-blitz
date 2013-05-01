@@ -188,42 +188,9 @@ object Conc {
     }
     val size = left.size + right.size
     override def normalized: Conc[T] = {
-      def squeeze(l: Conc[T]): Conc[T] = l match {
-        case a: Append[T] =>
-          a.left match {
-            case al: Append[T] =>
-              if (al.right.level > a.right.level) a
-              else {
-                val merged = new <>(al.right, a.right)
-                val squeezed = squeeze(al.left)
-                new Append(squeezed, merged)
-              }
-            case c: <>[T] =>
-              a
-            case _ => ???
-          }
-        case c: <>[T] =>
-          c
-        case _ => ???
-      }
       @tailrec def fold(l: Conc[T], tree: Conc[T]): Conc[T] = l match {
         case a: Append[T] =>
-          val alev = a.right.level
-          val tlev = tree.level
-          if (alev > tlev) fold(a.left, new <>(a.right, tree))
-          else a.left match {
-            case al: Append[T] =>
-              val allev = al.right.level
-              if (allev > alev) fold(a.left, new <>(a.right, tree))
-              else {
-                val squeezed = squeeze(a)
-                fold(squeezed, tree)
-              }
-            case c: <>[T] =>
-              val merged = new <>(a.right, tree)
-              c <> merged
-            case _ => ???
-          }
+          fold(a.left, a.right <> tree)
         case c: <>[T] =>
           c <> tree
         case _ => ???
@@ -239,7 +206,7 @@ object Conc {
       case a: Append[T] =>
         val alev = a.right.level
         if (alev > 0) new Append(a, right)
-        else constructDeep(a, right, alev, 0)
+        else construct(a, right)
       case s: Leaf[T] =>
         new <>(s, right)
       case c: <>[T] =>
@@ -249,31 +216,15 @@ object Conc {
       case _ =>
         ???
     }
-    private def construct[T](a: Append[T], r: Conc[T]): Append[T] = {
-      val rlev = r.level
-      val alev = a.right.level
-      if (alev > rlev) new Append(a, r)
-      else constructDeep(a, r, alev, rlev)
-    }
-    private def constructDeep[T](a: Append[T], r: Conc[T], alev: Int, rlev: Int): Append[T] = {
+    @tailrec private def construct[T](a: Append[T], r: Conc[T]): Conc[T] = {
+      val merged = new <>(a.right, r)
       a.left match {
         case al: Append[T] =>
           val allev = al.right.level
-          if (allev > alev) new Append(a, r)
-          else {
-            val merged = new <>(al.right, a.right)
-            al.left match {
-              case all: Append[T] =>
-                val pushed = construct(all, merged)
-                new Append(pushed, r)
-              case c: <>[T] =>
-                val pushed = new Append(c, merged)
-                new Append(pushed, r)
-              case _ => ???
-            }
-          }
-        case _: <>[T] =>
-          new Append(a, r)
+          if (allev > merged.level) new Append(al, merged)
+          else construct(al, merged)
+        case c: <>[T] =>
+          new Append(c, merged)
         case _ => ???
       }
     }
