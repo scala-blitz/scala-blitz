@@ -25,6 +25,8 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
     conc
   }
 
+  /* tests */
+
   performance of "Conc" in {
 
     measure method "append-element" config(
