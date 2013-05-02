@@ -1,13 +1,9 @@
 package scala.collection.parallel
 package workstealing
 
-
-
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.collection.parallel.generic._
-
-
 
 object Ranges {
 
@@ -85,9 +81,10 @@ object RangeKernel {
   def A0_RETURN_ZERO[R: c.WeakTypeTag](c: Context): c.Expr[(Int, R) => R] = c.universe.reify { (at: Int, zero: R) => zero }
   def A1_SUM[R: c.WeakTypeTag](c: Context)(oper: c.Expr[(R, Int) => R]): c.Expr[(Int, Int, R) => R] = c.universe.reify { (from: Int, to: Int, zero: R) =>
     {
-      var i: Int = from
+      val fin = if(from>to) from else to
+      var i: Int = from + to - fin
       var sum: R = zero
-      while (i <= to) {
+      while (i <= fin) {
         sum = oper.splice(sum, i)
         i += 1
       }
@@ -98,15 +95,22 @@ object RangeKernel {
     {
       var i = from
       var sum: R = zero
-      while (i <= to) {
-        sum = oper.splice(sum, i)
-        i += stride
-      }
+      if (stride > 0) {
+        while (i <= to) {
+          sum = oper.splice(sum, i)
+          i += stride
+        }
+      } else if (stride < 0) {
+        while (i >= to) {
+          sum = oper.splice(sum, i)
+          i += stride
+        }
+      } else ???
       sum
     }
   }
 
-  def makeKernel_Impl[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag, RR: c.WeakTypeTag](c: Context)(initilizers: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, R) => R], applyer1: c.Expr[(Int, Int, R) => R], applyerN: c.Expr[(Int, Int, Int, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler])(allowZeroRezult: Boolean = true): c.Expr[RR] = {
+  def makeKernel_Impl[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag, RR: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, R) => R], applyer1: c.Expr[(Int, Int, R) => R], applyerN: c.Expr[(Int, Int, Int, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler])(allowZeroRezult: Boolean = true): c.Expr[RR] = {
     import c.universe._
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val resultWithoutInit =
@@ -129,14 +133,14 @@ object RangeKernel {
         val result = ctx.splice.invokeParallelOperation(stealer, kernel)
         (kernel, result)
       }
-    val newChildren = initilizers.flatMap { initilizer =>
+    val newChildren = initializer.flatMap { initilizer =>
       val origTree = initilizer.tree
       if (origTree.isDef) List(origTree) else origTree.children
     }.toList
 
     val resultTree = resultWithoutInit.tree match {
       case Block((children, expr)) => Block(newChildren ::: children, expr)
-      case _ => c.abort(resultWithoutInit.tree.pos, "failed to get kernel as block " + resultWithoutInit.isInstanceOf[Block].toString)
+      case _ => c.abort(resultWithoutInit.tree.pos, "failed to get kernel as block")
     }
     val result = c.Expr[Tuple2[Ranges.RangeKernel[R], R]](resultTree)
 

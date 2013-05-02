@@ -120,8 +120,21 @@ object RangesMacros {
   def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]],ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
-    val nOrd = reify { ord.splice.reverse }
-    min[U](c)(nOrd,ctx)
+    val (ordv, ordg) = c.functionExpr2Local[Ordering[U]](ord)
+    val op = reify {
+      (x: Int, y: Int) => if (ordg.splice.compare(x, y) >= 0) x else y
+    }
+    val zero = reify { Ranges.EMPTY_RESULT }
+    val (lv, oper: Expr[(Int, Int) => Int]) = c.functionExpr2Local[(Int, Int) => Int](op)
+    val combine = reify { (a: Any, b: Any) =>
+      {
+        if (a == zero.splice) b
+        else if (b == zero.splice) a
+        else oper.splice(a.asInstanceOf[Int], b.asInstanceOf[Int])
+      }
+    }
+
+    makeKernel_Impl[Int, Any, Int](c)(lv,ordv)(zero)(combine)(A0_RETURN_ZERO(c), A1_SUM[Any](c)(combine), AN_SUM[Any](c)(combine))(ctx)(false)
   }
 
 }
