@@ -69,8 +69,17 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       using(sizes) curve("VectorBuffer") in { sz =>
         val vb = new collection.immutable.VectorBuilder[Unit]()
         var i = 0
-        while (i < sz * 2) {
+        while (i < sz) {
           vb += ()
+          i += 1
+        }
+      }
+
+      using(sizes) curve("ArrayBuffer") in { sz =>
+        val ab = new collection.mutable.ArrayBuffer[Unit]()
+        var i = 0
+        while (i < sz) {
+          ab += ()
           i += 1
         }
       }
