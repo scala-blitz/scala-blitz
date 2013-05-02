@@ -59,16 +59,6 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
           i += 1
         }
       }
-
-      using(sizes) curve("Conc.toTop") in { sz =>
-        import Conc._
-        var conc: Conc[Int] = Zero.toTop
-        var i = 0
-        while (i < sz) {
-          conc = conc <> i
-          i += 1
-        }
-      }
     }
 
     performance of "Buffer" config(

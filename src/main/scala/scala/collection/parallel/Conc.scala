@@ -36,8 +36,6 @@ sealed abstract class Conc[+T] {
 
   def normalized: Conc[T] = this
 
-  def toTop: Conc.Top[T] = new Conc.Top(Conc.Zero, this, Conc.Zero)
-
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
 }
 
@@ -238,17 +236,6 @@ object Conc {
       1 + (if (llev > rlev) llev else rlev)
     }
     val size = left.size + right.size
-    override lazy val toTop = {
-      @tailrec def fold(l: Conc[T], tree: Conc[T]): Top[T] = l match {
-        case a: Append[T] =>
-          fold(a.left, a.right <> tree)
-        case c: <>[T] =>
-          new Top(Zero, c, tree)
-        case _ => ???
-      }
-
-      fold(this.left, this.right)
-    }
     override def normalized: Conc[T] = {
       @tailrec def fold(l: Conc[T], tree: Conc[T]): Conc[T] = l match {
         case a: Append[T] =>
@@ -280,11 +267,8 @@ object Conc {
       case Zero =>
         right
       case p: Prepend[T] =>
-        val top = p.toTop
-        Append.apply(top, right)
-      case t: Top[T] =>
-        val appended = Append.apply(t.suffix, right)
-        new Top(t.prefix, t.tree, appended)
+        val n = p.normalized
+        Append.apply(n, right)
       case _ =>
         ???
     }
@@ -309,17 +293,6 @@ object Conc {
       1 + (if (llev > rlev) llev else rlev)
     }
     val size = left.size + right.size
-    override lazy val toTop: Top[T] = {
-      @tailrec def fold(tree: Conc[T], r: Conc[T]): Top[T] = r match {
-        case p: Prepend[T] =>
-          fold(tree <> p.left, p.right)
-        case c: <>[T] =>
-          new Top(tree, c, Zero)
-        case _ => ???
-      }
-
-      fold(this.left, this.right)
-    }
     override def normalized: Conc[T] = {
       @tailrec def fold(tree: Conc[T], r: Conc[T]): Conc[T] = r match {
         case p: Prepend[T] =>
@@ -351,11 +324,8 @@ object Conc {
       case Zero =>
         left
       case a: Append[T] =>
-        val top = a.toTop
-        Prepend.apply(left, top)
-      case t: Top[T] =>
-        val prepended = Prepend.apply(left, t.prefix)
-        new Top(prepended, t.tree, t.suffix)
+        val n = a.normalized
+        Prepend.apply(left, n)
       case _ =>
         ???
     }
@@ -378,7 +348,6 @@ object Conc {
     def right = if (prefix != Zero) new Top(Zero, tree, suffix) else suffix
     val level = 1 + math.max(tree.level, math.max(prefix.level, suffix.level))
     val size = prefix.size + tree.size + suffix.size
-    override def toTop = this
     override def normalized = left.normalized <> right.normalized
     override def toString = "Top(%d, %d)".format(level, size)
   }
