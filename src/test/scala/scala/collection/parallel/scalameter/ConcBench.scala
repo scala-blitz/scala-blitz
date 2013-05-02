@@ -27,7 +27,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
 
   performance of "Conc" in {
 
-    measure method "<>(T)" config(
+    measure method "append-element" config(
       exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
@@ -85,7 +85,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "<>(Conc[T])" config(
+    measure method "merge" config(
       exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
