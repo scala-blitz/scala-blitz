@@ -124,6 +124,42 @@ class RangeTest extends FunSuite with Timeouts {
     runForSizes(testSum)
   }
 
+  def testSumWithCustomNumeric(r: Range): Unit = try {
+    failAfter(1 seconds) {
+
+     object mynum extends Numeric[Int] { 
+        // Members declared in scala.math.Numeric
+        def fromInt(x: Int): Int = ???
+        def minus(x: Int,y: Int): Int = ???
+        def negate(x: Int): Int = ???
+        def plus(x: Int,y: Int): Int = math.min(x,y)
+        def times(x: Int,y: Int): Int = ???
+        def toDouble(x: Int): Double = ???
+        def toFloat(x: Int): Float = ???
+        def toInt(x: Int): Int = ???
+        def toLong(x: Int): Long = ???
+        override def zero = Int.MaxValue
+        override def one = ???
+        
+        // Members declared in scala.math.Ordering
+        def compare(x: Int,y: Int): Int = ???
+      }
+
+      val pr = r.toPar
+      val px = pr.sum(mynum,scheduler)
+      val x = if (r.isEmpty) Int.MaxValue else  r.min
+      assert(x == px,  x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("sumCustomNumeric") {
+    testSumWithCustomNumeric(0 until 0)
+    runForSizes(testSumWithCustomNumeric)
+  }
+
   def testProduct(r: Range): Unit = try {
     failAfter(1 seconds) {
 
@@ -144,6 +180,43 @@ class RangeTest extends FunSuite with Timeouts {
     runForSizes(testProduct)
   }
 
+  def testProductWithCustomNumeric(r: Range): Unit = try {
+    failAfter(1 seconds) {
+
+     object mynum extends Numeric[Int] { 
+        // Members declared in scala.math.Numeric
+        def fromInt(x: Int): Int = ???
+        def minus(x: Int,y: Int): Int = ???
+        def negate(x: Int): Int = ???
+        def plus(x: Int,y: Int): Int = ???
+        def times(x: Int,y: Int): Int = math.max(x,y)
+        def toDouble(x: Int): Double = ???
+        def toFloat(x: Int): Float = ???
+        def toInt(x: Int): Int = ???
+        def toLong(x: Int): Long = ???
+        override def zero = ???
+        override def one = Int.MinValue
+        
+        // Members declared in scala.math.Ordering
+        def compare(x: Int,y: Int): Int = ???
+      }
+
+      val pr = r.toPar
+      val px = pr.product(mynum,scheduler)
+      val x = if (r.isEmpty) Int.MinValue else r.max
+      assert(x == px,  x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("ProductCustomNumeric") {
+    testProductWithCustomNumeric(0 until 0)
+    runForSizes(testProductWithCustomNumeric)
+  }
+
+
   def testMin(r: Range): Unit = try {
     failAfter(1 seconds) {
       val x = r.min
@@ -159,11 +232,27 @@ class RangeTest extends FunSuite with Timeouts {
   }
 
   test("min") {
-  /*  intercept[UnsupportedOperationException] {
-      testMin(0)
-    } */
+    runForSizes(testMin)
+  }
 
+  def testMinCustomOrdering(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      object myOrd extends Ordering[Int]  {
+        def compare(x:Int, y:Int) = if(x<y) 1 else if(x>y) -1 else 0
+     }
+      val x = r.max
 
+      val pr = r.toPar
+      val px = pr.min(myOrd, scheduler)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("minCustomOrdering") {
     runForSizes(testMin)
   }
 
@@ -183,10 +272,28 @@ class RangeTest extends FunSuite with Timeouts {
   }
 
   test("max") {
-  /*  intercept[UnsupportedOperationException] {
-      testMax(0)
-    } */
     runForSizes(testMax)
+  }
+
+  def testMaxCustomOrdering(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      object myOrd extends Ordering[Int]  {
+        def compare(x:Int, y:Int) = if(x<y) 1 else if(x>y) -1 else 0
+     }
+      val x = r.min
+
+      val pr = r.toPar
+      val px = pr.max(myOrd, scheduler)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("maxCustomOrdering") {
+    runForSizes(testMin)
   }
 
 }
