@@ -19,11 +19,16 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
   /* generators */
 
   val sizes = Gen.enumeration("size")(500000, 1000000, 1500000)
+  val concs = for (size <- sizes) yield {
+    var conc: Conc[Int] = Conc.Zero
+    for (i <- 0 until size) conc = conc <> i
+    conc
+  }
 
   performance of "Conc" in {
 
-    measure method "<>" config(
-      exec.benchRuns -> 25,
+    measure method "<>(T)" config(
+      exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
     ) in {
@@ -56,22 +61,22 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "Buffer" config(
-      exec.benchRuns -> 25,
+    performance of "Buffer" config(
+      exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
     ) in {
       using(sizes) curve("VectorBuffer") in { sz =>
-        var vb = new collection.immutable.VectorBuilder[Unit]()
+        val vb = new collection.immutable.VectorBuilder[Unit]()
         var i = 0
-        while (i < sz) {
+        while (i < sz * 2) {
           vb += ()
           i += 1
         }
       }
 
       using(sizes) curve("Conc.Buffer") in { sz =>
-        var cb = new Conc.Buffer[Int]
+        val cb = new Conc.Buffer[Int]
         var i = 0
         while (i < sz) {
           cb += i
@@ -80,6 +85,50 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
+    measure method "<>(Conc[T])" config(
+      exec.benchRuns -> 35,
+      exec.independentSamples -> 5,
+      exec.jvmflags -> "-XX:+UseCondCardMark"
+    ) in {
+      using(concs) curve("Conc") in { conc =>
+        var i = 0
+        while (i < 10000) {
+          conc <> conc
+          i += 1
+        }
+      }
+    }
+
+    performance of "append-normalize-merge" config(
+      exec.benchRuns -> 35,
+      exec.independentSamples -> 5,
+      exec.jvmflags -> "-XX:+UseCondCardMark"
+    ) in {
+      using(sizes) curve("Conc") in { sz =>
+        import Conc._
+
+        // build
+        var conc: Conc[Int] = Zero
+        var i = 0
+        while (i < sz) {
+          conc = conc <> i
+          i += 1
+        }
+
+        // normalize and merge
+        i = 0
+        while (i < 10000) {
+          conc <> conc
+          i += 1
+        }
+      }
+    }
+
   }
 
 }
+
+
+
+
+

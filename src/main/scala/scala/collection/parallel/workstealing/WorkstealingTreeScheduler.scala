@@ -87,9 +87,25 @@ object WorkstealingTreeScheduler {
 
   object Config {
     class Default(val parallelismLevel: Int) extends Config {
+      def runtimeParameters: Seq[String] = {
+        import java.lang.management.ManagementFactory
+        import java.lang.management.RuntimeMXBean
+        import scala.collection.JavaConversions._
+        val bean = ManagementFactory.getRuntimeMXBean()
+        bean.getInputArguments()
+      }
+
       def this() = this(Runtime.getRuntime.availableProcessors)
+      
       def incrementStepFrequency = 1
-      def maximumStep = 4096
+      
+      def maximumStep = {
+        if (
+          scala.util.Properties.isJavaAtLeast("1.7") &&
+          runtimeParameters.contains("-XX:+UseCondCardMark")
+        ) 4096 else 1000000
+      }
+
       def stealingStrategy = FindMax
     }
   }

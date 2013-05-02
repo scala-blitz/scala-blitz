@@ -28,8 +28,10 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
   performance of "Par[Range]" in {
 
     measure method "fold" config(
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
+      exec.minWarmupRuns -> 20,
+      exec.maxWarmupRuns -> 50,
+      exec.benchRuns -> 30,
+      exec.independentSamples -> 6,
       exec.jvmflags -> "-XX:+UseCondCardMark"
     ) in {
       using(ranges) curve("Sequential") in { r =>
