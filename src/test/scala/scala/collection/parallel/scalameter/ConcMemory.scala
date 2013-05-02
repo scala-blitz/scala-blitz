@@ -60,6 +60,16 @@ class ConcMemory extends PerformanceTest.Regression with Serializable {
         }
         conc
       }
+
+      using(sizes) curve("Buffer") in { sz =>
+        val cb = new Conc.Buffer[Int]
+        var i = 0
+        while (i < sz) {
+          cb += i
+          i += 1
+        }
+        cb
+      }
     }
   }
 
