@@ -17,7 +17,7 @@ object BuildSettings {
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % "2.10.1"
       , "org.scalatest" %% "scalatest" % "1.9.1" % "test"
-      , "com.github.axel22" %% "scalameter" % "0.4-M1"
+      //, "com.github.axel22" %% "scalameter" % "0.4-M1"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
     logBuffered := false
@@ -81,13 +81,13 @@ object WorkstealingBuild extends Build {
   
   /* projects */
 
-  //lazy val scalameter = RootProject(uri("git://github.com/axel22/scalameter.git"))
+  lazy val scalameter = RootProject(uri("git://github.com/axel22/scalameter.git"))
   
   lazy val root = Project(
     "root",
     file("."),
     settings = BuildSettings.buildSettings ++ Seq(benchTask, javaCommandSetting, benchVerboseTask)
-  )// dependsOn (scalameter)
+  ) dependsOn (scalameter)
 
 }
 
