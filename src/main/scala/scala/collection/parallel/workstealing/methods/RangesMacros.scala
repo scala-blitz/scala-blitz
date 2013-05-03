@@ -10,7 +10,7 @@ import collection.parallel.workstealing._
 
 object RangesMacros {
 
-  private final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
+ final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
   /* macro implementations */
 
   def fold[U >: Int: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
