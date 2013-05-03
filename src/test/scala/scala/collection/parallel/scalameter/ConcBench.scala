@@ -25,9 +25,11 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
     conc
   }
 
+  /* tests */
+
   performance of "Conc" in {
 
-    measure method "<>(T)" config(
+    measure method "append-element" config(
       exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"
@@ -69,8 +71,17 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       using(sizes) curve("VectorBuffer") in { sz =>
         val vb = new collection.immutable.VectorBuilder[Unit]()
         var i = 0
-        while (i < sz * 2) {
+        while (i < sz) {
           vb += ()
+          i += 1
+        }
+      }
+
+      using(sizes) curve("ArrayBuffer") in { sz =>
+        val ab = new collection.mutable.ArrayBuffer[Unit]()
+        var i = 0
+        while (i < sz) {
+          ab += ()
           i += 1
         }
       }
@@ -85,7 +96,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "<>(Conc[T])" config(
+    measure method "merge" config(
       exec.benchRuns -> 35,
       exec.independentSamples -> 5,
       exec.jvmflags -> "-XX:+UseCondCardMark"

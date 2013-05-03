@@ -363,7 +363,7 @@ object Conc {
     def this() = this(Zero, new Array[T](INITIAL_SIZE), 0)
 
     private def pack() {
-      if (lastSize > 0) conc = conc <> new Chunk(lastChunk, lastSize)
+      if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
     }
 
     def clear() = {
