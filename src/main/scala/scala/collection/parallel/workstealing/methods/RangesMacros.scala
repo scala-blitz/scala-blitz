@@ -10,6 +10,7 @@ import collection.parallel.workstealing._
 
 object RangesMacros {
 
+  private final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
   /* macro implementations */
 
   def fold[U >: Int: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
@@ -47,30 +48,45 @@ object RangesMacros {
     import c.universe._
 
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
-    val zero = reify {
+    val (zerov, zerog) = c.functionExpr2Local[U](reify {
       numg.splice.zero
-    }
+    })
+    val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val op = reify {
       (x: U, y: U) => numg.splice.plus(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
 
-    invokeKernel[U, U, U](c)(lv, numv)(zero)(oper)(a0RetrunZero(c), a1Sum[U](c)(oper), aNSum[U](c)(oper))(ctx)(true)
+    val computator = invokeKernel[U, U, U](c)(lv, numv, zerov)(zerog)(oper)(a0RetrunZero(c), a1Sum[U](c)(oper), aNSum[U](c)(oper))(ctx)(true)
+    reify {
+      if (HAND_OPTIMIZATIONS_ENABLED && (num.splice eq scala.math.Numeric.IntIsIntegral)) {
+        val range = calleeExpression.splice.r
+        
+        if(range.isEmpty) 0 else  (range.numRangeElements.toLong * (range.head + range.last) / 2).toInt
+      } else { computator.splice }
+    }
+
   }
 
   def product[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
-    val zero = reify {
+    val (zerov, zerog) = c.functionExpr2Local[U](reify {
       numg.splice.one
-    }
+    })
     val op = reify {
       (x: U, y: U) => numg.splice.times(x, y)
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
+    val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
 
-    invokeKernel[U, U, U](c)(lv, numv)(zero)(oper)(a0RetrunZero(c), a1Sum[U](c)(oper), aNSum[U](c)(oper))(ctx)(true)
+    val computator = invokeKernel[U, U, U](c)(lv, numv, zerov)(zerog)(oper)(a0RetrunZero(c), a1Sum[U](c)(oper), aNSum[U](c)(oper))(ctx)(true)
+    reify {
+      if (HAND_OPTIMIZATIONS_ENABLED && (num.splice eq scala.math.Numeric.IntIsIntegral) && (calleeExpression.splice.r.containsSlice(1 to 34) || (calleeExpression.splice.r.contains(0)))) {
+        0
+      } else { computator.splice }
+    }
   }
 
   def count(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
@@ -107,8 +123,16 @@ object RangesMacros {
         else oper.splice(a.asInstanceOf[Int], b.asInstanceOf[Int])
       }
     }
+    val computator = invokeKernel[Int, Any, Int](c)(lv, ordv)(zero)(combine)(a0RetrunZero(c), a1Sum[Any](c)(combine), aNSum[Any](c)(combine))(ctx)(false)
+    val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
 
-    invokeKernel[Int, Any, Int](c)(lv, ordv)(zero)(combine)(a0RetrunZero(c), a1Sum[Any](c)(combine), aNSum[Any](c)(combine))(ctx)(false)
+    reify {
+      if (HAND_OPTIMIZATIONS_ENABLED && (ord.splice eq Ordering.Int)) {
+        val range = calleeExpression.splice.r
+        if (range.step > 0) range.head
+        else range.last
+      } else { computator.splice }
+    }
   }
 
   def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
@@ -128,7 +152,17 @@ object RangesMacros {
       }
     }
 
-    invokeKernel[Int, Any, Int](c)(lv, ordv)(zero)(combine)(a0RetrunZero(c), a1Sum[Any](c)(combine), aNSum[Any](c)(combine))(ctx)(false)
+    val computator = invokeKernel[Int, Any, Int](c)(lv, ordv)(zero)(combine)(a0RetrunZero(c), a1Sum[Any](c)(combine), aNSum[Any](c)(combine))(ctx)(false)
+    val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
+
+    reify {
+      if (HAND_OPTIMIZATIONS_ENABLED && (ord.splice eq Ordering.Int)) {
+        val range = calleeExpression.splice.r
+        if (range.step < 0) range.head
+        else range.last
+      } else { computator.splice }
+    }
+
   }
 
   def a0RetrunZero[R: c.WeakTypeTag](c: Context): c.Expr[(Int, R) => R] = c.universe.reify { (at: Int, zero: R) => zero }
