@@ -353,14 +353,16 @@ object Conc {
   }
 
   val INITIAL_SIZE = 8
-  val MAX_SIZE = 4096
+  val DEFAULT_MAX_SIZE = 1024
 
-  class Buffer[@specialized T: ClassTag](c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
-    private var conc: Conc[T] = c
-    private var lastChunk: Array[T] = ch
-    private var lastSize: Int = sz
+  class Buffer[@specialized T: ClassTag](private[Conc] val maxChunkSize: Int, c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
+    private[Conc] var conc: Conc[T] = c
+    private[Conc] var lastChunk: Array[T] = ch
+    private[Conc] var lastSize: Int = sz
 
-    def this() = this(Zero, new Array[T](INITIAL_SIZE), 0)
+    def this(mcs: Int) = this(mcs, Zero, new Array[T](INITIAL_SIZE), 0)
+
+    def this() = this(DEFAULT_MAX_SIZE)
 
     private def pack() {
       if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
@@ -378,7 +380,7 @@ object Conc {
       this
     } else {
       val oldlength = lastChunk.length
-      val newlength = math.min(MAX_SIZE, oldlength * 2)
+      val newlength = math.min(maxChunkSize, oldlength * 2)
       pack()
       lastChunk = new Array[T](newlength)
       lastSize = 0
@@ -397,7 +399,7 @@ object Conc {
       that.pack()
 
       val resconc = this.conc <> that.conc
-      val res = new Buffer(resconc, new Array[T](INITIAL_SIZE), 0)
+      val res = new Buffer(maxChunkSize, resconc, new Array[T](INITIAL_SIZE), 0)
 
       this.clear()
       that.clear()

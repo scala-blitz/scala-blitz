@@ -64,8 +64,10 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
     }
 
     performance of "Buffer" config(
-      exec.benchRuns -> 35,
-      exec.independentSamples -> 5,
+      exec.minWarmupRuns -> 50,
+      exec.maxWarmupRuns -> 100,
+      exec.benchRuns -> 90,
+      exec.independentSamples -> 15,
       exec.jvmflags -> "-XX:+UseCondCardMark"
     ) in {
       using(sizes) curve("VectorBuffer") in { sz =>
