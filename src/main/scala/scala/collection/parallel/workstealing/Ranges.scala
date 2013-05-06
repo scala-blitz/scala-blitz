@@ -52,7 +52,7 @@ object Ranges {
     def newStealer(s: Int, u: Int) = new RangeStealer(range, s, u)
   }
 
-  abstract class RangeKernel[@specialized R] extends IndexedStealer.IndexedKernel[Int, R] {
+  abstract class RangeKernel[@specialized R, M <: R] extends IndexedStealer.IndexedKernel[Int, R] {
     def apply(node: Node[Int, R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[RangeStealer]
       val nextProgress = stealer.nextProgress
@@ -70,8 +70,8 @@ object Ranges {
       }
     }
     def apply0(at: Int): R
-    def apply1(from: Int, to: Int): R
-    def applyN(from: Int, to: Int, stride: Int): R
+    def apply1(from: Int, to: Int): M
+    def applyN(from: Int, to: Int, stride: Int): M
   }
 
   val EMPTY_RESULT = new AnyRef
