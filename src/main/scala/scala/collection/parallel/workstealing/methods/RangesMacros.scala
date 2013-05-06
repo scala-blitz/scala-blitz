@@ -10,7 +10,8 @@ import collection.parallel.workstealing._
 
 object RangesMacros {
 
- final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
+  final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
+
   /* macro implementations */
 
   def fold[U >: Int: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
@@ -24,8 +25,7 @@ object RangesMacros {
     val zero = reify { Ranges.EMPTY_RESULT }
 
     val (lv, oper: Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
-    val combine = reify { (a: Any, b: Any) =>
-      {
+    val combine = reify { (a: Any, b: Any) => {
         if (a == zero.splice) b
         else if (b == zero.splice) a
         else oper.splice(a.asInstanceOf[U], b.asInstanceOf[U])
@@ -116,8 +116,7 @@ object RangesMacros {
     }
     val zero = reify { Ranges.EMPTY_RESULT }
     val (lv, oper: Expr[(Int, Int) => Int]) = c.functionExpr2Local[(Int, Int) => Int](op)
-    val combine = reify { (a: Any, b: Any) =>
-      {
+    val combine = reify { (a: Any, b: Any) => {
         if (a == zero.splice) b
         else if (b == zero.splice) a
         else oper.splice(a.asInstanceOf[Int], b.asInstanceOf[Int])
@@ -166,8 +165,7 @@ object RangesMacros {
   }
 
   def a0RetrunZero[R: c.WeakTypeTag](c: Context): c.Expr[(Int, R) => R] = c.universe.reify { (at: Int, zero: R) => zero }
-  def a1Sum[R: c.WeakTypeTag](c: Context)(oper: c.Expr[(R, Int) => R]): c.Expr[(Int, Int, R) => R] = c.universe.reify { (from: Int, to: Int, zero: R) =>
-    {
+  def a1Sum[R: c.WeakTypeTag](c: Context)(oper: c.Expr[(R, Int) => R]): c.Expr[(Int, Int, R) => R] = c.universe.reify { (from: Int, to: Int, zero: R) => {
       val fin = if (from > to) from else to
       var i: Int = from + to - fin
       var sum: R = zero
@@ -178,8 +176,7 @@ object RangesMacros {
       sum
     }
   }
-  def aNSum[R: c.WeakTypeTag](c: Context)(oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, stride: Int, zero: R) =>
-    {
+  def aNSum[R: c.WeakTypeTag](c: Context)(oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, stride: Int, zero: R) => {
       var i = from
       var sum: R = zero
       if (stride > 0) {
@@ -210,7 +207,6 @@ object RangesMacros {
         val stealer = callee.stealer
         val kernel =
           new scala.collection.parallel.workstealing.Ranges.RangeKernel[R] {
-
             def zero = z.splice
             def combine(a: R, b: R) = combiner.splice.apply(a, b)
             def apply0(at: Int) = applyer0.splice.apply(at, zero)
