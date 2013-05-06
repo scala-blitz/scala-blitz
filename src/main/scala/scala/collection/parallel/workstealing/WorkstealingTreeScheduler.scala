@@ -103,7 +103,7 @@ object WorkstealingTreeScheduler {
         if (
           scala.util.Properties.isJavaAtLeast("1.7") &&
           runtimeParameters.contains("-XX:+UseCondCardMark")
-        ) 500000 else 1000000
+        ) 4096 else 1000000
       }
 
       def stealingStrategy = FindMax
