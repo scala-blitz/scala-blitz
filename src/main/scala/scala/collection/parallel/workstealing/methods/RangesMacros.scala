@@ -8,6 +8,8 @@ import scala.collection.parallel.generic._
 import collection.parallel.Par
 import collection.parallel.workstealing._
 
+
+
 object RangesMacros {
 
   final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("Range.HandOptimizations").map(_.toBoolean).getOrElse(true)
