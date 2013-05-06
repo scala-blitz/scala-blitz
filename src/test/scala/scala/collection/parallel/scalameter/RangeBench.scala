@@ -3,6 +3,8 @@ package scalameter
 
 import org.scalameter.api._
 
+
+
 class RangeBench extends PerformanceTest.Regression with Serializable {
   import Par._
   import workstealing.WorkstealingTreeScheduler
