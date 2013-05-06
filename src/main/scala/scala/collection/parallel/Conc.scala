@@ -178,7 +178,6 @@ object Conc {
       case c: <>[T] => Some((c.left, c.right))
       case a: Append[T] => Some((c.left, c.right))
       case p: Prepend[T] => Some((c.left, c.right))
-      case t: Top[T] => Some((c.left, c.right))
       case _ => None
     }
     def apply[T](left: Conc[T], right: Conc[T]): Conc[T] = {
@@ -341,15 +340,6 @@ object Conc {
         case _ => ???
       }
     }
-  }
-
-  final class Top[+T] private[Conc] (val prefix: Conc[T], val tree: Conc[T], val suffix: Conc[T]) extends Lazy[T] {
-    def left = if (prefix != Zero) prefix else tree
-    def right = if (prefix != Zero) new Top(Zero, tree, suffix) else suffix
-    val level = 1 + math.max(tree.level, math.max(prefix.level, suffix.level))
-    val size = prefix.size + tree.size + suffix.size
-    override def normalized = left.normalized <> right.normalized
-    override def toString = "Top(%d, %d)".format(level, size)
   }
 
   val INITIAL_SIZE = 8
