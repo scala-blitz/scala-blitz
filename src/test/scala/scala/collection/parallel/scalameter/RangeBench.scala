@@ -1,8 +1,6 @@
 package scala.collection.parallel
 package scalameter
 
-
-
 import org.scalameter.api._
 
 class RangeBench extends PerformanceTest.Regression with Serializable {
@@ -23,15 +21,14 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
   @transient lazy val s8 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(8))
 
+  val opts = Seq[(String, Any)](exec.minWarmupRuns -> 20,
+    exec.maxWarmupRuns -> 50,
+    exec.benchRuns -> 30,
+    exec.independentSamples -> 6,
+    exec.jvmflags -> "-server -Xms512m -Xmx512m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
+
   performance of "Par[Range]" in {
-
-    measure method "fold" config (
-      exec.minWarmupRuns -> 20,
-      exec.maxWarmupRuns -> 50,
-      exec.benchRuns -> 30,
-      exec.independentSamples -> 6,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "fold" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -72,11 +69,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "reduce" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "reduce" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -88,40 +81,36 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      // using(ranges) curve ("Par-1") in { r =>
-      //   import workstealing.Ops._
-      //   implicit val s = s1
-      //   val pr = r.toPar
-      //   pr.reduce(_ + _)
-      // }
+      using(ranges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.reduce(_ + _)
+      }
 
-      // using(ranges) curve ("Par-2") in { r =>
-      //   import workstealing.Ops._
-      //   implicit val s = s2
-      //   val pr = r.toPar
-      //   pr.reduce(_ + _)
-      // }
+      using(ranges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.reduce(_ + _)
+      }
 
-      // using(ranges) curve ("Par-4") in { r =>
-      //   import workstealing.Ops._
-      //   implicit val s = s4
-      //   val pr = r.toPar
-      //   pr.reduce(_ + _)
-      // }
+      using(ranges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.reduce(_ + _)
+      }
 
-      // using(ranges) curve ("Par-8") in { r =>
-      //   import workstealing.Ops._
-      //   implicit val s = s8
-      //   val pr = r.toPar
-      //   pr.reduce(_ + _)
-      // }
+      using(ranges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        pr.reduce(_ + _)
+      }
     }
 
-    measure method "aggregate" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "aggregate" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -162,11 +151,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "min" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "min" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -206,11 +191,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "max" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "max" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -250,11 +231,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "sum" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "sum" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
@@ -295,11 +272,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "product" config (
-      exec.benchRuns -> 25,
-      exec.independentSamples -> 5,
-      exec.jvmflags -> "-XX:+UseCondCardMark"
-    ) in {
+    measure method "product" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
         val to = r.last
