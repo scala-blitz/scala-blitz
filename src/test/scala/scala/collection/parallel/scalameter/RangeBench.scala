@@ -27,7 +27,7 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms512m -Xmx512m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
+    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
 
   performance of "Par[Range]" in {
     measure method "fold" config (opts: _*) in {
@@ -40,6 +40,13 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
           i += 1
         }
         if (sum == 0) ???
+      }
+
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          val sum = r.par.sum
+          if (sum == 0) ???
+        }
       }
 
       using(ranges) curve ("Par-1") in { r =>
@@ -83,6 +90,12 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.reduce(_ + _)
+        }
+      }
+
       using(ranges) curve ("Par-1") in { r =>
         import workstealing.Ops._
         implicit val s = s1
@@ -122,6 +135,12 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
           i += 1
         }
         if (sum == 0) ???
+      }
+
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.aggregate(0)(_ + _, _ + _)
+        }
       }
 
       using(ranges) curve ("Par-1") in { r =>
@@ -164,6 +183,12 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.min
+        }
+      }
+
       using(ranges) curve ("Par-1") in { r =>
         import workstealing.Ops._
         implicit val s = s1
@@ -201,6 +226,12 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         while (i <= to) {
           if (i > max) max = i
           i = i + 1
+        }
+      }
+
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.max
         }
       }
 
@@ -245,6 +276,12 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.sum
+        }
+      }
+
       using(ranges) curve ("Par-1") in { r =>
         import workstealing.Ops._
         implicit val s = s1
@@ -284,6 +321,11 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
           i += 1
         }
         if (sum == 1) ???
+      }
+      performance of "extra" in {
+        using(ranges) curve ("old") in { r =>
+          r.par.product
+        }
       }
 
       using(ranges) curve ("Par-1") in { r =>
