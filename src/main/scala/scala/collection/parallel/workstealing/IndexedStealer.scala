@@ -7,10 +7,8 @@ import scala.annotation.tailrec
 
 
 
-abstract class IndexedStealer[@specialized T](val startIndex: Int, val untilIndex: Int) extends PreciseStealer[T] {
+abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends PreciseStealer[T] {
   import IndexedStealer._
-
-  type StealerType <: IndexedStealer[T]
 
   @volatile var progress: Int = startIndex
   var nextProgress: Int = _
@@ -20,16 +18,12 @@ abstract class IndexedStealer[@specialized T](val startIndex: Int, val untilInde
   final def WRITE_PROGRESS(nv: Int) = unsafe.putIntVolatile(this, PROGRESS_OFFSET, nv)
   final def CAS_PROGRESS(ov: Int, nv: Int) = unsafe.compareAndSwapInt(this, PROGRESS_OFFSET, ov, nv)
 
-  def newStealer(start: Int, until: Int): StealerType
-
   final def state: Stealer.State = {
     val p_t0 = READ_PROGRESS
     if (p_t0 == untilIndex) Stealer.Completed
     else if (p_t0 < 0) Stealer.StolenOrExpanded
     else Stealer.AvailableOrOwned
   }
-
-  def hasNext: Boolean = nextProgress < nextUntil
 
   @tailrec final def advance(step: Int): Int = {
     val p_t0 = READ_PROGRESS
@@ -66,21 +60,9 @@ abstract class IndexedStealer[@specialized T](val startIndex: Int, val untilInde
     }
   }
 
-  def psplit(leftsize: Int): (StealerType, StealerType) = {
-    val p = decode(READ_PROGRESS)
-    val mid = math.min(p + leftsize, untilIndex)
-
-    val left = newStealer(p, mid)
-    val right = newStealer(mid, untilIndex)
-
-    (left, right)
-  }
-
-  def split: (StealerType, StealerType) = psplit(elementsRemainingEstimate / 2)
-
   def elementsRemainingEstimate: Int = untilIndex - decode(READ_PROGRESS)
 
-  private def decode(p: Int) = if (p >= 0) p else -p - 1
+  protected def decode(p: Int) = if (p >= 0) p else -p - 1
 
   override def toString = {
     val p = READ_PROGRESS
@@ -95,6 +77,27 @@ object IndexedStealer {
   import WorkstealingTreeScheduler._
 
   val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[IndexedStealer[_]].getDeclaredField("progress"))
+
+  abstract class Flat[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
+    type StealerType <: IndexedStealer[T]
+
+    def newStealer(start: Int, until: Int): StealerType
+
+    def hasNext: Boolean = nextProgress < nextUntil
+
+    def psplit(leftsize: Int): (StealerType, StealerType) = {
+      val p = decode(READ_PROGRESS)
+      val mid = math.min(p + leftsize, untilIndex)
+  
+      val left = newStealer(p, mid)
+      val right = newStealer(mid, untilIndex)
+  
+      (left, right)
+    }
+  
+    def split: (StealerType, StealerType) = psplit(elementsRemainingEstimate / 2)
+
+  }
 
   trait IndexedKernel[@specialized T, @specialized R] extends Kernel[T, R] {
     override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {

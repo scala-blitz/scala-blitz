@@ -31,7 +31,7 @@ object Ranges {
 
   import WorkstealingTreeScheduler.{ Kernel, Node }
 
-  class RangeStealer(val range: collection.immutable.Range, start: Int, end: Int) extends IndexedStealer[Int](start, end) {
+  class RangeStealer(val range: collection.immutable.Range, start: Int, end: Int) extends IndexedStealer.Flat[Int](start, end) {
     type StealerType = RangeStealer
 
     var padding8: Int = _

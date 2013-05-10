@@ -145,22 +145,26 @@ object Conc {
     override def toString(depth: Int) = (" " * depth) + this
   }
 
-  abstract class Leaf[+T] extends Conc[T] {
+  trait Leaf[@specialized +T] extends Conc[T] {
     override def toString(depth: Int) = (" " * depth) + this
+
+    def elementAt(idx: Int): T
   }
 
-  final case class Single[@specialized T](elem: T) extends Leaf[T] {
+  final case class Single[@specialized(Int, Long, Float, Double) T](elem: T) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Single.left")
     def right = throw new UnsupportedOperationException("Single.right")
     def size = 1
     def level = 0
+    def elementAt(idx: Int) = elem
   }
 
-  final case class Chunk[@specialized T](elems: Array[T], size: Int) extends Leaf[T] {
+  final case class Chunk[@specialized(Int, Long, Float, Double) T](elems: Array[T], size: Int) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Chunk.left")
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
-    override def toString = "Chunk(%s, %d)".format(elems, size)
+    def elementAt(idx: Int) = elems(idx)
+    override def toString = "Chunk(%s; %d)".format(elems.take(10).mkString(", "), size)
   }
 
   final class <>[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
@@ -345,7 +349,7 @@ object Conc {
   val INITIAL_SIZE = 8
   val DEFAULT_MAX_SIZE = 1024
 
-  class Buffer[@specialized T: ClassTag](private[Conc] val maxChunkSize: Int, c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
+  class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](private[Conc] val maxChunkSize: Int, c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
     private[Conc] var conc: Conc[T] = c
     private[Conc] var lastChunk: Array[T] = ch
     private[Conc] var lastSize: Int = sz

@@ -18,6 +18,10 @@ trait Stealer[@specialized T] {
    */
   def state: Stealer.State
 
+  /** A shortcut method that checks if the stealer is in the available state.
+   */
+  def isAvailable = state == Stealer.AvailableOrOwned
+
   /** Commits to processing a block of elements by using `next` and `hasNext`.
    *
    *  Once `hasNext` has returned `false`, `advance` can be called again.

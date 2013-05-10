@@ -8,6 +8,8 @@ import scala.collection.parallel.generic._
 import collection.parallel.Par
 import collection.parallel.workstealing._
 
+
+
 object RangesMacros {
 
   final val HAND_OPTIMIZATIONS_ENABLED = sys.props.get("scala.collection.parallel.range.manual_optimizations").map(_.toBoolean).getOrElse(true)
@@ -223,8 +225,8 @@ object RangesMacros {
         val result = ctx.splice.invokeParallelOperation(stealer, kernel)
         (kernel, result)
       }
-    val newChildren = initializer.flatMap { initilizer =>
-      val origTree = initilizer.tree
+    val newChildren = initializer.flatMap { initializer =>
+      val origTree = initializer.tree
       if (origTree.isDef) List(origTree) else origTree.children
     }.toList
 

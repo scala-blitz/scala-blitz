@@ -3,12 +3,157 @@ package workstealing
 
 
 
+import scala.annotation.tailrec
 
 
 
 object Concs {
 
+  trait Scope {
+    implicit def concOps[T](a: Par[Conc[T]]) = ???
+    
+    implicit def conc2zippable[T](a: Par[Conc[T]]) = ???
+  }
   
+  /* stealer implementation */
+
+  class ConcStealer[@specialized(Int, Long, Float, Double) T](val conc: Conc[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
+    val stack = new Array[Conc[T]](conc.level + 1)
+    var depth = 0
+    var idx = 0
+    var leaf: Conc.Leaf[Any] = null // to circumvent a specialization bug where the wrong field is assigned in the non-specialized `init`
+
+    var padding12: Int = _
+    var padding13: Int = _
+    var padding14: Int = _
+    var padding15: Int = _
+
+    private def init() {
+      stack(0) = conc
+      while (stack(depth).level != 0) {
+        depth += 1
+        stack(depth) = stack(depth - 1).left
+      }
+      if (stack(depth).isInstanceOf[Conc.Leaf[_]]) {
+        leaf = stack(depth).asInstanceOf[Conc.Leaf[T]]
+      }
+      if (leaf != null) moveN(startIndex)
+    }
+
+    init()
+
+    private def push(v: Conc[T]) {
+      depth += 1
+      stack(depth) = v
+    }
+
+    private def pop() = if (depth >= 0) {
+      val t = stack(depth)
+      depth -= 1
+      t
+    } else null
+
+    private def peek = if (depth >= 0) stack(depth) else null
+
+    private def move0(): Unit = {
+      if (idx >= leaf.size) {
+        pop()
+        if (peek != null) {
+          val inner = pop()
+          push(inner.right)
+          while (peek.level != 0) push(peek.left)
+        }
+        leaf = peek.asInstanceOf[Conc.Leaf[T]]
+        idx = 0
+      }
+    }
+
+    private[parallel] def move1(): Unit = {
+      idx += 1
+      nextProgress += 1
+      move0()
+    }
+
+    private[parallel] def moveN(numElems: Int): Unit = {
+      @tailrec def moveUp(num: Int): Int = {
+        val inner = pop()
+        if (inner == null) 0
+        else if (inner.right.size > num) {
+          push(inner.right)
+          num
+        } else {
+          moveUp(num - inner.right.size)
+        }
+      }
+      @tailrec def moveDown(num: Int): Int = {
+        val inner = peek
+        if (inner != null) {
+          if (inner.level == 0) num
+          else if (inner.left.size < num) {
+            pop()
+            push(inner.right)
+            moveDown(num - inner.left.size)
+          } else {
+            push(inner.left)
+            moveDown(num)
+          }
+        } else num
+      }
+
+      val remElems = math.min(leaf.size - idx, numElems)
+      idx += numElems
+      if (idx >= leaf.size) {
+        pop()
+        val afterUp = moveUp(numElems - remElems)
+        val afterDown = moveDown(afterUp)
+        leaf = peek.asInstanceOf[Conc.Leaf[Any]]
+        idx = afterDown
+        if (leaf != null) move0()
+      }
+      nextProgress += numElems
+    }
+
+    def next(): T = if (hasNext) {
+      val res = leaf.asInstanceOf[Conc.Leaf[T]].elementAt(idx)
+      move1()
+      res
+    } else throw new NoSuchElementException
+  
+    def hasNext: Boolean = nextProgress < nextUntil
+  
+    def split: (ConcStealer[T], ConcStealer[T]) = {
+      val total = elementsRemainingEstimate
+      psplit(total / 2)
+    }
+  
+    def psplit(leftSize: Int): (ConcStealer[T], ConcStealer[T]) = {
+      val ls = decode(READ_PROGRESS)
+      val lu = ls + leftSize
+      val rs = lu
+      val ru = untilIndex
+
+      (new ConcStealer[T](conc, ls, lu), new ConcStealer[T](conc, rs, ru))
+    }
+  }
+
+  // abstract class ConcKernel[@specialized T, @specialized R, M <: R] extends IndexedStealer.IndexedKernel[T, R] {
+  //   def apply(node: Node[Int, R], chunkSize: Int): R = {
+  //     val stealer = node.stealer.asInstanceOf[RangeStealer]
+  //     val nextProgress = stealer.nextProgress
+  //     val nextUntil = stealer.nextUntil
+  //     val range = stealer.range
+  //     val from = range.apply(nextProgress)
+
+  //     if (nextProgress == nextUntil) apply0(from)
+  //     else {
+  //       val to = range.apply(nextUntil - 1)
+  //       val step = range.step
+
+  //       if (step == 1) apply1(from, to)
+  //       else applyN(from, to, step)
+  //     }
+  //   }
+  // }
 
 }
 

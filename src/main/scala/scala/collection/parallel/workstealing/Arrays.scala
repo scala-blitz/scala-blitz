@@ -14,6 +14,6 @@ object Arrays {
     implicit def array2zippable[T](a: Par[Array[T]]) = ???
   }
 
-  // manual array ops specializations
+  // array ops implementations
 
 }
