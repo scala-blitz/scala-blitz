@@ -218,9 +218,9 @@ object RangesMacros {
           new scala.collection.parallel.workstealing.Ranges.RangeKernel[REDUCE, M] {
             def zero = z.splice
             def combine(a: REDUCE, b: REDUCE) = combiner.splice.apply(a, b)
-            def apply0(at: Int) = applyer0.splice.apply(at, zero)
-            def apply1(from: Int, to: Int) = applyer1.splice.apply(from, to, zero)
-            def applyN(from: Int, to: Int, stride: Int) = applyerN.splice.apply(from, to, stride, zero)
+            def apply0(node: WorkstealingTreeScheduler.Node[Int, REDUCE], at: Int) = applyer0.splice.apply(at, zero)
+            def apply1(node: WorkstealingTreeScheduler.Node[Int, REDUCE], from: Int, to: Int) = applyer1.splice.apply(from, to, zero)
+            def applyN(node: WorkstealingTreeScheduler.Node[Int, REDUCE], from: Int, to: Int, stride: Int) = applyerN.splice.apply(from, to, stride, zero)
           }
         val result = ctx.splice.invokeParallelOperation(stealer, kernel)
         (kernel, result)
@@ -241,6 +241,67 @@ object RangesMacros {
       val res = result.splice
       if (res._2 == res._1.zero) throw new java.lang.UnsupportedOperationException("result is empty")
       else res._2.asInstanceOf[RESULT]
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+  def reduce2[U >: Int: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+    import c.universe._
+
+    val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
+    val result =
+      reify {
+        import scala.collection.parallel.workstealing._
+        val callee = calleeExpression.splice
+        val stealer = callee.stealer
+        val kernel = 
+          new scala.collection.parallel.workstealing.Ranges.RangeKernel[ResultCell[U], ResultCell[U]] {
+            override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[Int, ResultCell[U]], node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]]) {
+              node.WRITE_INTERMEDIATE(new ResultCell[U])
+            }
+            def zero = new ResultCell[U]
+            def combine(a: ResultCell[U], b: ResultCell[U]) = {
+              if (a eq b) a
+              //else if (a eq EmptyCell) b
+              //else if (b eq EmptyCell) a
+              else {
+                a.result = op.splice(a.result, b.result)
+                a
+              }
+            }
+            def apply0(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], at: Int) = zero
+            def apply1(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int) = {
+              val cell = node.READ_INTERMEDIATE
+              var sum = cell.result
+              var i = from
+              while (i < to) {
+                sum = op.splice(sum, i)
+                i += 1
+              }
+              cell.result = sum
+              cell
+            }
+            def applyN(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int, stride: Int) = {
+              val cell = node.READ_INTERMEDIATE
+              var sum = cell.result
+              var i = from
+              while (i < to) {
+                sum = op.splice(sum, i)
+                i += stride
+              }
+              cell.result = sum
+              cell
+            }
+          }
+        val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+        (kernel, result)
+      }
+
+    val operation = reify {
+      val res = result.splice
+      if (res._2 == null) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      else res._2.result
     }
 
     c.inlineAndReset(operation)

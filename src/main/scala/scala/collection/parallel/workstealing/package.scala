@@ -25,6 +25,12 @@ package object workstealing {
     }
   }
 
+  class ResultCell[@specialized T] {
+    var result: T = _
+  }
+
+  val EmptyCell = new ResultCell[Nothing]
+
   /* macro utilities */
 
   implicit def Util(context: Context) = new Util[context.type](context)
