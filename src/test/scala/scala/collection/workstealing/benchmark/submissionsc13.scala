@@ -906,16 +906,16 @@ object RaytracingPC extends StatisticsBenchmark {
 
 /* vector addition */
 
-object VectorAdditionSpecific extends StatisticsBenchmark {
+object ScalarProductSpecific extends StatisticsBenchmark {
 
  class Vector(val size: Int) {
-    val array = new Array[Double](size)
+    val array = new Array[Float](size)
     def scalar(that: Vector) {
       val range = new ParRange(0 until size, Workstealing.DefaultConfig)
       val a = this.array
       val b = that.array
-      range.aggregate(0.0)(_ + _) {
-        (sum, i) => sum + a(i) * b(i)
+      range.aggregate(0.f)(_ + _) {
+       (sum, i) => sum + a(i) * b(i)
       }
     }
   }
