@@ -17,7 +17,7 @@ object Ranges {
 
   class Ops(val r: collection.immutable.Range) extends AnyVal with Zippable.OpsLike[Int, Par[collection.immutable.Range]] {
     def stealer: Stealer[Int] = new RangeStealer(r, 0, r.length)
-    override def reduce[U >: Int](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce2[U]
+    override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
     def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
@@ -52,7 +52,7 @@ object Ranges {
     def newStealer(s: Int, u: Int) = new RangeStealer(range, s, u)
   }
 
-  abstract class RangeKernel[@specialized R, M <: R] extends IndexedStealer.IndexedKernel[Int, R] {
+  abstract class RangeKernel[@specialized R] extends IndexedStealer.IndexedKernel[Int, R] {
     def apply(node: Node[Int, R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[RangeStealer]
       val nextProgress = stealer.nextProgress
@@ -70,8 +70,8 @@ object Ranges {
       }
     }
     def apply0(node: Node[Int, R], at: Int): R
-    def apply1(node: Node[Int, R], from: Int, to: Int): M
-    def applyN(node: Node[Int, R], from: Int, to: Int, stride: Int): M
+    def apply1(node: Node[Int, R], from: Int, to: Int): R
+    def applyN(node: Node[Int, R], from: Int, to: Int, stride: Int): R
   }
 
   val EMPTY_RESULT = new AnyRef

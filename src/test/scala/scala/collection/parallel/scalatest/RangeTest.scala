@@ -52,7 +52,7 @@ class RangeTest extends FunSuite with Timeouts {
       val pr = r.toPar
       val px = pr.reduce(_ + _)
 
-      assert(x == px, x + ", " + px)
+      assert(x == px, r + ".reduce: " + x + ", " + px)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -68,7 +68,6 @@ class RangeTest extends FunSuite with Timeouts {
 
   def testFold(r: Range): Unit = try {
     failAfter(1 seconds) {
-
       val x = r.fold(0)(_ + _)
 
       val pr = r.toPar
@@ -126,7 +125,6 @@ class RangeTest extends FunSuite with Timeouts {
 
   def testSumWithCustomNumeric(r: Range): Unit = try {
     failAfter(1 seconds) {
-
       object mynum extends Numeric[Int] {
         // Members declared in scala.math.Numeric
         def fromInt(x: Int): Int = ???
@@ -162,7 +160,6 @@ class RangeTest extends FunSuite with Timeouts {
 
   def testProduct(r: Range): Unit = try {
     failAfter(1 seconds) {
-
       val x = r.product
 
       val pr = r.toPar
@@ -250,20 +247,19 @@ class RangeTest extends FunSuite with Timeouts {
     case e: exceptions.TestFailedDueToTimeoutException =>
       assert(false, "timeout for range: " + r)
   }
-
+  
   test("minCustomOrdering") {
     runForSizes(testMin)
   }
-
+  
   def testMax(r: Range): Unit = try {
     failAfter(1 seconds) {
-
       val x = r.max
 
       val pr = r.toPar
       val px = pr.max
 
-      assert(x == px, x + ", " + px)
+      assert(x == px, r + ": " + x + ", " + px)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -292,7 +288,7 @@ class RangeTest extends FunSuite with Timeouts {
   }
 
   test("maxCustomOrdering") {
-    runForSizes(testMin)
+    runForSizes(testMaxCustomOrdering)
   }
 
 }

@@ -26,7 +26,14 @@ package object workstealing {
   }
 
   class ResultCell[@specialized T] {
-    var result: T = _
+    private var r: T = _
+    private var empty = true
+    def result: T = r
+    def result_=(v: T) = {
+      r = v
+      empty = false
+    }
+    def isEmpty = empty
   }
 
   val EmptyCell = new ResultCell[Nothing]

@@ -914,7 +914,7 @@ object ScalarProductSpecific extends StatisticsBenchmark {
       val range = new ParRange(0 until size, Workstealing.DefaultConfig)
       val a = this.array
       val b = that.array
-      range.aggregate(0.f)(_ + _) {
+      range.aggregate(0.0f)(_ + _) {
         (sum, i) => sum + a(i) * b(i)
       }
     }

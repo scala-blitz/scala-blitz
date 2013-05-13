@@ -23,11 +23,20 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
   @transient lazy val s8 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(8))
 
-  val opts = Seq[(String, Any)](exec.minWarmupRuns -> 20,
+  val opts = Seq[(String, Any)](
+    exec.minWarmupRuns -> 20,
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
+    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false"
+  )
+
+  val pcopts = Seq[(String, Any)](
+    exec.minWarmupRuns -> 2,
+    exec.maxWarmupRuns -> 4,
+    exec.benchRuns -> 4,
+    exec.independentSamples -> 1
+  )
 
   performance of "Par[Range]" in {
     measure method "fold" config (opts: _*) in {
@@ -42,8 +51,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           val sum = r.par.sum
           if (sum == 0) ???
         }
@@ -90,8 +99,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.reduce(_ + _)
         }
       }
@@ -137,8 +146,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.aggregate(0)(_ + _, _ + _)
         }
       }
@@ -183,8 +192,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.min
         }
       }
@@ -229,8 +238,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.max
         }
       }
@@ -276,8 +285,8 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.sum
         }
       }
@@ -322,8 +331,9 @@ class RangeBench extends PerformanceTest.Regression with Serializable {
         }
         if (sum == 1) ???
       }
-      performance of "extra" in {
-        using(ranges) curve ("old") in { r =>
+
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
           r.par.product
         }
       }
