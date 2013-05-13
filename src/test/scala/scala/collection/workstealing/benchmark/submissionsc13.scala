@@ -915,7 +915,7 @@ object ScalarProductSpecific extends StatisticsBenchmark {
       val a = this.array
       val b = that.array
       range.aggregate(0.f)(_ + _) {
-       (sum, i) => sum + a(i) * b(i)
+        (sum, i) => sum + a(i) * b(i)
       }
     }
   }
