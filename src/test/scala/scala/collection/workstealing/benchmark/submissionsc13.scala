@@ -503,6 +503,31 @@ object MandelbrotSpecific extends StatisticsBenchmark {
     }
   }
 
+  override def runBenchmark(noTimes: Int): List[Long] = {
+    val times = super.runBenchmark(noTimes)
+
+    // output png
+    import javax.imageio._
+    import java.awt.image._
+    import java.io._
+    val bi = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+    for (x <- 0 until size; y <- 0 until size) {
+      val iters = image(y * size + x)
+      if (iters == threshold) bi.setRGB(x, y, 0xff000000)
+      else {
+        val r = (1.0 * iters / threshold * 255).toInt
+        val g = (1.5 * iters / threshold * 255).toInt
+        val b = (3.0 * iters / threshold * 255).toInt
+        val a = 255
+        val color = (a << 24) | (r << 16) | (g << 8) | b
+        bi.setRGB(x, y, color)
+      }
+    }
+    ImageIO.write(bi, "png", new File("mandelbrot.png"))
+
+    times
+  }
+
 }
 
 
@@ -874,6 +899,33 @@ object RaytracingPC extends StatisticsBenchmark {
 
       image(idx) = Raytracing.compute(x0, y0, threshold)
     }
+  }
+
+}
+
+
+/* vector addition */
+
+object VectorAdditionSpecific extends StatisticsBenchmark {
+
+ class Vector(val size: Int) {
+    val array = new Array[Double](size)
+    def scalar(that: Vector) {
+      val range = new ParRange(0 until size, Workstealing.DefaultConfig)
+      val a = this.array
+      val b = that.array
+      range.aggregate(0.0)(_ + _) {
+        (sum, i) => sum + a(i) * b(i)
+      }
+    }
+  }
+
+  val size = sys.props("size").toInt
+  val a = new Vector(size)
+  val b = new Vector(size)
+
+  def run() {
+    a.scalar(b)
   }
 
 }
