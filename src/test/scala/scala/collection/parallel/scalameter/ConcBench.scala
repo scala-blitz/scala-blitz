@@ -143,10 +143,10 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    class SumKernel extends scala.collection.parallel.workstealing.Concs.ConcKernel[Int, Int] {
+    final class SumKernel extends scala.collection.parallel.workstealing.Concs.ConcKernel[Int, Int] {
       def zero = 0
       def combine(a: Int, b: Int) = a + b
-      def applyTree(t: Conc[Int], remaining: Int, acc: Int) = t match {
+      final def applyTree(t: Conc[Int], remaining: Int, acc: Int) = t match {
         case c: Conc.<>[Int] =>
           applyTree(c.left, remaining, acc)
           applyTree(c.right, remaining - c.left.size, acc)
@@ -157,7 +157,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         case _ =>
           ???
       }
-      def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int, acc: Int) = {
+      final def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int, acc: Int) = {
         var i = from
         val until = math.min(from + remaining, c.size)
         var a = c.elems
@@ -180,8 +180,8 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    class SequentialSum {
-      def sum(c: Conc[Int]): Int = c match {
+    final class SequentialSum {
+      final def sum(c: Conc[Int]): Int = c match {
         case c: Conc.Single[Int] =>
           c.elem
         case c: Conc.<>[Int] =>
