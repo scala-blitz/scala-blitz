@@ -145,6 +145,8 @@ object Concs {
 
   abstract class ConcKernel[@specialized(Int, Long, Float, Double) T, @specialized(Int, Long, Float, Double) R]
   extends IndexedStealer.IndexedKernel[T, R] {
+    override def defaultIncrementStepFactor = 4
+
     def apply(node: Node[T, R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[ConcStealer[T]]
       var remaining = stealer.nextUntil - stealer.nextProgress

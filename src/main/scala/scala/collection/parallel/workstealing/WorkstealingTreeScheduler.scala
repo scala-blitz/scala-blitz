@@ -81,6 +81,7 @@ object WorkstealingTreeScheduler {
   trait Config {
     def parallelismLevel: Int
     def incrementStepFrequency: Int
+    def incrementStepFactor: Int
     def maximumStep: Int
     def stealingStrategy: Strategy
   }
@@ -97,7 +98,9 @@ object WorkstealingTreeScheduler {
 
       def this() = this(Runtime.getRuntime.availableProcessors)
       
-      def incrementStepFrequency = 1
+      def incrementStepFrequency = -1
+
+      def incrementStepFactor = -1
       
       def maximumStep = {
         if (
@@ -214,6 +217,20 @@ object WorkstealingTreeScheduler {
       node.WRITE_INTERMEDIATE(res)
     }
 
+    def defaultIncrementStepFrequency = 1
+
+    def incrementStepFrequency(config: Config) = {
+      val isf = config.incrementStepFrequency
+      if (isf == -1) defaultIncrementStepFrequency else isf
+    }
+
+    def defaultIncrementStepFactor = 2
+
+    def incrementStepFactor(config: Config) = {
+      val isf = config.incrementStepFactor
+      if (isf == -1) defaultIncrementStepFactor else isf
+    }
+
     /** Returns true if completed with no stealing.
      *  Returns false if steal occurred.
      *
@@ -228,7 +245,8 @@ object WorkstealingTreeScheduler {
       beforeWorkOn(tree, node)
       var intermediate = node.READ_INTERMEDIATE
       var incCount = 0
-      val incFreq = config.incrementStepFrequency
+      val incFreq = incrementStepFrequency(config)
+      val incFact = incrementStepFactor(config)
       val ms = config.maximumStep
 
       // commit to processing chunks of the collection and process them until termination
@@ -245,7 +263,7 @@ object WorkstealingTreeScheduler {
   
           // update step
           incCount = (incCount + 1) % incFreq
-          if (incCount == 0) node.WRITE_STEP(math.min(ms, currstep * 2))
+          if (incCount == 0) node.WRITE_STEP(math.min(ms, currstep * incFact))
         } else looping = false
       }
 

@@ -270,7 +270,6 @@ object RangesMacros {
     }
   }
 
-
 }
 
 
