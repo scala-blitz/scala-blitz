@@ -145,7 +145,7 @@ object Conc {
     override def toString(depth: Int) = (" " * depth) + this
   }
 
-  trait Leaf[@specialized +T] extends Conc[T] {
+  trait Leaf[@specialized(Int, Long, Float, Double) +T] extends Conc[T] {
     override def toString(depth: Int) = (" " * depth) + this
 
     def elementAt(idx: Int): T
@@ -164,7 +164,7 @@ object Conc {
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
     def elementAt(idx: Int) = elems(idx)
-    override def toString = "Chunk(%s; %d)".format(elems.take(10).mkString(", "), size)
+    override def toString = "Chunk(%s%s; %d)".format(elems.take(10).mkString(", "), if (size > 10) ", ..." else "", size)
   }
 
   final class <>[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Conc[T] {

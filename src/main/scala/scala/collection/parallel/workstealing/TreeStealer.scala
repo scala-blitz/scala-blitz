@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 
 
 
-trait TreeStealer[@specialized(Char, Int, Long, Float, Double) T] extends PreciseStealer[T] {
+trait TreeStealer[@specialized(Int, Long, Float, Double) T] extends PreciseStealer[T] {
 
   // TODO
 

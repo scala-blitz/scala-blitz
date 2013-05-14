@@ -50,6 +50,7 @@ class ConcStealerTest extends FunSuite {
     for (i <- 0 until 10) f(i)
     for (i <- 10 until 100 by 10) f(i)
     for (i <- 100 until 1000 by 100) f(i)
+    for (i <- 1000 until 10000 by 1000) f(i)
   }
 
   test("stealer.traverse") {
@@ -132,6 +133,52 @@ class ConcStealerTest extends FunSuite {
 
   test("stealer.advance") {
     testSizes(testAdvance)
+  }
+
+  def testKernel(sz: Int) {
+    def test(c: Conc[Int]) {
+      val b = mutable.ArrayBuffer[Int]()
+      val stealer = new parallel.workstealing.Concs.ConcStealer[Int](c, 0, c.size)
+      val kernel = new parallel.workstealing.Concs.ConcKernel[Int, Unit] {
+        def zero = ()
+        def combine(a: Unit, b: Unit) = a
+        def applyTree(t: Conc[Int], remaining: Int, acc: Unit) = t match {
+          case c: Conc.Single[Int] =>
+            b += c.elem
+          case c: Conc.<>[Int] =>
+            applyTree(c.left, remaining, acc)
+            applyTree(c.right, remaining - c.left.size, acc)
+          case c: Conc.Chunk[Int] =>
+            applyChunk(c, 0, remaining, acc)
+          case _ =>
+            ???
+        }
+        def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int, acc: Unit) = {
+          b ++= c.elems.drop(from).take(remaining)
+        }
+      }
+      val node = new parallel.workstealing.WorkstealingTreeScheduler.Node[Int, Unit](null, null)(stealer)
+
+      val sizes = Array(c.size / 8, c.size / 8, c.size / 4, c.size - c.size / 8 * 2 - c.size / 4)
+      for (s <- sizes) {
+        stealer.advance(s)
+        kernel.apply(node, s)
+      }
+      assert(b == (0 until c.size))
+    }
+
+    val c = createConc(sz)
+    test(c)
+
+    val cf = createFlatConc(sz, 32)
+    test(cf)
+
+    val cf128 = createFlatConc(sz, 128)
+    test(cf128)
+  }
+
+  test("stealer.kernel") {
+    testSizes(testKernel)
   }
 
 }

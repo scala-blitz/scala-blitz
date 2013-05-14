@@ -24,6 +24,12 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
     for (i <- 0 until size) conc = conc <> i
     conc
   }
+  val normalizedConcs = for (conc <- concs) yield conc.normalized
+  val bufferConcs = for (size <- sizes) yield {
+    var cb = new Conc.Buffer[Int]
+    for (i <- 0 until size) cb += i
+    cb.result.normalized
+  }
 
   /* tests */
 
@@ -133,6 +139,115 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         while (i < 10000) {
           conc <> conc
           i += 1
+        }
+      }
+    }
+
+    class SumKernel extends scala.collection.parallel.workstealing.Concs.ConcKernel[Int, Int] {
+      def zero = 0
+      def combine(a: Int, b: Int) = a + b
+      def applyTree(t: Conc[Int], remaining: Int, acc: Int) = t match {
+        case c: Conc.<>[Int] =>
+          applyTree(c.left, remaining, acc)
+          applyTree(c.right, remaining - c.left.size, acc)
+        case c: Conc.Single[Int] =>
+          c.elem
+        case c: Conc.Chunk[Int] =>
+          applyChunk(c, 0, remaining, acc)
+        case _ =>
+          ???
+      }
+      def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int, acc: Int) = {
+        var i = from
+        val until = math.min(from + remaining, c.size)
+        var a = c.elems
+        var sum = 0
+        while (i < until) {
+          sum += a(i)
+          i += 1
+        }
+        sum
+      }
+
+      def sum(c: Conc[Int]) {
+        val stealer = new scala.collection.parallel.workstealing.Concs.ConcStealer[Int](c, 0, c.size)
+        val node = new scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node[Int, Int](null, null)(stealer)
+
+        while (stealer.isAvailable) {
+          stealer.advance(4096)
+          this.apply(node, c.size)
+        }
+      }
+    }
+
+    class SequentialSum {
+      def sum(c: Conc[Int]): Int = c match {
+        case c: Conc.Single[Int] =>
+          c.elem
+        case c: Conc.<>[Int] =>
+          sum(c.left) + sum(c.right)
+        case c: Conc.Chunk[Int] =>
+          var i = 0
+          val until = c.size
+          var a = c.elems
+          var sum = 0
+          while (i < until) {
+            sum += a(i)
+            i += 1
+          }
+          sum
+        case _ => sys.error(c.toString)
+      }
+    }
+
+    class StealerSum {
+      def sum(c: Conc[Int]) = {
+        val stealer = new scala.collection.parallel.workstealing.Concs.ConcStealer[Int](c, 0, c.size)
+        var sum = 0
+        stealer.advance(c.size)
+        while (stealer.hasNext) {
+          sum += stealer.next()
+        }
+        if (sum == 0) ???
+      }
+    }
+
+    performance of "Kernel" config(
+      exec.minWarmupRuns -> 10,
+      exec.maxWarmupRuns -> 20,
+      exec.benchRuns -> 120,
+      exec.independentSamples -> 10,
+      exec.reinstantiation.frequency -> 2
+    ) in {
+
+      performance of "Buffer" config (
+        exec.minWarmupRuns -> 50,
+        exec.maxWarmupRuns -> 100
+      ) in {
+        using(bufferConcs) curve("Kernel") in { c =>
+          (new SumKernel).sum(c)
+        }
+  
+        using(bufferConcs) curve("Stealer") in { c =>
+          (new StealerSum).sum(c)
+        }
+  
+        using(bufferConcs) curve("Seq") in { root =>
+          (new SequentialSum).sum(root)
+        }
+      }
+
+      performance of "Append" in {
+        using(normalizedConcs) curve("Kernel") in { c =>
+          (new SumKernel).sum(c)
+        }
+  
+        using(normalizedConcs) curve("Stealer") in { c =>
+          (new StealerSum).sum(c)
+        }
+  
+        using(normalizedConcs) curve("Seq") in { root =>
+          (new SequentialSum).sum(root)
         }
       }
     }

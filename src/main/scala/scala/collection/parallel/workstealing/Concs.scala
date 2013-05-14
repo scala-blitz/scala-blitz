@@ -17,6 +17,8 @@ object Concs {
   
   /* stealer implementation */
 
+  import WorkstealingTreeScheduler.{ Kernel, Node }
+
   class ConcStealer[@specialized(Int, Long, Float, Double) T](val conc: Conc[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
     val stack = new Array[Conc[T]](conc.level + 1)
     var depth = 0
@@ -42,18 +44,23 @@ object Concs {
 
     init()
 
-    private def push(v: Conc[T]) {
+    private[parallel] final def push(v: Conc[T]) {
       depth += 1
       stack(depth) = v
     }
 
-    private def pop() = if (depth >= 0) {
+    private[parallel] final def pop() = if (depth >= 0) {
       val t = stack(depth)
       depth -= 1
       t
     } else null
 
-    private def peek = if (depth >= 0) stack(depth) else null
+    private[parallel] final def peek = if (depth >= 0) stack(depth) else null
+
+    private[parallel] final def switch() = if (depth >= 0) {
+      val t = stack(depth)
+      stack(depth) = t.right
+    }
 
     private def move0(): Unit = {
       if (idx >= leaf.size) {
@@ -68,7 +75,7 @@ object Concs {
       }
     }
 
-    private[parallel] def move1(): Unit = {
+    private[parallel] final def move1(): Unit = {
       idx += 1
       nextProgress += 1
       move0()
@@ -136,26 +143,68 @@ object Concs {
     }
   }
 
-  // abstract class ConcKernel[@specialized T, @specialized R, M <: R] extends IndexedStealer.IndexedKernel[T, R] {
-  //   def apply(node: Node[Int, R], chunkSize: Int): R = {
-  //     val stealer = node.stealer.asInstanceOf[RangeStealer]
-  //     val nextProgress = stealer.nextProgress
-  //     val nextUntil = stealer.nextUntil
-  //     val range = stealer.range
-  //     val from = range.apply(nextProgress)
+  abstract class ConcKernel[@specialized(Int, Long, Float, Double) T, @specialized(Int, Long, Float, Double) R]
+  extends IndexedStealer.IndexedKernel[T, R] {
+    def apply(node: Node[T, R], chunkSize: Int): R = {
+      val stealer = node.stealer.asInstanceOf[ConcStealer[T]]
+      var remaining = stealer.nextUntil - stealer.nextProgress
+      var from = stealer.idx
+      var result = node.READ_INTERMEDIATE
 
-  //     if (nextProgress == nextUntil) apply0(from)
-  //     else {
-  //       val to = range.apply(nextUntil - 1)
-  //       val step = range.step
+      stealer.peek match {
+        case c: Conc.Chunk[T] =>
+          val remainingInChunk = c.size - from
+          result = applyChunk(c, from, math.min(remaining, remainingInChunk), result)
+          if (remainingInChunk > remaining) {
+            stealer.idx += remaining
+            remaining = 0
+          } else {
+            stealer.idx = 0
+            remaining -= remainingInChunk
+            stealer.pop()
+            stealer.switch()
+          }
+        case _ =>
+          // nothing
+      }
 
-  //       if (step == 1) apply1(from, to)
-  //       else applyN(from, to, step)
-  //     }
-  //   }
-  // }
+      while (stealer.peek != null && remaining > 0) {
+        // descend until subtree is smaller
+        var top = stealer.peek
+        while (top.size > remaining && top.level > 0) {
+          stealer.push(top.left)
+          top = stealer.peek
+        }
+
+        // process subtree and decrease remaining
+        result = applyTree(top, remaining, result)
+        remaining -= top.size
+
+        // move to the next subtree if the leaf is completed
+        if (remaining >= 0) {
+          stealer.pop()
+          stealer.switch()
+        } else {
+          // if the leaf was a chunk with remaining elements
+          stealer.idx = top.size + remaining
+        }
+      }
+
+      result
+    }
+
+    def applyTree(t: Conc[T], remaining: Int, acc: R): R
+
+    def applyChunk(t: Conc.Chunk[T], from: Int, remaining: Int, acc: R): R
+  }
 
 }
+
+
+
+
+
+
 
 
 
