@@ -148,16 +148,21 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
       def combine(a: Int, b: Int) = a + b
       final def applyTree(t: Conc[Int], remaining: Int, acc: Int) = t match {
         case c: Conc.<>[Int] =>
-          applyTree(c.left, remaining, acc)
-          applyTree(c.right, remaining - c.left.size, acc)
+          val l = applyTree(c.left, remaining, acc)
+          val r = applyTree(c.right, remaining - c.left.size, acc)
+          l + r
         case c: Conc.Single[Int] =>
           c.elem
         case c: Conc.Chunk[Int] =>
-          applyChunk(c, 0, remaining, acc)
+          applyChunk(c, 0, remaining)
         case _ =>
           ???
       }
       final def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int, acc: Int) = {
+        val sum = applyChunk(c, from, remaining)
+        acc + sum
+      }
+      final def applyChunk(c: Conc.Chunk[Int], from: Int, remaining: Int) = {
         var i = from
         val until = math.min(from + remaining, c.size)
         var a = c.elems

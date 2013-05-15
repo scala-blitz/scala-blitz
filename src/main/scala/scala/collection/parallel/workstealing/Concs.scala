@@ -3,6 +3,8 @@ package workstealing
 
 
 
+import scala.language.experimental.macros
+import scala.reflect.macros._
 import scala.annotation.tailrec
 
 
@@ -10,9 +12,12 @@ import scala.annotation.tailrec
 object Concs {
 
   trait Scope {
-    implicit def concOps[T](a: Par[Conc[T]]) = ???
-    
-    implicit def conc2zippable[T](a: Par[Conc[T]]) = ???
+    implicit def concOps[T](c: Par[Conc[T]]) = new Concs.Ops[T](c.xs)
+  }
+
+  class Ops[T](val c: Conc[T]) extends AnyVal with Zippable.OpsLike[T, Par[Conc[T]]] {
+    def stealer: Stealer[T] = new ConcStealer(c, 0, c.size)
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ConcsMacros.reduce[T, U]
   }
   
   /* stealer implementation */

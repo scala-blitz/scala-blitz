@@ -7,11 +7,13 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.collection.parallel.generic._
 
+
+
 object Ranges {
 
   trait Scope {
     implicit def rangeOps(r: Par[collection.immutable.Range]) = new Ranges.Ops(r.xs)
-
+    
     implicit def canMergeRange[T]: CanMergeFrom[Par[Range], Int, Par[Range]] = ???
   }
 
@@ -24,7 +26,6 @@ object Ranges {
     def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
     def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
     def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
-
   }
 
   /* stealer implementation */

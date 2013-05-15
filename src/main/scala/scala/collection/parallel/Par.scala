@@ -15,6 +15,8 @@ object Par {
   }
 
   implicit def range2zippable(r: Par[collection.immutable.Range]): Zippable[Int] = ???
+    
+  implicit def conc2zippable[T](a: Par[Conc[T]]) = ???
 
   /* aliases */
 

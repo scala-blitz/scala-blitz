@@ -9,7 +9,9 @@ import org.scalatest.time.SpanSugar._
 import Par._
 import workstealing.Ops._
 
-class RangeTest extends FunSuite with Timeouts {
+
+
+class ParRangeTest extends FunSuite with Timeouts {
 
   implicit val scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin()
 
@@ -42,7 +44,6 @@ class RangeTest extends FunSuite with Timeouts {
     method(1 to 5 by 1000)
     method(1 to 1 by 1000)
     method(1000 to 1 by -100000)
-
   }
 
   def testReduce(r: Range): Unit = try {
@@ -179,7 +180,6 @@ class RangeTest extends FunSuite with Timeouts {
 
   def testProductWithCustomNumeric(r: Range): Unit = try {
     failAfter(1 seconds) {
-
       object mynum extends Numeric[Int] {
         // Members declared in scala.math.Numeric
         def fromInt(x: Int): Int = ???
@@ -251,7 +251,7 @@ class RangeTest extends FunSuite with Timeouts {
   test("minCustomOrdering") {
     runForSizes(testMin)
   }
-  
+
   def testMax(r: Range): Unit = try {
     failAfter(1 seconds) {
       val x = r.max

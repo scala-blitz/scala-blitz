@@ -170,62 +170,60 @@ object RangesMacros {
 
     val (lv, op) = c.functionExpr2Local[(U, U) => U](operator)
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
-    val result =
-      reify {
-        import scala.collection.parallel.workstealing._
-        lv.splice
-        val callee = calleeExpression.splice
-        val stealer = callee.stealer
-        val kernel = 
-          new scala.collection.parallel.workstealing.Ranges.RangeKernel[ResultCell[U]] {
-            override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[Int, ResultCell[U]], node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]]) {
-              node.WRITE_INTERMEDIATE(new ResultCell[U])
+    val result = reify {
+      import scala.collection.parallel.workstealing._
+      lv.splice
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[ResultCell[U]] {
+        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[Int, ResultCell[U]], node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[U])
+        }
+        def zero = new ResultCell[U]
+        def combine(a: ResultCell[U], b: ResultCell[U]) = {
+          if (a eq b) a
+          else if (a.isEmpty) b
+          else if (b.isEmpty) a
+          else {
+            val r = new ResultCell[U]
+            r.result = op.splice(a.result, b.result)
+            r
+          }
+        }
+        def apply0(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], at: Int) = node.READ_INTERMEDIATE
+        def apply1(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int) = {
+          val cell = node.READ_INTERMEDIATE
+          var i = from + 1
+          var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
+          while (i <= to) {
+            sum = op.splice(sum, i)
+            i += 1
+          }
+          cell.result = sum
+          cell
+        }
+        def applyN(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int, stride: Int) = {
+          val cell = node.READ_INTERMEDIATE
+          var i = from + stride
+          var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
+          if (stride > 0) {
+            while (i <= to) {
+              sum = op.splice(sum, i)
+              i += stride
             }
-            def zero = new ResultCell[U]
-            def combine(a: ResultCell[U], b: ResultCell[U]) = {
-              if (a eq b) a
-              else if (a.isEmpty) b
-              else if (b.isEmpty) a
-              else {
-                val r = new ResultCell[U]
-                r.result = op.splice(a.result, b.result)
-                r
-              }
-            }
-            def apply0(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], at: Int) = node.READ_INTERMEDIATE
-            def apply1(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int) = {
-              val cell = node.READ_INTERMEDIATE
-              var i = from + 1
-              var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
-              while (i <= to) {
-                sum = op.splice(sum, i)
-                i += 1
-              }
-              cell.result = sum
-              cell
-            }
-            def applyN(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int, stride: Int) = {
-              val cell = node.READ_INTERMEDIATE
-              var i = from + stride
-              var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
-              if (stride > 0) {
-                while (i <= to) {
-                  sum = op.splice(sum, i)
-                  i += stride
-                }
-              } else {
-                while (i >= to) {
-                  sum = op.splice(sum, i)
-                  i += stride
-                }
-              }
-              cell.result = sum
-              cell
+          } else {
+            while (i >= to) {
+              sum = op.splice(sum, i)
+              i += stride
             }
           }
-        val result = ctx.splice.invokeParallelOperation(stealer, kernel)
-        result
+          cell.result = sum
+          cell
+        }
       }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      result
+    }
 
     val operation = reify {
       val res = result.splice
