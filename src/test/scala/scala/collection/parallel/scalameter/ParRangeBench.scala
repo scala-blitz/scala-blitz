@@ -376,6 +376,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         var result: Option[Int] = None
         while (i <= to && result.isEmpty) {
           if (to == i) result = Some(i)
+          i += 1
         }
         if (result.isDefined) ???
       }
@@ -427,6 +428,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         var result = false
         while (i <= to && !result) {
           if (to == i) result == true
+          i += 1
         }
         if (!result) ???
       }
@@ -478,6 +480,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         var result = true
         while (i <= to && result) {
           result == i > Int.MinValue
+          i += 1
         }
         if (!result) ???
       }
