@@ -93,4 +93,51 @@ object ConcsMacros {
     c.inlineAndReset(operation)
   }
 
+  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val calleeExpression = c.Expr[Concs.Ops[T]](c.applyPrefix)
+    reify {
+      null
+    }
+    // reify {
+    //   import scala.collection.parallel.workstealing._
+    //   val array = arr.splice
+    //   val startIndex = start.splice
+    //   val length = len.splice
+    //   val callee = calleeExpression.splice
+    //   val stealer = callee.stealer
+    //   val kernel = new scala.collection.parallel.workstealing.Concs.ConcKernel[T, ProgressStatus] {
+    //     override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
+    //     }
+    //     override def afterCreateRoot(root: Ref[T, ProgressStatus]) {
+    //       root.child.lresult = new ProgressStatus(startIndex, startIndex)
+    //     }
+    //     override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
+    //       val 
+    //       val completed = node.elementsCompleted
+    //       val arrstart = old.READ_INTERMEDIATE.start + completed
+    //       val leftarrstart = arrstart
+    //       val rightarrstart = arrstart + node.left.child.elementsRemaining
+
+    //       node.left.child.lresult = new ProgressStatus(leftarrstart, leftarrstart)
+    //       node.right.child.lresult = new ProgressStatus(rightarrstart, rightarrstart)
+    //     }
+    //   }
+    //   ctx.splice.invokeParallelOperation(stealer, kernel)
+    // }
+  }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+

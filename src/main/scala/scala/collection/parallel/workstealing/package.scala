@@ -36,7 +36,7 @@ package object workstealing {
     def isEmpty = empty
   }
 
-  val EmptyCell = new ResultCell[Nothing]
+  final class ProgressStatus(val start: Int, var progress: Int)
 
   /* macro utilities */
 
