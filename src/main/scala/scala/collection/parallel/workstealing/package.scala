@@ -36,7 +36,7 @@ package object workstealing {
     def isEmpty = empty
   }
 
-  val EmptyCell = new ResultCell[Nothing]
+  final class ProgressStatus(val start: Int, var progress: Int)
 
   object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
     def validateResult[R](r: R) = if (r.isInstanceOf[Option[Int]]) r else ???
