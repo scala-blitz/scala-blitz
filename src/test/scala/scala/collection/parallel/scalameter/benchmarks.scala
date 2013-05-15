@@ -17,7 +17,8 @@ class benchmarks extends PerformanceTest.Regression with Serializable {
 
   include[ConcBench]
   include[ConcMemory]
-  include[RangeBench]
+  include[ParRangeBench]
+  include[ParConcBench]
 
 }
 

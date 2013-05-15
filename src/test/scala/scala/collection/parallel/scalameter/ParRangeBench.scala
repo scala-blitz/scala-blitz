@@ -1,11 +1,13 @@
 package scala.collection.parallel
 package scalameter
 
+
+
 import org.scalameter.api._
 
 
 
-class RangeBench extends PerformanceTest.Regression with Serializable {
+class ParRangeBench extends PerformanceTest.Regression with Serializable {
   import Par._
   import workstealing.WorkstealingTreeScheduler
   import workstealing.WorkstealingTreeScheduler.Config
