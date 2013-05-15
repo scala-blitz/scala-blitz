@@ -285,9 +285,6 @@ object RangesMacros {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[Option[Int]] {
-        object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
-          def validateResult[R](r: R) = if (r.isInstanceOf[Option[Int]]) r else ???
-        }
         def zero = None
         def combine(a: Option[Int], b: Option[Int]) =  if(a.isDefined) a else b
         def apply0(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], at: Int) = {

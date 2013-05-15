@@ -30,15 +30,13 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false"
-  )
+    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
 
   val pcopts = Seq[(String, Any)](
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
-    exec.independentSamples -> 1
-  )
+    exec.independentSamples -> 1)
 
   performance of "Par[Range]" in {
     measure method "fold" config (opts: _*) in {
@@ -372,13 +370,18 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     measure method "find" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
-        val to = r.last + 1
+        val to = r.last
+        var found = false
         var result: Option[Int] = None
-        while (i <= to && result.isEmpty) {
-          if (to == i) result = Some(i)
+        while (i <= to && !found) {
+          if (i == to) {
+            found = true
+            result = Some(i)
+          }
           i += 1
         }
-        if (result.isDefined) ???
+        if (result.isEmpty) ???
+
       }
 
       performance of "extra" config (pcopts: _*) in {
@@ -424,10 +427,12 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     measure method "exists" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
-        val to = r.last + 1
+        val to = r.last
         var result = false
-        while (i <= to && !result) {
-          if (to == i) result == true
+        while (i <= to && (!result)) {
+          if (to == i) {
+            result = true
+          }
           i += 1
         }
         if (!result) ???
@@ -476,10 +481,10 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     measure method "forall" config (opts: _*) in {
       using(ranges) curve ("Sequential") in { r =>
         var i = r.head
-        val to = r.last + 1
+        val to = r.last
         var result = true
         while (i <= to && result) {
-          result == i > Int.MinValue
+          result = i < Int.MaxValue
           i += 1
         }
         if (!result) ???
@@ -487,7 +492,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
 
       performance of "extra" config (pcopts: _*) in {
         using(ranges) curve ("pc") in { r =>
-          r.par.forall(_ > Int.MinValue)
+          r.par.forall(_ < Int.MaxValue)
         }
       }
 
@@ -495,28 +500,28 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         import workstealing.Ops._
         implicit val s = s1
         val pr = r.toPar
-        pr.forall(_ > Int.MinValue)
+        pr.forall(_ < Int.MaxValue)
       }
 
       using(ranges) curve ("Par-2") in { r =>
         import workstealing.Ops._
         implicit val s = s2
         val pr = r.toPar
-        pr.forall(_ > Int.MinValue)
+        pr.forall(_ < Int.MaxValue)
       }
 
       using(ranges) curve ("Par-4") in { r =>
         import workstealing.Ops._
         implicit val s = s4
         val pr = r.toPar
-        pr.forall(_ > Int.MinValue)
+        pr.forall(_ < Int.MaxValue)
       }
 
       using(ranges) curve ("Par-8") in { r =>
         import workstealing.Ops._
         implicit val s = s8
         val pr = r.toPar
-        pr.forall(_ > Int.MinValue)
+        pr.forall(_ < Int.MaxValue)
       }
     }
 
