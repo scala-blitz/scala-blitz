@@ -369,6 +369,154 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
+    measure method "find" config (opts: _*) in {
+      using(ranges) curve ("Sequential") in { r =>
+        var i = r.head
+        val to = r.last + 1
+        var result: Option[Int] = None
+        while (i <= to && result.isEmpty) {
+          if (to == i) result = Some(i)
+        }
+        if (result.isDefined) ???
+      }
+
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
+          val mx = r.last + 1
+          r.par.find(_ == mx)
+        }
+      }
+
+      using(ranges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.find(_ == mx)
+      }
+
+      using(ranges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.find(_ == mx)
+      }
+
+      using(ranges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.find(_ == mx)
+      }
+
+      using(ranges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.find(_ == mx)
+      }
+    }
+
+    measure method "exists" config (opts: _*) in {
+      using(ranges) curve ("Sequential") in { r =>
+        var i = r.head
+        val to = r.last + 1
+        var result = false
+        while (i <= to && !result) {
+          if (to == i) result == true
+        }
+        if (!result) ???
+      }
+
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
+          val mx = r.last + 1
+          r.par.exists(_ == mx)
+        }
+      }
+
+      using(ranges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.exists(_ == mx)
+      }
+
+      using(ranges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.exists(_ == mx)
+      }
+
+      using(ranges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.exists(_ == mx)
+      }
+
+      using(ranges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        val mx = r.last + 1
+        pr.exists(_ == mx)
+      }
+    }
+
+    measure method "forall" config (opts: _*) in {
+      using(ranges) curve ("Sequential") in { r =>
+        var i = r.head
+        val to = r.last + 1
+        var result = true
+        while (i <= to && result) {
+          result == i > Int.MinValue
+        }
+        if (!result) ???
+      }
+
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
+          r.par.forall(_ > Int.MinValue)
+        }
+      }
+
+      using(ranges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.forall(_ > Int.MinValue)
+      }
+
+      using(ranges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.forall(_ > Int.MinValue)
+      }
+
+      using(ranges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.forall(_ > Int.MinValue)
+      }
+
+      using(ranges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        pr.forall(_ > Int.MinValue)
+      }
+    }
+
   }
 
 }

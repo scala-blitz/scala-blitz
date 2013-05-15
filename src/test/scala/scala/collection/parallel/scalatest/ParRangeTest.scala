@@ -247,7 +247,7 @@ class ParRangeTest extends FunSuite with Timeouts {
     case e: exceptions.TestFailedDueToTimeoutException =>
       assert(false, "timeout for range: " + r)
   }
-  
+
   test("minCustomOrdering") {
     runForSizes(testMin)
   }
@@ -289,6 +289,65 @@ class ParRangeTest extends FunSuite with Timeouts {
 
   test("maxCustomOrdering") {
     runForSizes(testMaxCustomOrdering)
+  }
+
+  def testFind(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      val toBeFound = r.last
+      val toNotBeFound = toBeFound + 1
+
+      val pr = r.toPar
+      val shouldBeFound = pr.find(_ == toBeFound)
+      assert(shouldBeFound.isDefined && shouldBeFound.get == toBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
+      val shouldNotBeFound = pr.find(_ == toNotBeFound)
+      assert(shouldNotBeFound.isEmpty, r + ": " + shouldNotBeFound + ", None")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("find") {
+    runForSizes(testFind)
+  }
+
+  def testExists(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      val toBeFound = r.last
+      val toNotBeFound = toBeFound + 1
+
+      val pr = r.toPar
+      val shouldBeFound = pr.exists(_ == toBeFound)
+      assert(shouldBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
+      val shouldNotBeFound = pr.exists(_ == toNotBeFound)
+      assert(!shouldNotBeFound, r + ": " + shouldNotBeFound + ", false")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("exists") {
+    runForSizes(testExists)
+  }
+
+  def testForAll(r: Range): Unit = try {
+    failAfter(1 seconds) {
+
+      val pr = r.toPar
+      val mx = r.last
+      val shouldBe = pr.forall(_ > Int.MinValue)
+      assert(shouldBe, r + ": " + shouldBe + ", true")
+      val shouldNotBe = pr.forall(_ < mx - 1)
+      assert(!shouldNotBe, r + ": " + shouldNotBe + ", false")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("forAll") {
+    runForSizes(testForAll)
   }
 
 }

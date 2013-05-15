@@ -38,6 +38,10 @@ package object workstealing {
 
   val EmptyCell = new ResultCell[Nothing]
 
+  object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
+    def validateResult[R](r: R) = if (r.isInstanceOf[Option[Int]]) r else ???
+  }
+
   /* macro utilities */
 
   implicit def Util(context: Context) = new Util[context.type](context)
