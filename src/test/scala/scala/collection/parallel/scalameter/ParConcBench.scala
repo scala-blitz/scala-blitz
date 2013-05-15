@@ -31,6 +31,9 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
     for (i <- 0 until size) cb += i
     cb.result.normalized
   }
+  val arrays = for (size <- bufferSizes) yield {
+    (0 until size).toArray
+  }
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -39,14 +42,26 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
   /* tests */
 
   performance of "Conc" config(
-    exec.minWarmupRuns -> 20,
+    exec.minWarmupRuns -> 25,
     exec.maxWarmupRuns -> 50,
-    exec.benchRuns -> 30,
-    exec.independentSamples -> 6,
+    exec.benchRuns -> 40,
+    exec.independentSamples -> 5,
+    exec.outliers.suspectPercent -> 40,
     exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false"
   ) in { 
 
     measure method "reduce" in {
+      using(arrays) curve("Array") in { a =>
+        var i = 0
+        val until = a.length
+        var sum = 0
+        while (i < until) {
+          sum += a(i)
+          i += 1
+        }
+        if (sum == 0) ???
+      }
+
       using(normalizedConcs) curve("Conc-1") in { c =>
         import workstealing.Ops._
         implicit val s = s1

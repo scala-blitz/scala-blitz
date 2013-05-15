@@ -347,7 +347,7 @@ object Conc {
   }
 
   val INITIAL_SIZE = 8
-  val DEFAULT_MAX_SIZE = 1024
+  val DEFAULT_MAX_SIZE = 4096
 
   class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](private[Conc] val maxChunkSize: Int, c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
     private[Conc] var conc: Conc[T] = c
