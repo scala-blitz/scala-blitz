@@ -293,7 +293,7 @@ class ParRangeTest extends FunSuite with Timeouts {
 
   def testFind(r: Range): Unit = try {
     failAfter(1 seconds) {
-      val toBeFound = r.last
+      val toBeFound = r.max
       val toNotBeFound = toBeFound + 1
 
       val pr = r.toPar
@@ -313,7 +313,7 @@ class ParRangeTest extends FunSuite with Timeouts {
 
   def testExists(r: Range): Unit = try {
     failAfter(1 seconds) {
-      val toBeFound = r.last
+      val toBeFound = r.max
       val toNotBeFound = toBeFound + 1
 
       val pr = r.toPar

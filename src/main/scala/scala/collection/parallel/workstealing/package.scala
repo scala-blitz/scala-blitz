@@ -39,7 +39,7 @@ package object workstealing {
   final class ProgressStatus(val start: Int, var progress: Int)
 
   object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
-    def validateResult[R](r: R) = if (r.isInstanceOf[Option[Int]]) r else ???
+    def validateResult[R](r: R) = if (r.isInstanceOf[Option[_]]) r else ???
   }
 
   /* macro utilities */
