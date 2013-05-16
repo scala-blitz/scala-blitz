@@ -60,7 +60,9 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
     }
   }
 
-  def elementsRemainingEstimate: Int = untilIndex - decode(READ_PROGRESS)
+  def elementsRemaining: Int = untilIndex - decode(READ_PROGRESS)
+
+  def totalElements: Int = untilIndex - startIndex
 
   protected def decode(p: Int) = if (p >= 0) p else -p - 1
 
