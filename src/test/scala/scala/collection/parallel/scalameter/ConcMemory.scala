@@ -23,7 +23,9 @@ class ConcMemory extends PerformanceTest.Regression with Serializable {
 
   /* tests */
 
-  performance of "Conc" in {
+  performance of "Conc" config(
+    reports.regression.noiseMagnitude -> 0.15
+  ) in {
 
     measure method "memory" config(
       exec.benchRuns -> 6,
