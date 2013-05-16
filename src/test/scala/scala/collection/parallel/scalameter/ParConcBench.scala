@@ -45,7 +45,7 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
 
   /* tests */
 
-  performance of "Conc" config(
+  performance of "Par[Conc]" config(
     exec.minWarmupRuns -> 25,
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 48,
