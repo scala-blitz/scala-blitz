@@ -123,7 +123,7 @@ object ConcsMacros {
         }
         def zero = null
         def combine(a: ProgressStatus, b: ProgressStatus) = null
-        final def applyTree(t: Conc[T], remaining: Int, status: ProgressStatus) {
+        final def applyTree(t: Conc[T], remaining: Int, status: ProgressStatus): ProgressStatus = {
           def apply(t: Conc[T], remaining: Int, idx: Int): Unit = t match {
             case _: Conc.<>[T] | _: Conc.Append[T] =>
               apply(t.left, remaining, idx)
@@ -138,11 +138,13 @@ object ConcsMacros {
 
           apply(t, remaining, status.progress)
           status.progress += remaining
+          status
         }
-        final def applyChunk(c: Conc.Chunk[T], from: Int, remaining: Int, status: ProgressStatus) {
+        final def applyChunk(c: Conc.Chunk[T], from: Int, remaining: Int, status: ProgressStatus): ProgressStatus = {
           val len = min(remaining, c.size - from)
           applyChunk(c, from, status.progress, len)
           status.progress += len
+          status
         }
         private def min(a: Int, b: Int) = if (a < b) a else b
         private def applyChunk(c: Conc.Chunk[T], from: Int, idx: Int, length: Int) {
