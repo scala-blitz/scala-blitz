@@ -38,7 +38,8 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
-    exec.independentSamples -> 1
+    exec.independentSamples -> 1,
+    reports.regression.noiseMagnitude -> 0.75
   )
 
   performance of "Par[Range]" in {

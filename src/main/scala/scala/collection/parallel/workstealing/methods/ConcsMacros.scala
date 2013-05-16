@@ -100,10 +100,10 @@ object ConcsMacros {
     reify {
       import scala.collection.parallel.workstealing._
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+      val callee = calleeExpression.splice
       val array = arr.splice
       val startIndex = start.splice
-      val length = len.splice
-      val callee = calleeExpression.splice
+      val length = math.min(len.splice, math.min(callee.c.length, array.length - startIndex))
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Concs.ConcKernel[T, ProgressStatus] {
         override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
