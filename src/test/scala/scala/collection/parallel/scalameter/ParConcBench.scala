@@ -4,6 +4,7 @@ package scalameter
 
 
 import org.scalameter.api._
+import scala.reflect.ClassTag
 
 
 
@@ -34,6 +35,9 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
   val arrays = for (size <- bufferSizes) yield {
     (0 until size).toArray
   }
+  def withArrays[T: ClassTag, CC[_] <: { def length: Int }](gen: Gen[CC[T]]): Gen[(CC[T], Array[T])] = for (v <- gen) yield {
+    (v, new Array[T](v.length))
+  }
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -48,7 +52,7 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
     exec.independentSamples -> 5,
     exec.outliers.suspectPercent -> 40,
     exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
-    reports.regression.noiseMagnitude -> 15
+    reports.regression.noiseMagnitude -> 0.15
   ) in { 
 
     measure method "reduce" in {
@@ -111,7 +115,19 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
         c.toPar.reduce(_ + _)
       }
     }
+
+    measure method "copyToArray" in {
+      using(withArrays(arrays)) curve("Array") in {
+        case (src, dest) => Array.copy(src, 0, dest, 0, src.length)
+      }
+    }
+
   }
 
 }
+
+
+
+
+
 

@@ -31,7 +31,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
     exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
-    reports.regression.noiseMagnitude -> 15
+    reports.regression.noiseMagnitude -> 0.15
   )
 
   val pcopts = Seq[(String, Any)](
