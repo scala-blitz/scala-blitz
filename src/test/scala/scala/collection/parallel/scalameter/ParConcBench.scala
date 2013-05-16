@@ -117,8 +117,32 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "copyToArray" in {
-      using(withArrays(arrays)) curve("Array") in {
-        case (src, dest) => Array.copy(src, 0, dest, 0, src.length)
+      using(withArrays(arrays)) curve("Array") in { case (src, dest) =>
+        Array.copy(src, 0, dest, 0, src.length)
+      }
+
+      using(withArrays(bufferConcs)) curve("Conc.Buffer-1") in { case (c, dest) =>
+        import workstealing.Ops._
+        implicit val s = s1
+        c.toPar.copyToArray(dest, 0, c.length)
+      }
+
+      using(withArrays(bufferConcs)) curve("Conc.Buffer-2") in { case (c, dest) =>
+        import workstealing.Ops._
+        implicit val s = s2
+        c.toPar.copyToArray(dest, 0, c.length)
+      }
+
+      using(withArrays(bufferConcs)) curve("Conc.Buffer-4") in { case (c, dest) =>
+        import workstealing.Ops._
+        implicit val s = s4
+        c.toPar.copyToArray(dest, 0, c.length)
+      }
+
+      using(withArrays(bufferConcs)) curve("Conc.Buffer-8") in { case (c, dest) =>
+        import workstealing.Ops._
+        implicit val s = s8
+        c.toPar.copyToArray(dest, 0, c.length)
       }
     }
 
