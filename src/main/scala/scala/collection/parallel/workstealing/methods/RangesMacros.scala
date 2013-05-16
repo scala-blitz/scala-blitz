@@ -268,15 +268,10 @@ object RangesMacros {
     }
   }
 
-
-
-
-
   def find(c: Context)(p: c.Expr[Int => Boolean])(ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
     val (lv, pred) = c.functionExpr2Local[Int => Boolean](p)
-
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val result = reify {
       import scala.collection.parallel.workstealing._
@@ -288,7 +283,7 @@ object RangesMacros {
         def zero = None
         def combine(a: Option[Int], b: Option[Int]) =  if(a.isDefined) a else b
         def apply0(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], at: Int) = {
-          if(pred.splice(at)) {
+          if (pred.splice(at)) {
             terminationCause = ResultFound
             Some(at)
           }
@@ -298,28 +293,27 @@ object RangesMacros {
           var i = from
           var result: Option[Int] = None
           while (i <= to && result.isEmpty) {
-            if(pred.splice(i)) result = Some(i)
+            if (pred.splice(i)) result = Some(i)
             i += 1
           }
-          if(result.isDefined) terminationCause =  ResultFound
+          if (result.isDefined) terminationCause =  ResultFound
           result
         }
         def applyN(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int, stride: Int) = {
-
           var i = from
           var result: Option[Int] = None
           if (stride > 0) {
-            while (i <= to&&result.isEmpty) {
-              if(pred.splice(i)) result = Some(i)
+            while (i <= to && result.isEmpty) {
+              if (pred.splice(i)) result = Some(i)
               i += stride
             }
           } else {
-            while (i >= to&&result.isEmpty) {
-              if(pred.splice(i)) result = Some(i)
+            while (i >= to && result.isEmpty) {
+              if (pred.splice(i)) result = Some(i)
               i += stride
             }
           }
-          if(result.isDefined) terminationCause = ResultFound
+          if (result.isDefined) terminationCause = ResultFound
           result
         }
       }
@@ -328,7 +322,6 @@ object RangesMacros {
     }
 
     c.inlineAndReset(result)
-
   }
 
   def forall(c: Context)(p: c.Expr[Int => Boolean])( ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
@@ -351,8 +344,6 @@ object RangesMacros {
       found.splice.nonEmpty
     }
   }
-
-
 
 }
 
