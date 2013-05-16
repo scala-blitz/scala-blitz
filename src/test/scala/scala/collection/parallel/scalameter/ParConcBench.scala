@@ -110,7 +110,6 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
         c.toPar.reduce(_ + _)
       }
     }
-
   }
 
 }

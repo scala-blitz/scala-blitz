@@ -131,13 +131,13 @@ object ConcsMacros {
             case c: Conc.Single[T] =>
               array(idx) = c.elem
             case c: Conc.Chunk[T] =>
-              applyChunk(c, 0, idx, c.size)
+              applyChunk(c, 0, idx, min(remaining, c.size))
             case _ =>
               ???
           }
 
           apply(t, remaining, status.progress)
-          status.progress += remaining
+          status.progress += min(t.size, remaining)
           status
         }
         final def applyChunk(c: Conc.Chunk[T], from: Int, remaining: Int, status: ProgressStatus): ProgressStatus = {
