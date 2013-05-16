@@ -34,7 +34,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
   /* tests */
 
   performance of "Conc" config(
-    reports.regression.noiseMagnitude -> 0.15
+    reports.regression.noiseMagnitude -> 0.20
   ) in {
 
     measure method "append-element" config(
