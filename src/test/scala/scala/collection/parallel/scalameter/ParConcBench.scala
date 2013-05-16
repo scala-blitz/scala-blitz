@@ -47,7 +47,8 @@ class ParConcBench extends PerformanceTest.Regression with Serializable {
     exec.benchRuns -> 40,
     exec.independentSamples -> 5,
     exec.outliers.suspectPercent -> 40,
-    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false"
+    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
+    reports.regression.noiseMagnitude -> 15
   ) in { 
 
     measure method "reduce" in {
