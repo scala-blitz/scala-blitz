@@ -350,5 +350,27 @@ class ParRangeTest extends FunSuite with Timeouts {
     runForSizes(testForAll)
   }
 
+  def testCopyToArray(r: Range): Unit = try {
+    failAfter(1 seconds) {
+
+      val pr = r.toPar
+      val start = r.size / 7
+      val len = 5 * (r.size / 7)
+      val dest = new Array[Int](len)
+      pr.copyToArray(dest, start, len)
+      var i = 0
+      while (i < start) { assert(dest(i) == 0); i += 1 }
+      while (i < len) { assert(dest(i) == r(i - start)); i += 1 }
+
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("copyToArray") {
+    runForSizes(testCopyToArray)
+  }
+
 }
 

@@ -29,6 +29,9 @@ object Ranges {
     def find(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
     def exists(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
     def forall(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.forall
+    override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray[U]
+    def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray2[U]
+    def copyToArray[U >: Int](arr: Array[U])(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray3[U]
   }
 
   /* stealer implementation */
