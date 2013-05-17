@@ -372,7 +372,11 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "find" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
+      using(ranges) curve ("Sequential") config(
+        exec.benchRuns -> 30,
+        exec.independentSamples -> 3,
+        reports.regression.noiseMagnitude -> 0.75
+      ) in { r =>
         var i = r.head
         val to = r.last
         var found = false
