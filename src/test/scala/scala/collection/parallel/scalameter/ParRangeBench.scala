@@ -30,13 +30,17 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false")
+    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
+    reports.regression.noiseMagnitude -> 0.15
+  )
 
   val pcopts = Seq[(String, Any)](
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
-    exec.independentSamples -> 1)
+    exec.independentSamples -> 1,
+    reports.regression.noiseMagnitude -> 0.75
+  )
 
   performance of "Par[Range]" in {
     measure method "fold" config (opts: _*) in {
@@ -368,7 +372,11 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "find" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
+      using(ranges) curve ("Sequential") config(
+        exec.benchRuns -> 30,
+        exec.independentSamples -> 3,
+        reports.regression.noiseMagnitude -> 0.75
+      ) in { r =>
         var i = r.head
         val to = r.last
         var found = false

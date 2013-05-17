@@ -30,12 +30,27 @@ trait PreciseStealer[@specialized T] extends Stealer[T] {
    */
   def psplit(leftSize: Int): (PreciseStealer[T], PreciseStealer[T])
 
+  def elementsRemainingEstimate: Int = elementsRemaining
+
   /** An exact number of remaining elements in this stealer that its owner
    *  has not yet committed to.
    *
    *  @return an exact number of remaining elements
    */
-  def elementsRemainingEstimate: Int
+  def elementsRemaining: Int
+
+  /** A total number of elements that this stealer could commit to
+   *  at the time of its creation.
+   *
+   *  @return total number of elements in the stealer
+   */
+  def totalElements: Int
+
+  /** The number of elements already committed to by this stealer.
+   *
+   *  @return number of elements the stealer already committed to
+   */
+  def elementsCompleted = totalElements - elementsRemaining
 
 }
 

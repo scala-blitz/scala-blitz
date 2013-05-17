@@ -68,6 +68,10 @@ trait Stealer[@specialized T] {
    */
   def minimumStealThreshold: Int = 1
 
+  /** Attempts to cast this stealer into a precise stealer.
+   */
+  def asPrecise: PreciseStealer[T] = this.asInstanceOf[PreciseStealer[T]]
+
 }
 
 

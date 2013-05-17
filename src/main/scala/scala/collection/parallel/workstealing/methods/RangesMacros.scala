@@ -268,7 +268,11 @@ object RangesMacros {
     }
   }
 
-  def find(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
+
+
+
+
+  def find(c: Context)(p: c.Expr[Int => Boolean])(ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
     val (lv, pred) = c.functionExpr2Local[Int => Boolean](p)
@@ -282,21 +286,22 @@ object RangesMacros {
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[Option[Int]] {
         def zero = None
-        def combine(a: Option[Int], b: Option[Int]) = if (a.isDefined) a else b
+        def combine(a: Option[Int], b: Option[Int]) =  if(a.isDefined) a else b
         def apply0(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], at: Int) = {
-          if (pred.splice(at)) {
+          if(pred.splice(at)) {
             terminationCause = ResultFound
             Some(at)
-          } else None
+          }
+          else None
         }
         def apply1(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int) = {
           var i = from
           var result: Option[Int] = None
           while (i <= to && result.isEmpty) {
-            if (pred.splice(i)) result = Some(i)
+            if(pred.splice(i)) result = Some(i)
             i += 1
           }
-          if (result.isDefined) terminationCause = ResultFound
+          if(result.isDefined) terminationCause =  ResultFound
           result
         }
         def applyN(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int, stride: Int) = {
@@ -304,17 +309,17 @@ object RangesMacros {
           var i = from
           var result: Option[Int] = None
           if (stride > 0) {
-            while (i <= to && result.isEmpty) {
-              if (pred.splice(i)) result = Some(i)
+            while (i <= to&&result.isEmpty) {
+              if(pred.splice(i)) result = Some(i)
               i += stride
             }
           } else {
-            while (i >= to && result.isEmpty) {
-              if (pred.splice(i)) result = Some(i)
+            while (i >= to&&result.isEmpty) {
+              if(pred.splice(i)) result = Some(i)
               i += stride
             }
           }
-          if (result.isDefined) terminationCause = ResultFound
+          if(result.isDefined) terminationCause = ResultFound
           result
         }
       }
@@ -326,7 +331,7 @@ object RangesMacros {
 
   }
 
-  def forall(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def forall(c: Context)(p: c.Expr[Int => Boolean])( ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -338,7 +343,7 @@ object RangesMacros {
     }
   }
 
-  def exists(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def exists(c: Context)(p: c.Expr[Int => Boolean])(ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find(c)(p)(ctx)
@@ -381,7 +386,7 @@ object RangesMacros {
       zero
     }
   }
-  
+
   def invokeCopyToArrayKernel[U >: Int: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     import c.universe._
     val (startv, startg) = c.functionExpr2Local[Int](start)
@@ -396,7 +401,7 @@ object RangesMacros {
       result.splice
       ()
     }
-  }
+}
 
   def copyToArray[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     invokeCopyToArrayKernel[U](c)()(arr, start, len)(ctx)
@@ -413,6 +418,8 @@ object RangesMacros {
     val len = c.universe.reify{arrg.splice.length}
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
+
+
 
 }
 

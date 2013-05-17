@@ -29,7 +29,7 @@ class ParConcTest extends FunSuite with Timeouts {
       method(0 to i)
       method(i to 0 by -1)
     }
-    for (i <- 100000 to 1000000 by 100000) {
+    for (i <- 100000 to 1000000 by 200000) {
       method(0 to i)
       method(i to 0 by -1)
     }
@@ -52,31 +52,65 @@ class ParConcTest extends FunSuite with Timeouts {
     conc
   }
 
-  def testReduce(r: Range): Unit = try {
-    failAfter(1 seconds) {
+  def testReduce(r: Range, cf: Range => Conc[Int]): Unit = try {
+    failAfter(6 seconds) {
       val x = r.reduce(_ + _)
 
-      val c = createConc(r)
+      val c = cf(r)
       val pc = c.toPar
       val px = pc.reduce(_ + _)
 
-      val cf = createFlatConc(r, 128)
-      val pcf = cf.toPar
-      val pxf = pcf.reduce(_ + _)
-
       assert(x == px, r + ".reduce: " + x + ", " + px)
-      assert(x == pxf, r + ".reduce: " + x + ", " + pxf)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+      assert(false, "timeout for conc: " + r)
   }
 
   test("reduce") {
     intercept[UnsupportedOperationException] {
-      testReduce(0 until 0)
+      testReduce(0 until 0, createConc)
     }
-    runForSizes(testReduce)
+    runForSizes(testReduce(_, createConc))
+    runForSizes(testReduce(_, createFlatConc(_, 128)))
+  }
+
+  def testCopyToArray(r: Range, cf: Range => Conc[Int]): Unit = try {
+    failAfter(6 seconds) {
+      val array = new Array[Int](r.length)
+
+      val c = cf(r)
+      val pc = c.toPar
+      pc.copyToArray(array, 0, c.size)
+
+      assert(array.sameElements(r), r + " != " + array.mkString(", "))
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for conc: " + r)
+  }
+
+  test("copyToArray") {
+    runForSizes(testCopyToArray(_, createConc))
+    runForSizes(testCopyToArray(_, createFlatConc(_, 32)))
+    runForSizes(testCopyToArray(_, createFlatConc(_, 1024)))
   }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

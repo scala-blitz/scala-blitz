@@ -36,6 +36,8 @@ sealed abstract class Conc[+T] {
 
   def normalized: Conc[T] = this
 
+  def length = size
+
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
 }
 
