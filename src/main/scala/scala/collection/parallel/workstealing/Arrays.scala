@@ -50,7 +50,7 @@ object Arrays {
       clear()
 
       val array = new Array[T](c.size)
-      c.toPar.copyToArray(array, 0, array.length)(ctx)
+      c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
       array
     }
 
