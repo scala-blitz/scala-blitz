@@ -97,59 +97,60 @@ object ConcsMacros {
 
 
 object ConcsMethods {
-
-  import scala.collection.parallel.PreciseStealer
   import scala.collection.parallel.workstealing._
   import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
 
-  def copyToArray[T, U >: T](stealer: PreciseStealer[T], array: Array[U], startIndex: Int, length: Int)(ctx: WorkstealingTreeScheduler): Unit = {
-    class Kernel extends scala.collection.parallel.workstealing.Concs.ConcKernel[T, ProgressStatus] {
-      override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
-      }
-      override def afterCreateRoot(root: Ref[T, ProgressStatus]) {
-        root.child.WRITE_INTERMEDIATE(new ProgressStatus(startIndex, startIndex))
-      }
-      override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
-        val stealer = newnode.stealer.asPrecise
-        val completed = stealer.elementsCompleted
-        val arrstart = oldnode.READ_INTERMEDIATE.start + completed
-        val leftarrstart = arrstart
-        val rightarrstart = arrstart + newnode.left.child.stealer.asPrecise.elementsRemaining
-        newnode.left.child.WRITE_INTERMEDIATE(new ProgressStatus(leftarrstart, leftarrstart))
-        newnode.right.child.WRITE_INTERMEDIATE(new ProgressStatus(rightarrstart, rightarrstart))
-      }
-      def zero = null
-      def combine(a: ProgressStatus, b: ProgressStatus) = null
-      final def apply(t: Conc[T], remaining: Int, idx: Int): Unit = t match {
+  class CopyToArrayKernel[T, U >: T](array: Array[U], startIndex: Int, length: Int) extends scala.collection.parallel.workstealing.Concs.ConcKernel[T, ProgressStatus] {
+    override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
+    }
+    override def afterCreateRoot(root: Ref[T, ProgressStatus]) {
+      root.child.WRITE_INTERMEDIATE(new ProgressStatus(startIndex, startIndex))
+    }
+    override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
+      val stealer = newnode.stealer.asPrecise
+      val completed = stealer.elementsCompleted
+      val arrstart = oldnode.READ_INTERMEDIATE.start + completed
+      val leftarrstart = arrstart
+      val rightarrstart = arrstart + newnode.left.child.stealer.asPrecise.elementsRemaining
+      newnode.left.child.WRITE_INTERMEDIATE(new ProgressStatus(leftarrstart, leftarrstart))
+      newnode.right.child.WRITE_INTERMEDIATE(new ProgressStatus(rightarrstart, rightarrstart))
+    }
+    def zero = null
+    def combine(a: ProgressStatus, b: ProgressStatus) = null
+    def array_assign(idx: Int, a: Array[U], c: Conc.Single[T]) = array(idx) = c.elem
+    final def applyTree(t: Conc[T], remaining: Int, status: ProgressStatus): ProgressStatus = {
+      def apply(t: Conc[T], remaining: Int, idx: Int): Unit = t match {
         case _: Conc.<>[T] | _: Conc.Append[T] =>
           apply(t.left, remaining, idx)
           apply(t.right, remaining - t.left.size, idx + t.left.size)
         case c: Conc.Single[T] =>
-          array(idx) = c.elem
+          array_assign(idx, array, c)
         case c: Conc.Chunk[T] =>
           applyChunk(c, 0, idx, min(remaining, c.size))
         case _ =>
           ???
       }
-      final def applyTree(t: Conc[T], remaining: Int, status: ProgressStatus): ProgressStatus = {
-        apply(t, remaining, status.progress)
-        status.progress += min(t.size, remaining)
-        status
-      }
-      final def applyChunk(c: Conc.Chunk[T], from: Int, remaining: Int, status: ProgressStatus): ProgressStatus = {
-        val len = min(remaining, c.size - from)
-        applyChunk(c, from, status.progress, len)
-        status.progress += len
-        status
-      }
-      private def min(a: Int, b: Int) = if (a < b) a else b
-      private def applyChunk(c: Conc.Chunk[T], from: Int, idx: Int, length: Int) {
-        Array.copy(c.elems, from, array, idx, length)
-      }
+      apply(t, remaining, status.progress)
+      status.progress += min(t.size, remaining)
+      status
     }
+    final def applyChunk(c: Conc.Chunk[T], from: Int, remaining: Int, status: ProgressStatus): ProgressStatus = {
+      val len = min(remaining, c.size - from)
+      applyChunk(c, from, status.progress, len)
+      status.progress += len
+      status
+    }
+    private def min(a: Int, b: Int) = if (a < b) a else b
+    private def applyChunk(c: Conc.Chunk[T], from: Int, idx: Int, length: Int) {
+      Array.copy(c.elems, from, array, idx, length)
+    }
+  }
 
-    val kernel = new Kernel
+  def copyToArray[T, U >: T](c: Conc[T], array: Array[U], startIndex: Int, len: Int)(ctx: WorkstealingTreeScheduler): Unit = {
+    val length = math.min(len, math.min(c.length, array.length - startIndex))
+    val stealer = new Concs.Ops(c).stealer
 
+    val kernel = new CopyToArrayKernel[T, U](array, startIndex, length)
     ctx.invokeParallelOperation(stealer, kernel)
     ()
   }

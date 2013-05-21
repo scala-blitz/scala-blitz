@@ -351,7 +351,7 @@ object Conc {
   val INITIAL_SIZE = 8
   val DEFAULT_MAX_SIZE = 4096
 
-  abstract class BufferLike[T, +To, Repr <: BufferLike[T, To, Repr]] extends MergerLike[T, To, Repr] {
+  trait BufferLike[T, +To, Repr <: BufferLike[T, To, Repr]] extends MergerLike[T, To, Repr] {
     private[parallel] val maxChunkSize: Int
     private[parallel] var conc: Conc[T]
     private[parallel] var lastChunk: Array[T]

@@ -3,6 +3,8 @@ package workstealing
 
 
 
+import scala.language.experimental.macros
+import scala.reflect.macros._
 import scala.reflect.ClassTag
 
 
@@ -19,15 +21,16 @@ object Arrays {
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
     private[parallel] var lastChunk: Array[T],
-    private[parallel] var lastSize: Int
-  ) extends Conc.BufferLike[T, Conc[T], Merger[T]] {
+    private[parallel] var lastSize: Int,
+    private val ctx: WorkstealingTreeScheduler
+  ) extends Conc.BufferLike[T, Array[T], Merger[T]] {
     def classTag = implicitly[ClassTag[T]]
 
-    def this(mcs: Int) = this(mcs, Conc.Zero, new Array[T](Conc.INITIAL_SIZE), 0)
+    def this(mcs: Int, ctx: WorkstealingTreeScheduler) = this(mcs, Conc.Zero, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
-    def this() = this(Conc.DEFAULT_MAX_SIZE)
+    def this(ctx: WorkstealingTreeScheduler) = this(Conc.DEFAULT_MAX_SIZE, ctx)
 
-    def newBuffer(conc: Conc[T]) = new Merger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0)
+    def newBuffer(conc: Conc[T]) = new Merger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
     final def +=(elem: T) = if (lastSize < lastChunk.length) {
       lastChunk(lastSize) = elem
@@ -38,12 +41,17 @@ object Arrays {
       this += elem
     }
 
-    def result = {
+    def result: Array[T] = {
+      import Ops._
+      import Par._
+
       pack()
-      val res = conc
+      val c = conc
       clear()
 
-      ???
+      val array = new Array[T](c.size)
+      c.toPar.copyToArray(array, 0, array.length)(ctx)
+      array
     }
 
   }
