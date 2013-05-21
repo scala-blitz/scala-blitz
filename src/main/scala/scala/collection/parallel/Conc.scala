@@ -351,17 +351,26 @@ object Conc {
   val INITIAL_SIZE = 8
   val DEFAULT_MAX_SIZE = 4096
 
-  class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](private[Conc] val maxChunkSize: Int, c: Conc[T], ch: Array[T], sz: Int) extends MergerLike[T, Conc[T], Buffer[T]] {
-    private[Conc] var conc: Conc[T] = c
-    private[Conc] var lastChunk: Array[T] = ch
-    private[Conc] var lastSize: Int = sz
+  abstract class BufferLike[T, +To, Repr <: BufferLike[T, To, Repr]] extends MergerLike[T, To, Repr] {
+    private[parallel] val maxChunkSize: Int
+    private[parallel] var conc: Conc[T]
+    private[parallel] var lastChunk: Array[T]
+    private[parallel] var lastSize: Int
 
-    def this(mcs: Int) = this(mcs, Zero, new Array[T](INITIAL_SIZE), 0)
+    implicit def classTag: ClassTag[T]
 
-    def this() = this(DEFAULT_MAX_SIZE)
+    def newBuffer(c: Conc[T]): Repr
 
-    private def pack() {
+    private[parallel] final def pack() {
       if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
+    }
+
+    private[parallel] final def expand() {
+      val oldlength = lastChunk.length
+      val newlength = math.min(maxChunkSize, oldlength * 2)
+      pack()
+      lastChunk = new Array[T](newlength)
+      lastSize = 0
     }
 
     def clear() = {
@@ -370,16 +379,43 @@ object Conc {
       conc = Zero
     }
 
+    def merge(that: Repr) = {
+      this.pack()
+      that.pack()
+
+      val resconc = this.conc <> that.conc
+      val res = newBuffer(resconc)
+
+      this.clear()
+      that.clear()
+
+      res
+    }
+
+    def +=(elem: T): Repr
+    def result: To
+  }
+
+  final class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](
+    private[parallel] val maxChunkSize: Int,
+    private[parallel] var conc: Conc[T],
+    private[parallel] var lastChunk: Array[T],
+    private[parallel] var lastSize: Int
+  ) extends BufferLike[T, Conc[T], Buffer[T]] {
+    def classTag = implicitly[ClassTag[T]]
+
+    def this(mcs: Int) = this(mcs, Zero, new Array[T](INITIAL_SIZE), 0)
+
+    def this() = this(DEFAULT_MAX_SIZE)
+
+    def newBuffer(conc: Conc[T]) = new Buffer(maxChunkSize, conc, new Array[T](INITIAL_SIZE), 0)
+
     final def +=(elem: T) = if (lastSize < lastChunk.length) {
       lastChunk(lastSize) = elem
       lastSize += 1
       this
     } else {
-      val oldlength = lastChunk.length
-      val newlength = math.min(maxChunkSize, oldlength * 2)
-      pack()
-      lastChunk = new Array[T](newlength)
-      lastSize = 0
+      expand()
       this += elem
     }
 
@@ -390,18 +426,6 @@ object Conc {
       res
     }
 
-    def merge(that: Buffer[T]) = {
-      this.pack()
-      that.pack()
-
-      val resconc = this.conc <> that.conc
-      val res = new Buffer(maxChunkSize, resconc, new Array[T](INITIAL_SIZE), 0)
-
-      this.clear()
-      that.clear()
-
-      res
-    }
   }
 
 }
