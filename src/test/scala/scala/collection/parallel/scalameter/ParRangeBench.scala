@@ -20,6 +20,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
 
   val sizes = Gen.enumeration("size")(50000000, 100000000, 150000000)
   val ranges = for (size <- sizes) yield 0 until size
+  val rangesAndArrays = for(size <- sizes) yield (0 until size, new Array[Int](size))
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -530,6 +531,65 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         implicit val s = s8
         val pr = r.toPar
         pr.forall(_ < Int.MaxValue)
+      }
+    }
+
+    measure method "copyToArray" config (opts: _*) in {
+      using(rangesAndArrays) curve ("Sequential") in { rra =>
+        val r= rra._1
+        val a = rra._2
+        var i = r.head
+        val to = r.last
+        var result = true
+        while (i <= to && result) {
+          a(i) = i
+          i += 1
+        }
+        if (!result) ???
+      }
+
+      performance of "extra" config (pcopts: _*) in {
+        using(rangesAndArrays) curve ("pc") in { rra =>
+          val r= rra._1
+          val a = rra._2
+          r.par.copyToArray(a)
+        }
+      }
+
+      using(rangesAndArrays) curve ("Par-1") in { rra =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val r= rra._1
+        val pr = r.toPar
+        val a = rra._2
+        pr.copyToArray(a)
+      }
+
+      using(rangesAndArrays) curve ("Par-2") in { rra =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val r= rra._1
+        val a = rra._2
+        val pr = r.toPar
+        pr.copyToArray(a) 
+      }
+
+      using(rangesAndArrays) curve ("Par-4") in { rra =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val r= rra._1
+        val a = rra._2
+        val pr = r.toPar
+        pr.copyToArray(a)
+      }
+
+      using(rangesAndArrays) curve ("Par-8") in { rra =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val r= rra._1
+        val a = rra._2
+        val pr = r.toPar
+        pr.copyToArray(a)
       }
     }
 

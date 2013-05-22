@@ -395,7 +395,7 @@ object RangesMacros {
     val comboper: c.Expr[(Array[U], Array[U]) => Array[U]] = reify { (a: Array[U], b: Array[U]) => a }
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val rhead = reify { calleeExpression.splice.r.head }
-    val result = invokeAggregateKernel[Int, Array[U]](c)(Seq(startv, lenv, arrv) ++ initializer:_*)(arrg)(comboper)(aggregateZero(c),
+    val result = invokeAggregateKernel[Int, Array[U]](c)(initializer++Seq(startv, lenv, arrv):_*)(arrg)(comboper)(aggregateZero(c),
       copyToArray1[U](c)( startg, lengg, rhead), copyToArrayN[U](c)(startg, lengg, rhead))(ctx)
     reify {
       result.splice
@@ -413,6 +413,7 @@ object RangesMacros {
     val start = c.universe.reify{0}
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
+
   def copyToArray2[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     val (arrv,arrg) = c.functionExpr2Local[Array[U]](arr)
     val len = c.universe.reify{arrg.splice.length}
