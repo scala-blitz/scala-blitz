@@ -536,21 +536,19 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
 
     measure method "copyToArray" config (opts: _*) in {
       using(rangesAndArrays) curve ("Sequential") in { rra =>
-        val r= rra._1
+        val r = rra._1
         val a = rra._2
         var i = r.head
         val to = r.last
-        var result = true
-        while (i <= to && result) {
+        while (i <= to) {
           a(i) = i
           i += 1
         }
-        if (!result) ???
       }
 
       performance of "extra" config (pcopts: _*) in {
         using(rangesAndArrays) curve ("pc") in { rra =>
-          val r= rra._1
+          val r = rra._1
           val a = rra._2
           r.par.copyToArray(a)
         }
@@ -559,7 +557,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       using(rangesAndArrays) curve ("Par-1") in { rra =>
         import workstealing.Ops._
         implicit val s = s1
-        val r= rra._1
+        val r = rra._1
         val pr = r.toPar
         val a = rra._2
         pr.copyToArray(a)
@@ -568,7 +566,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       using(rangesAndArrays) curve ("Par-2") in { rra =>
         import workstealing.Ops._
         implicit val s = s2
-        val r= rra._1
+        val r = rra._1
         val a = rra._2
         val pr = r.toPar
         pr.copyToArray(a) 
@@ -577,7 +575,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       using(rangesAndArrays) curve ("Par-4") in { rra =>
         import workstealing.Ops._
         implicit val s = s4
-        val r= rra._1
+        val r = rra._1
         val a = rra._2
         val pr = r.toPar
         pr.copyToArray(a)
@@ -586,7 +584,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       using(rangesAndArrays) curve ("Par-8") in { rra =>
         import workstealing.Ops._
         implicit val s = s8
-        val r= rra._1
+        val r = rra._1
         val a = rra._2
         val pr = r.toPar
         pr.copyToArray(a)

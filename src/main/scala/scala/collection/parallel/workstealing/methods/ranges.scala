@@ -268,10 +268,6 @@ object RangesMacros {
     }
   }
 
-
-
-
-
   def find(c: Context)(p: c.Expr[Int => Boolean])(ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
@@ -305,7 +301,6 @@ object RangesMacros {
           result
         }
         def applyN(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int, stride: Int) = {
-
           var i = from
           var result: Option[Int] = None
           if (stride > 0) {
@@ -352,38 +347,36 @@ object RangesMacros {
     }
   }
 
-  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, zero: Array[U]) =>
-    {
+  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, arr: Array[U]) => {
       val fin = if (from > to) from else to
       var i: Int = from + to - fin
       var dest: Int = start.splice + i - rhead.splice
       while (i <= fin && (dest < len.splice)) {
-        zero(dest) = i
+        arr(dest) = i
         i += 1
         dest += 1
       }
-      zero
+      arr
     }
   }
 
-  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, zero: Array[U]) =>
-    {
+  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, arr: Array[U]) => {
       var i = from
       var dest = start.splice + (i - rhead.splice) / stride
       if (stride > 0) {
         while (i <= to && (dest < len.splice)) {
-          zero(dest) = i
+          arr(dest) = i
           i += stride
           dest += 1
         }
       } else if (stride < 0) {
         while (i >= to && (dest < len.splice)) {
-          zero(dest) = i
+          arr(dest) = i
           i += stride
           dest += 1
         }
       } else ???
-      zero
+      arr
     }
   }
 
@@ -395,13 +388,17 @@ object RangesMacros {
     val comboper: c.Expr[(Array[U], Array[U]) => Array[U]] = reify { (a: Array[U], b: Array[U]) => a }
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val rhead = reify { calleeExpression.splice.r.head }
-    val result = invokeAggregateKernel[Int, Array[U]](c)(initializer++Seq(startv, lenv, arrv):_*)(arrg)(comboper)(aggregateZero(c),
-      copyToArray1[U](c)( startg, lengg, rhead), copyToArrayN[U](c)(startg, lengg, rhead))(ctx)
+    val result = invokeAggregateKernel[Int, Array[U]](c)(initializer ++ Seq(startv, lenv, arrv): _*)(arrg)(comboper)(
+      aggregateZero(c),
+      copyToArray1[U](c)(startg, lengg, rhead),
+      copyToArrayN[U](c)(startg, lengg, rhead)
+    )(ctx)
+
     reify {
       result.splice
       ()
     }
-}
+  }
 
   def copyToArray[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     invokeCopyToArrayKernel[U](c)()(arr, start, len)(ctx)
@@ -409,18 +406,16 @@ object RangesMacros {
 
   def copyToArray3[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     val (arrv,arrg) = c.functionExpr2Local[Array[U]](arr)
-    val len = c.universe.reify{arrg.splice.length}
-    val start = c.universe.reify{0}
+    val len = c.universe.reify{ arrg.splice.length }
+    val start = c.universe.reify{ 0 }
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
 
   def copyToArray2[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     val (arrv,arrg) = c.functionExpr2Local[Array[U]](arr)
-    val len = c.universe.reify{arrg.splice.length}
+    val len = c.universe.reify{ arrg.splice.length }
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
-
-
 
 }
 
