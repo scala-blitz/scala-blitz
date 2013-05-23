@@ -351,7 +351,9 @@ object RangesMacros {
       val fin = if (from > to) from else to
       var i: Int = from + to - fin
       var dest: Int = start.splice + i - rhead.splice
-      while (i <= fin && (dest < len.splice)) {
+      val dto = if(1 + to-from < len.splice - dest - 1) to else from + (len.splice - dest - 1)
+
+      while (i <= dto) {
         arr(dest) = i
         i += 1
         dest += 1
@@ -363,19 +365,22 @@ object RangesMacros {
   def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, arr: Array[U]) => {
       var i = from
       var dest = start.splice + (i - rhead.splice) / stride
+      val dto = if(1 + (to-from)/stride < len.splice - dest - 1) to else from + (len.splice - dest - 1) * stride
+
+      if(dest < len.splice) {
       if (stride > 0) {
-        while (i <= to && (dest < len.splice)) {
+        while (i <= dto) {
           arr(dest) = i
           i += stride
           dest += 1
         }
       } else if (stride < 0) {
-        while (i >= to && (dest < len.splice)) {
+        while (i >= dto) {
           arr(dest) = i
           i += stride
           dest += 1
         }
-      } else ???
+      } else ???}
       arr
     }
   }
