@@ -381,16 +381,15 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         var i = r.head
         val to = r.last
         var found = false
-        var result: Option[Int] = None
+        var result = -1
         while (i <= to && !found) {
           if (i == to) {
             found = true
-            result = Some(i)
+            result = i
           }
           i += 1
         }
-        if (result.isEmpty) ???
-
+	result
       }
 
       performance of "extra" config (pcopts: _*) in {
