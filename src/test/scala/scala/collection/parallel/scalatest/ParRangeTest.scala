@@ -23,18 +23,26 @@ class ParRangeTest extends FunSuite with Timeouts {
     for (i <- 1000 to 10000 by 1000) {
       method(0 to i)
       method(i to 0 by -1)
+      method(i to 0 by -13)
+      method(0 to i by 13)
     }
     for (i <- 10000 to 100000 by 10000) {
       method(0 to i)
       method(i to 0 by -1)
+      method(i to 0 by -15)
+      method(0 to i by 15)
     }
     for (i <- 100000 to 1000000 by 100000) {
       method(0 to i)
       method(i to 0 by -1)
+      method(i to 0 by -29)
+      method(0 to i by 29)
     }
     for (i <- 1000000 to 10000000 by 1000000) {
       method(0 to i)
       method(i to 0 by -1)
+      method(i to 0 by -91)
+      method(0 to i by 91)
     }
     for (i <- 1000 to 1 by -1) {
       method(0 to i)
@@ -361,7 +369,7 @@ class ParRangeTest extends FunSuite with Timeouts {
       var i = 0
       while (i < start) { assert(dest(i) == 0); i += 1 }
       while (i < len) { assert(dest(i) == r(i - start)); i += 1 }
-
+      while (i < dest.length) { assert(dest(i) == 0); i += 1    }
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
