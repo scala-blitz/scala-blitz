@@ -2,25 +2,20 @@ package scala.collection.parallel
 
 
 
+import generic._
 
 
 
-class Par[Repr](val xs: Repr)
+class Par[+Repr](val seq: Repr)
 
 
 object Par {
 
-  implicit class ops[Repr](val xs: Repr) {
-    def toPar = new Par(xs)
+  implicit class ops[Repr](val seq: Repr) {
+    def toPar = new Par(seq)
   }
 
-  implicit def range2zippable(r: Par[collection.immutable.Range]): Zippable[Int] = ???
-    
-  implicit def conc2zippable[T](a: Par[Conc[T]]) = ???
-
-  /* aliases */
-
-  val WorkstealingRanges = workstealing.Ranges
+  implicit def par2zippable[T, Repr](r: Par[Repr])(implicit isZippable: IsZippable[Repr, T]): Zippable[T] = isZippable(r)
 
 }
 

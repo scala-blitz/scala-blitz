@@ -139,6 +139,10 @@ object Conc {
     def <>(that: T) = Append.apply(new Single(elem), new Single(that))
   }
 
+  implicit def concIsZippable[T] = new generic.IsZippable[Conc[T], T] {
+    def apply(pc: Par[Conc[T]]) = ???
+  }
+
   final case object Zero extends Conc[Nothing] {
     def left = throw new UnsupportedOperationException("Zero.left")
     def right = throw new UnsupportedOperationException("Zero.right")

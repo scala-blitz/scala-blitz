@@ -11,7 +11,6 @@ object Zippables {
 
   trait Scope extends Reducables.Scope {
     implicit def zippableOps[T](z: Zippable[T]) = new collection.parallel.workstealing.Zippables.Ops[T](z)
-
     implicit def canMergeZippable[T]: CanMergeFrom[Zippable[_], Int, Zippable[T]] = ???
   }
 

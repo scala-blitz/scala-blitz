@@ -65,7 +65,7 @@ object ArraysMacros {
     }
 
     c.inlineAndReset(operation)
-  }  
+  }
 
 }
 
