@@ -251,8 +251,8 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           val until = arr.length
           var count = 0
           while (i < until) {
-            if (arr(i) % 3 == 1)
-              count += 1
+            if (arr(i) % 3 == 1) { count += 1}
+            i += 1
           }
           count
         }

@@ -380,8 +380,8 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         val to = r.last
         var count = 0
         while (i <= to) {
-          if(i % 3 == 1)
-          count +=1
+          if(i % 3 == 1) { count +=1 }
+          i += 1
         }
         count
       }
