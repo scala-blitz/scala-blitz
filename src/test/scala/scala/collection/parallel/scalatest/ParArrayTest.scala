@@ -213,6 +213,26 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testProductWithCustomNumeric)
   }
 
+  def testCount(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      val x = r.count(_ % 3 == 1)
+
+      val a = r.toArray
+      val pa = a.toPar
+      val px = pa.count(_ % 3 == 1)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("count") {
+    testFold(0 until 0)
+    runForSizes(testFold)
+  }
+
  
 
 }

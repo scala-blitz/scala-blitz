@@ -13,24 +13,24 @@ object ArraysMacros {
 
   /* macro implementations */
 
-  def aggregate[T:c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
+  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.functionExpr2Local[(S, T) => S](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(S, S) => S](combop)
     val (zv, zg) = c.functionExpr2Local[S](z)
     val init = c.universe.reify { a: T => seqoper.splice.apply(zg.splice, a) }
-    invokeAggregateKernel[T, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateN[T,S](c)(init, seqoper))(ctx)
+    invokeAggregateKernel[T, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateN[T, S](c)(init, seqoper))(ctx)
   }
 
-  def fold[T:c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
     val (zv, zg: c.Expr[U]) = c.functionExpr2Local[U](z)
     val init = c.universe.reify { a: U => oper.splice.apply(zg.splice, a) }
-    invokeAggregateKernel[T, U](c)(lv, zv)(zg)(oper)(aggregateN[T,U](c)(init, oper))(ctx)
+    invokeAggregateKernel[T, U](c)(lv, zv)(zg)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def sum[T:c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
@@ -43,11 +43,11 @@ object ArraysMacros {
     }
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
     val init = c.universe.reify { a: U => a }
-    invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T,U](c)(init, oper))(ctx)
-    
+    invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
+
   }
 
-  def product[T:c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.functionExpr2Local[Numeric[U]](num)
@@ -60,11 +60,11 @@ object ArraysMacros {
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val init = c.universe.reify { a: U => a }
-    invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T,U](c)(init, oper))(ctx)
+    invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
 
   }
 
-  def count[T:c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+  def count[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (predicv, predic) = c.functionExpr2Local[T => Boolean](p)
@@ -79,12 +79,12 @@ object ArraysMacros {
     val (seqlv, seqoper) = c.functionExpr2Local[(Int, T) => Int](seqop)
     val (comblv, comboper) = c.functionExpr2Local[(Int, Int) => Int](combop)
     val init = c.universe.reify { a: T => if (predic.splice(a)) 1 else 0; }
-    invokeAggregateKernel[T, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateN[T,Int](c)(init, seqoper))(ctx)
+    invokeAggregateKernel[T, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateN[T, Int](c)(init, seqoper))(ctx)
   }
- 
-  def aggregateN[T:c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (from: Int, to: Int, zero: R, arr:Array[T]) =>
+
+  def aggregateN[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (from: Int, to: Int, zero: R, arr: Array[T]) =>
     {
-      if(from>to) zero
+      if (from > to) zero
       else {
         var i = from + 1
         var sum: R = init.splice.apply(arr(from))
@@ -98,7 +98,7 @@ object ArraysMacros {
     }
   }
 
-  def invokeAggregateKernel[T:c.WeakTypeTag,  R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Int, Int, R, Array[T]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Int, Int, R, Array[T]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Arrays.Ops[T]](c.applyPrefix)
@@ -110,7 +110,7 @@ object ArraysMacros {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel =
-        new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T,R] {
+        new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
           def apply(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyerN.splice.apply(from, to, zero, callee.array)
@@ -131,7 +131,6 @@ object ArraysMacros {
 
     c.inlineAndReset(result)
   }
-
 
   def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
@@ -186,8 +185,6 @@ object ArraysMacros {
 
     c.inlineAndReset(operation)
   }
-
-
 
 }
 

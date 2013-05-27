@@ -29,6 +29,7 @@ object Arrays {
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
     def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
+    def count(p:T=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
   }
   
   final class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
