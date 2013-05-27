@@ -36,7 +36,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     exec.outliers.suspectPercent -> 40,
     exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15
-  ) in { 
+  ) in {
 
     measure method "reduce" in {
       using(arrays) curve("Array") in { a =>

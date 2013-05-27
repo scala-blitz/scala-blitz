@@ -6,13 +6,18 @@ package workstealing
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.annotation.tailrec
+import scala.collection.parallel.generic._
 
 
 
 object Concs {
 
   trait Scope {
-    implicit def concOps[T](c: Par[Conc[T]]) = new Concs.Ops[T](c.xs)
+    implicit def concOps[T](c: Par[Conc[T]]) = new Concs.Ops[T](c.seq)
+    implicit def canMergeConc[T]: CanMergeFrom[Par[Conc[_]], T, Par[Conc[T]]] = ???
+    implicit def concIsZippable[T] = new IsZippable[Conc[T], T] {
+      def apply(pr: Par[Conc[T]]) = ???
+    }
   }
 
   class Ops[T](val c: Conc[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {

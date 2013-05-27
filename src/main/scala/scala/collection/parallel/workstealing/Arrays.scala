@@ -6,6 +6,7 @@ package workstealing
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
+import scala.collection.parallel.generic._
 
 
 
@@ -14,9 +15,11 @@ object Arrays {
   import WorkstealingTreeScheduler.{ Kernel, Node }
 
   trait Scope {
-    implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.xs)
-    implicit def array2zippable[T](a: Par[Array[T]]) = ???
-    implicit def intArrayToOps(a: Array[Int]) = Par.ops(a)
+    implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.seq)
+    implicit def canMergeArray[T]: CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] = ???
+    implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
+      def apply(pr: Par[Array[T]]) = ???
+    }
   }
 
   class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {

@@ -12,8 +12,11 @@ import scala.collection.parallel.generic._
 object Ranges {
 
   trait Scope {
-    implicit def rangeOps(r: Par[collection.immutable.Range]) = new Ranges.Ops(r.xs)
-    implicit def canMergeRange[T]: CanMergeFrom[Par[Range], Int, Par[Range]] = ???
+    implicit def rangeOps(r: Par[Range]) = new Ranges.Ops(r.seq)
+    implicit def canMergeRange[T]: CanMergeFrom[Par[Range], Int, Par[Conc[T]]] = ???
+    implicit def rangeIsZippable = new IsZippable[Range, Int] {
+      def apply(pr: Par[Range]) = ???
+    }
   }
 
   class Ops(val r: collection.immutable.Range) extends AnyVal with Zippables.OpsLike[Int, Par[collection.immutable.Range]] {

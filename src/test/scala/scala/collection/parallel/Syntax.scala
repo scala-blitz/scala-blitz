@@ -38,6 +38,21 @@ object Syntax {
     r.map(_ + 1)
   }
 
+  def zippableConcReduce() {
+    import workstealing.Ops._
+
+    implicit val ws: Scheduler = null
+
+    val pc: Par[Conc[Int]] = Conc.Zero.toPar
+    pc.reduce(_ + _)
+
+    def foo(z: Zippable[Int]) {
+      z.reduce(_ + _)
+    }
+
+    foo(pc)
+  }
+
 }
 
 
