@@ -216,7 +216,7 @@ class ParRangeTest extends FunSuite with Timeouts {
       assert(false, "timeout for range: " + r)
   }
 
-  test("ProductCustomNumeric") {
+  test("productCustomNumeric") {
     testProductWithCustomNumeric(0 until 0)
     runForSizes(testProductWithCustomNumeric)
   }

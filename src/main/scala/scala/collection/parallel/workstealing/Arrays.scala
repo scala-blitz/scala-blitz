@@ -21,7 +21,11 @@ object Arrays {
 
   class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {
     def stealer: PreciseStealer[T] = new ArrayStealer(array, 0, array.length)
+    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
+    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
+    def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
+    def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
   }
   
   final class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
