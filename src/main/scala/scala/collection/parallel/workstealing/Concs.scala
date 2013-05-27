@@ -15,7 +15,7 @@ object Concs {
     implicit def concOps[T](c: Par[Conc[T]]) = new Concs.Ops[T](c.xs)
   }
 
-  class Ops[T](val c: Conc[T]) extends AnyVal with Zippable.OpsLike[T, Par[Conc[T]]] {
+  class Ops[T](val c: Conc[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {
     def stealer: PreciseStealer[T] = new ConcStealer(c, 0, c.size)
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ConcsMacros.reduce[T, U]
     override def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.ConcsMacros.copyToArray[T, U]

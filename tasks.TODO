@@ -22,14 +22,15 @@ Reducable interface:
 
 
 Parallel ranges:
- ☐ fold
- ☐ reduce
- ☐ aggregate
- ☐ max
- ☐ min
- ☐ sum
+ ✔ fold @done (13-05-27 14:24)
+ ✔ reduce @done (13-05-27 14:24)
+ ✔ aggregate @done (13-05-27 14:24)
+ ✔ max @done (13-05-27 14:24)
+ ✔ min @done (13-05-27 14:24)
+ ✔ sum @done (13-05-27 14:24)
  ☐ foreach
- ☐ product
+ ✔ product @done (13-05-27 14:25)
+ ☐ copyToArray
  ☐ map
  ☐ filter
  ☐ flatMap
@@ -46,6 +47,15 @@ Zippable:
  ☐ operations
  ☐ unit tests
  ☐ microbenchmarks
+
+Parallel concs:
+ ✔ reduce @done (13-05-27 14:26)
+ ☐ fold
+ ☐ aggregate
+ ☐ map
+ ☐ filter
+ ☐ flatMap
+ ✔ copyToArray @done (13-05-27 14:26)
 
 Parallel arrays:
  ☐ operations

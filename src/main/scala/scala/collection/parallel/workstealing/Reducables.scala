@@ -9,17 +9,17 @@ import scala.collection.parallel.generic._
 
 
 
-object Reducable {
+object Reducables {
 
   trait Scope {
-    implicit def reducableOps[T](r: Reducable[T]) = new collection.parallel.workstealing.Reducable.Ops[T](r)
+    implicit def reducableOps[T](r: Reducable[T]) = new collection.parallel.workstealing.Reducables.Ops[T](r)
 
     implicit def canMergeReducable[T]: CanMergeFrom[Reducable[_], Int, Reducable[T]] = ???
   }
 
   trait OpsLike[+T, +Repr] extends Any /*with ReducableOps[T, Repr, WorkstealingTreeScheduler]*/ {
-    def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducable.reduce[T, U]
-    def fold[U >: T](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducable.fold[T, U]
+    def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducables.reduce[T, U]
+    def fold[U >: T](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducables.fold[T, U]
     def map[S, That](f: T => S)(implicit cbf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler) = ???
   }
 

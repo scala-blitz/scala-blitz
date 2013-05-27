@@ -11,12 +11,19 @@ import scala.reflect.ClassTag
 
 object Arrays {
 
+  import WorkstealingTreeScheduler.{ Kernel, Node }
+
   trait Scope {
-    implicit def arrayOps[T](a: Par[Array[T]]) = ???
-    
+    implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.xs)
     implicit def array2zippable[T](a: Par[Array[T]]) = ???
+    implicit def intArrayToOps(a: Array[Int]) = Par.ops(a)
   }
 
+  class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {
+    def stealer: PreciseStealer[T] = new ArrayStealer(array, 0, array.length)
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
+  }
+  
   final class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
@@ -42,7 +49,7 @@ object Arrays {
     }
 
     def result: Array[T] = {
-      import Ops._
+      import workstealing.Ops._
       import Par._
 
       pack()
@@ -53,9 +60,51 @@ object Arrays {
       c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
       array
     }
-
   }
 
-  // array ops implementations
+  class ArrayStealer[@specialized(Specializable.AllNumeric) T](val array: Array[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
+    var padding8: Int = _
+    var padding9: Int = _
+    var padding10: Int = _
+    var padding11: Int = _
+    var padding12: Int = _
+    var padding13: Int = _
+    var padding14: Int = _
+    var padding15: Int = _
+
+    def next(): T = if (hasNext) {
+      val res = array(nextProgress)
+      nextProgress += 1
+      res
+    } else throw new NoSuchElementException
+  
+    def hasNext: Boolean = nextProgress < nextUntil
+  
+    def split: (ArrayStealer[T], ArrayStealer[T]) = {
+      val total = elementsRemainingEstimate
+      psplit(total / 2)
+    }
+  
+    def psplit(leftSize: Int): (ArrayStealer[T], ArrayStealer[T]) = {
+      val ls = decode(READ_PROGRESS)
+      val lu = ls + leftSize
+      val rs = lu
+      val ru = untilIndex
+
+      (new ArrayStealer[T](array, ls, lu), new ArrayStealer[T](array, rs, ru))
+    }
+  }
+
+  abstract class ArrayKernel[@specialized(Specializable.AllNumeric) T, @specialized(Specializable.AllNumeric) R] extends IndexedStealer.IndexedKernel[T, R] {
+    def apply(node: Node[T, R], chunkSize: Int): R = {
+      val stealer = node.stealer.asInstanceOf[ArrayStealer[T]]
+      apply(node, stealer.nextProgress, stealer.nextUntil)
+    }
+    def apply(node: Node[T, R], from: Int, to: Int): R
+  }
 
 }
+
+
+
+

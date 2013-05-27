@@ -13,11 +13,10 @@ object Ranges {
 
   trait Scope {
     implicit def rangeOps(r: Par[collection.immutable.Range]) = new Ranges.Ops(r.xs)
-    
     implicit def canMergeRange[T]: CanMergeFrom[Par[Range], Int, Par[Range]] = ???
   }
 
-  class Ops(val r: collection.immutable.Range) extends AnyVal with Zippable.OpsLike[Int, Par[collection.immutable.Range]] {
+  class Ops(val r: collection.immutable.Range) extends AnyVal with Zippables.OpsLike[Int, Par[collection.immutable.Range]] {
     def stealer: Stealer[Int] = new RangeStealer(r, 0, r.length)
     override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
