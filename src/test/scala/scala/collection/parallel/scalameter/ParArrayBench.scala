@@ -56,13 +56,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           if (sum == 0) ???
         }
 
-        performance of "extra" config (pcopts: _*) in {
-          using(arrays) curve ("pc") in { arr =>
-            val sum = arr.par.sum
-            if (sum == 0) ???
-          }
-        }
-
         using(arrays) curve ("Par-1") in { arr =>
           import workstealing.Ops._
           implicit val s = s1
@@ -141,12 +134,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           if (sum == 0) ???
         }
 
-        performance of "extra" config (pcopts: _*) in {
-          using(arrays) curve ("pc") in { arr =>
-            arr.par.aggregate(0)(_ + _, _ + _)
-          }
-        }
-
         using(arrays) curve ("Par-1") in { arr =>
           import workstealing.Ops._
           implicit val s = s1
@@ -186,12 +173,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
             i += 1
           }
           if (sum == 0) ???
-        }
-
-        performance of "extra" config (pcopts: _*) in {
-          using(arrays) curve ("pc") in { arr =>
-            arr.par.sum
-          }
         }
 
         using(arrays) curve ("Par-1") in { arr =>
@@ -235,12 +216,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           if (sum == 1) ???
         }
 
-        performance of "extra" config (pcopts: _*) in {
-          using(arrays) curve ("pc") in { arr =>
-            arr.par.product
-          }
-        }
-
         using(arrays) curve ("Par-1") in { arr =>
           import workstealing.Ops._
           implicit val s = s1
@@ -280,12 +255,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
               count += 1
           }
           count
-        }
-
-        performance of "extra" config (pcopts: _*) in {
-          using(arrays) curve ("pc") in { arr =>
-            arr.par.count(_ % 3 == 1)
-          }
         }
 
         using(arrays) curve ("Par-1") in { arr =>
