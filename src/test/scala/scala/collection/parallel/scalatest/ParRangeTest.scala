@@ -94,6 +94,25 @@ class ParRangeTest extends FunSuite with Timeouts {
     runForSizes(testFold)
   }
 
+  def testCount(r: Range): Unit = try {
+    failAfter(1 seconds) {
+      val x = r.count(_ % 3 == 1)
+
+      val pr = r.toPar
+      val px = pr.count(_ % 3 == 1)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("count") {
+    testFold(0 until 0)
+    runForSizes(testFold)
+  }
+
   def testAggregate(r: Range): Unit = try {
     failAfter(1 seconds) {
       val x = r.aggregate(0)(_ + _, _ + _)

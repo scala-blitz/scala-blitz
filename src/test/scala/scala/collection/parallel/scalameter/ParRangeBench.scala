@@ -372,6 +372,56 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
+
+
+    measure method "count" config (opts: _*) in {
+      using(ranges) curve ("Sequential") in { r =>
+        var i = r.head
+        val to = r.last
+        var count = 0
+        while (i <= to) {
+          if(i % 3 == 1)
+          count +=1
+        }
+        count
+      }
+
+      performance of "extra" config (pcopts: _*) in {
+        using(ranges) curve ("pc") in { r =>
+          r.par.count(_ % 3 == 1)
+        }
+      }
+
+      using(ranges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.count(_ % 3 == 1)
+      }
+
+      using(ranges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.count(_ % 3 == 1)
+      }
+
+      using(ranges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.count(_ % 3 == 1)
+      }
+
+      using(ranges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        pr.count(_ % 3 == 1)
+      }
+    }
+
+
     measure method "find" config (opts: _*) in {
       using(ranges) curve ("Sequential") config(
         exec.benchRuns -> 30,

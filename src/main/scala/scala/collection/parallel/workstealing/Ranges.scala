@@ -27,9 +27,11 @@ object Ranges {
     def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
     def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
     def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
+
     def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
     def find(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
     def exists(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
+    def count(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count
     def forall(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.forall
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray[U]
     def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray2[U]
