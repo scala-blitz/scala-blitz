@@ -18,7 +18,7 @@ object Arrays {
     implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.seq)
     implicit def canMergeArray[T]: CanMergeFrom[Array[_], T, Par[Array[T]]] = ???
     implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
-      def apply(pr: Par[Array[T]]) = ???
+      def apply(pr: Par[Array[T]]) = ??? // TODO
     }
   }
 
@@ -29,7 +29,7 @@ object Arrays {
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
     def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
-    def count(p:T => Boolean)(implicit ctx:WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
+    def count(p: T => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Array[T], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
   }
   
