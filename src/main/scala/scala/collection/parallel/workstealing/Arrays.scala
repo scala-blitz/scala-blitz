@@ -18,7 +18,7 @@ object Arrays {
     implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.seq)
     implicit def canMergeArray[T]: CanMergeFrom[Array[_], T, Par[Array[T]]] = ???
     implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
-      def apply(pr: Par[Array[T]]) = ??? // TODO
+      def apply(pa: Par[Array[T]]) = ??? // TODO
     }
   }
 
@@ -39,7 +39,7 @@ object Arrays {
     private[parallel] var lastChunk: Array[T],
     private[parallel] var lastSize: Int,
     private val ctx: WorkstealingTreeScheduler
-  ) extends Conc.BufferLike[T, Array[T], ArrayMerger[T]] with collection.parallel.Merger[T, Array[T]] {
+  ) extends Conc.BufferLike[T, Par[Array[T]], ArrayMerger[T]] with collection.parallel.Merger[T, Par[Array[T]]] {
     def classTag = implicitly[ClassTag[T]]
 
     def this(mcs: Int, ctx: WorkstealingTreeScheduler) = this(mcs, Conc.Zero, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
@@ -57,7 +57,7 @@ object Arrays {
       this += elem
     }
 
-    def result: Array[T] = {
+    def result: Par[Array[T]] = {
       import workstealing.Ops._
       import Par._
 
@@ -67,7 +67,7 @@ object Arrays {
 
       val array = new Array[T](c.size)
       c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
-      array
+      new Par(array)
     }
   }
 

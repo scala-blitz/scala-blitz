@@ -13,13 +13,13 @@ object Ranges {
 
   trait Scope {
     implicit def rangeOps(r: Par[Range]) = new Ranges.Ops(r.seq)
-    implicit def canMergeRange[T]: CanMergeFrom[Par[Range], Int, Par[Conc[T]]] = ???
+    implicit def canMergeRange[T]: CanMergeFrom[Range, Int, Par[Conc[T]]] = ???
     implicit def rangeIsZippable = new IsZippable[Range, Int] {
       def apply(pr: Par[Range]) = ???
     }
   }
 
-  class Ops(val r: collection.immutable.Range) extends AnyVal with Zippables.OpsLike[Int, Par[collection.immutable.Range]] {
+  class Ops(val r: collection.immutable.Range) extends AnyVal with Zippables.OpsLike[Int, collection.immutable.Range] {
     def stealer: Stealer[Int] = new RangeStealer(r, 0, r.length)
     override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
@@ -27,7 +27,6 @@ object Ranges {
     def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
     def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
     def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
-
     def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
     def find(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
     def exists(p:Int=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
