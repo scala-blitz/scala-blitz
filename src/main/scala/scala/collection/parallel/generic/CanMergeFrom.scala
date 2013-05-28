@@ -4,6 +4,7 @@ package generic
 
 
 import scala.annotation.implicitNotFound
+import scala.reflect.ClassTag
 
 
 

@@ -16,36 +16,37 @@ object Arrays {
 
   trait Scope {
     implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.seq)
-    implicit def canMergeArray[T]: CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] = ???
+    implicit def canMergeArray[T]: CanMergeFrom[Array[_], T, Par[Array[T]]] = ???
     implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
       def apply(pr: Par[Array[T]]) = ???
     }
   }
 
-  class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Par[Conc[T]]] {
+  class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Array[T]] {
     def stealer: PreciseStealer[T] = new ArrayStealer(array, 0, array.length)
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
     def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
-    def count(p:T=> Boolean)(implicit ctx:WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
+    def count(p:T => Boolean)(implicit ctx:WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Array[T], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
   }
   
-  final class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
+  final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
     private[parallel] var lastChunk: Array[T],
     private[parallel] var lastSize: Int,
     private val ctx: WorkstealingTreeScheduler
-  ) extends Conc.BufferLike[T, Array[T], Merger[T]] {
+  ) extends Conc.BufferLike[T, Array[T], ArrayMerger[T]] with collection.parallel.Merger[T, Array[T]] {
     def classTag = implicitly[ClassTag[T]]
 
     def this(mcs: Int, ctx: WorkstealingTreeScheduler) = this(mcs, Conc.Zero, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
     def this(ctx: WorkstealingTreeScheduler) = this(Conc.DEFAULT_MAX_SIZE, ctx)
 
-    def newBuffer(conc: Conc[T]) = new Merger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
+    def newBuffer(conc: Conc[T]) = new ArrayMerger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
     final def +=(elem: T) = if (lastSize < lastChunk.length) {
       lastChunk(lastSize) = elem
@@ -109,6 +110,26 @@ object Arrays {
       apply(node, stealer.nextProgress, stealer.nextUntil)
     }
     def apply(node: Node[T, R], from: Int, to: Int): R
+  }
+
+  type CopyProgress = ProgressStatus
+
+  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, CopyProgress] {
+    import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+    override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
+    }
+    override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
+      val stealer = newnode.stealer.asPrecise
+      val completed = stealer.elementsCompleted
+      val arrstart = oldnode.READ_INTERMEDIATE.start + completed
+      val leftarrstart = arrstart
+      val rightarrstart = arrstart + newnode.left.child.stealer.asPrecise.elementsRemaining
+      newnode.left.child.WRITE_INTERMEDIATE(new ProgressStatus(leftarrstart, leftarrstart))
+      newnode.right.child.WRITE_INTERMEDIATE(new ProgressStatus(rightarrstart, rightarrstart))
+    }
+    def zero = null
+    def combine(a: ProgressStatus, b: ProgressStatus) = null
+    def resultArray: Array[S]
   }
 
 }

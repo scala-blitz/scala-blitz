@@ -20,7 +20,7 @@ object Reducables {
   trait OpsLike[+T, +Repr] extends Any /*with ReducableOps[T, Repr, WorkstealingTreeScheduler]*/ {
     def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducables.reduce[T, U]
     def fold[U >: T](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro Reducables.fold[T, U]
-    def map[S, That](f: T => S)(implicit cbf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler) = ???
+    def map[S, That](f: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = ???
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]]

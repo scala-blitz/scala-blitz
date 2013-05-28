@@ -4,8 +4,11 @@ package scala.collection.parallel.workstealing.methods
 
 import scala.language.experimental.macros
 import scala.reflect.macros._
+import scala.reflect.ClassTag
 import scala.collection.parallel.workstealing._
 import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node
+import scala.collection.parallel.generic._
+import scala.collection.parallel.Par
 
 
 
@@ -44,7 +47,6 @@ object ArraysMacros {
     val (lv, oper: c.Expr[(U, U) => U]) = c.functionExpr2Local[(U, U) => U](op)
     val init = c.universe.reify { a: U => a }
     invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
-
   }
 
   def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
@@ -61,7 +63,6 @@ object ArraysMacros {
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val init = c.universe.reify { a: U => a }
     invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
-
   }
 
   def count[T: c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
@@ -181,6 +182,78 @@ object ArraysMacros {
       val res = result.splice
       if (res.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
       else res.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+  def copyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(f: c.Expr[T => S])(callee: c.Expr[Arrays.Ops[T]], from: c.Expr[Int], until: c.Expr[Int])(getTagForS: c.Expr[ClassTag[S]]): c.Expr[Arrays.CopyMapArrayKernel[T, S]] = {
+    import c.universe._
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.ProgressStatus
+      val sTag = getTagForS.splice
+      val len = until.splice - from.splice
+      val sarray = sTag.newArray(len)
+      new Arrays.CopyMapArrayKernel[T, S] {
+        import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+        import scala.collection.parallel.workstealing.Arrays.CopyProgress
+        override def afterCreateRoot(root: Ref[T, CopyProgress]) {
+          root.child.WRITE_INTERMEDIATE(new CopyProgress(from.splice, from.splice))
+        }
+        def resultArray = sarray
+        def apply(node: Node[T, CopyProgress], from: Int, until: Int) = {
+          val status = node.READ_INTERMEDIATE
+          val destarr = resultArray
+          val srcarr = callee.splice.array
+          var srci = from
+          var desti = status.progress
+          while (srci < until) {
+            destarr(desti) = f.splice(srcarr(srci))
+            srci += 1
+            desti += 1
+          }
+          status.progress += (until - from)
+          status
+        }
+      }
+    }
+  }
+
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Array[T], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (lv, f) = c.functionExpr2Local[T => S](func)
+    val calleeName = newTermName(c.fresh("callee"))
+    val (cv, callee) = (
+      c.Expr[Unit](ValDef(Modifiers(), calleeName, TypeTree(), c.applyPrefix)),
+      c.Expr[Arrays.Ops[T]](Ident(calleeName))
+    )
+    val cmfName = newTermName(c.fresh("cmf"))
+    val (cmfv, canmerge) = (
+      c.Expr[Unit](ValDef(Modifiers(), cmfName, TypeTree(), cmf.tree)),
+      c.Expr[CanMergeFrom[Array[T], S, That]](Ident(cmfName))
+    )
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.array) }
+    val stagExpr = reify { mergerExpr.splice.asInstanceOf[Arrays.ArrayMerger[S]].classTag }
+    val lengthExpr = reify { callee.splice.array.length }
+    val cmkernel = copyMapKernel(c)(f)(callee, reify { 0 }, lengthExpr)(stagExpr)
+
+    val operation = reify {
+      import scala.collection.parallel.workstealing.Arrays
+      lv.splice
+      cv.splice
+      cmfv.splice
+      val stealer = callee.splice.stealer
+      val canmerge = cmf.splice
+      if (mergerExpr.splice.isInstanceOf[Arrays.ArrayMerger[S]]) {
+        val kernel = cmkernel.splice
+        ctx.splice.invokeParallelOperation(stealer, kernel)
+        new Par(kernel.resultArray).asInstanceOf[That]
+      } else {
+        ???
+      }
     }
 
     c.inlineAndReset(operation)

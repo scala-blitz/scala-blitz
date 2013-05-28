@@ -58,7 +58,6 @@ class ParArrayTest extends FunSuite with Timeouts {
       testReduce(0 until 0)
     }
     runForSizes(testReduce)
-    runForSizes(testReduce)
   }
 
   def testAggregate(r: Range): Unit = try {
@@ -233,7 +232,25 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testFold)
   }
 
- 
+  def testMap(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val rm = r.map(_ + 1)
+
+      val a = r.toArray
+      val pa = a.toPar
+      val pam = pa.map(_ + 1)
+
+      assert(rm == pam, r + ".map: " + rm + ", " + pam)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("map") {
+    // testMap(0 until 0)
+    // runForSizes(testMap)
+  }
 
 }
 
