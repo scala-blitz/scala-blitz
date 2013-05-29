@@ -19,7 +19,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
 
   /* generators */
 
-  val arraySizes = Gen.enumeration("size")(10000000, 30000000, 50000000)
+  val arraySizes = Gen.enumeration("size")(1000000, 3000000, 5000000)
   val arrays = for (size <- arraySizes) yield (0 until size).toArray
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
@@ -45,247 +45,292 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     reports.regression.noiseMagnitude -> 0.15
   ) in {
 
-      measure method "fold" in {
-        using(arrays) curve ("Sequential") in { a =>
-          var i = 0
-          val until = a.length
-          var sum = 0
-          while (i < until) {
-            sum += a(i)
-            i += 1
-          }
-          if (sum == 0) ???
+    measure method "fold" in {
+      using(arrays) curve ("Sequential") in { a =>
+        var i = 0
+        val until = a.length
+        var sum = 0
+        while (i < until) {
+          sum += a(i)
+          i += 1
         }
-
-        using(arrays) curve ("Par-1") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s1
-          val pa = arr.toPar
-          pa.fold(0)(_ + _)
-        }
-
-        using(arrays) curve ("Par-2") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s2
-          val pa = arr.toPar
-          pa.fold(0)(_ + _)
-        }
-
-        using(arrays) curve ("Par-4") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s4
-          val pa = arr.toPar
-          pa.fold(0)(_ + _)
-        }
-
-        using(arrays) curve ("Par-8") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s8
-          val pa = arr.toPar
-          pa.fold(0)(_ + _)
-        }
+        if (sum == 0) ???
       }
 
-      measure method "reduce" in {
-        using(arrays) curve ("Array") in { a =>
-          var i = 0
-          val until = a.length
-          var sum = 0
-          while (i < until) {
-            sum += a(i)
-            i += 1
-          }
-          if (sum == 0) ???
-        }
-
-        using(arrays) curve ("Par-1") in { a =>
-          import workstealing.Ops._
-          implicit val s = s1
-          a.toPar.reduce(_ + _)
-        }
-
-        using(arrays) curve ("Par-2") in { a =>
-          import workstealing.Ops._
-          implicit val s = s2
-          a.toPar.reduce(_ + _)
-        }
-
-        using(arrays) curve ("Par-4") in { a =>
-          import workstealing.Ops._
-          implicit val s = s4
-          a.toPar.reduce(_ + _)
-        }
-
-        using(arrays) curve ("Par-8") in { a =>
-          import workstealing.Ops._
-          implicit val s = s8
-          a.toPar.reduce(_ + _)
-        }
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.fold(0)(_ + _)
       }
 
-      measure method "aggregate" in {
-        using(arrays) curve ("Sequential") in { arr =>
-          var i = 0
-          val until = arr.length
-          var sum = 0
-          while (i < until) {
-            sum += arr(i)
-            i += 1
-          }
-          if (sum == 0) ???
-        }
-
-        using(arrays) curve ("Par-1") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s1
-          val pa = arr.toPar
-          pa.aggregate(0)(_ + _)(_ + _)
-        }
-
-        using(arrays) curve ("Par-2") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s2
-          val pa = arr.toPar
-          pa.aggregate(0)(_ + _)(_ + _)
-        }
-
-        using(arrays) curve ("Par-4") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s4
-          val pa = arr.toPar
-          pa.aggregate(0)(_ + _)(_ + _)
-        }
-
-        using(arrays) curve ("Par-8") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s8
-          val pa = arr.toPar
-          pa.aggregate(0)(_ + _)(_ + _)
-        }
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.fold(0)(_ + _)
       }
 
-      measure method "sum" in {
-        using(arrays) curve ("Sequential") in { arr =>
-          var i = 0
-          val until = arr.length
-          var sum = 0
-          while (i < until) {
-            sum += arr(i)
-            i += 1
-          }
-          if (sum == 0) ???
-        }
-
-        using(arrays) curve ("Par-1") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s1
-          val pa = arr.toPar
-          pa.sum
-        }
-
-        using(arrays) curve ("Par-2") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s2
-          val pa = arr.toPar
-          pa.sum
-        }
-
-        using(arrays) curve ("Par-4") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s4
-          val pa = arr.toPar
-          pa.sum
-        }
-
-        using(arrays) curve ("Par-8") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s8
-          val pa = arr.toPar
-          pa.sum
-        }
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.fold(0)(_ + _)
       }
 
-      measure method "product" in {
-        using(arrays) curve ("Sequential") in { arr =>
-          var i = 0
-          val until = arr.length
-          var sum = 1
-          while (i < until) {
-            sum *= arr(i)
-            i += 1
-          }
-          if (sum == 1) ???
-        }
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.fold(0)(_ + _)
+      }
+    }
 
-        using(arrays) curve ("Par-1") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s1
-          val pa = arr.toPar
-          pa.product
+    measure method "reduce" in {
+      using(arrays) curve ("Array") in { a =>
+        var i = 0
+        val until = a.length
+        var sum = 0
+        while (i < until) {
+          sum += a(i)
+          i += 1
         }
-
-        using(arrays) curve ("Par-2") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s2
-          val pa = arr.toPar
-          pa.product
-        }
-
-        using(arrays) curve ("Par-4") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s4
-          val pa = arr.toPar
-          pa.product
-        }
-
-        using(arrays) curve ("Par-8") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s8
-          val pa = arr.toPar
-          pa.product
-        }
+        if (sum == 0) ???
       }
 
-      measure method "count" in {
-        using(arrays) curve ("Sequential") in { arr =>
-          var i = 0
-          val until = arr.length
-          var count = 0
-          while (i < until) {
-            if (arr(i) % 3 == 1) { count += 1}
-            i += 1
-          }
-          count
-        }
+      using(arrays) curve ("Par-1") in { a =>
+        import workstealing.Ops._
+        implicit val s = s1
+        a.toPar.reduce(_ + _)
+      }
 
-        using(arrays) curve ("Par-1") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s1
-          val pa = arr.toPar
-          pa.count(_ % 3 == 1)
-        }
+      using(arrays) curve ("Par-2") in { a =>
+        import workstealing.Ops._
+        implicit val s = s2
+        a.toPar.reduce(_ + _)
+      }
 
-        using(arrays) curve ("Par-2") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s2
-          val pa = arr.toPar
-          pa.count(_ % 3 == 1)
-        }
+      using(arrays) curve ("Par-4") in { a =>
+        import workstealing.Ops._
+        implicit val s = s4
+        a.toPar.reduce(_ + _)
+      }
 
-        using(arrays) curve ("Par-4") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s4
-          val pa = arr.toPar
-          pa.count(_ % 3 == 1)
-        }
+      using(arrays) curve ("Par-8") in { a =>
+        import workstealing.Ops._
+        implicit val s = s8
+        a.toPar.reduce(_ + _)
+      }
+    }
 
-        using(arrays) curve ("Par-8") in { arr =>
-          import workstealing.Ops._
-          implicit val s = s8
-          val pa = arr.toPar
-          pa.count(_ % 3 == 1)
+    measure method "aggregate" in {
+      using(arrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        var sum = 0
+        while (i < until) {
+          sum += arr(i)
+          i += 1
         }
+        if (sum == 0) ???
+      }
+
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.aggregate(0)(_ + _)(_ + _)
+      }
+
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.aggregate(0)(_ + _)(_ + _)
+      }
+
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.aggregate(0)(_ + _)(_ + _)
+      }
+
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.aggregate(0)(_ + _)(_ + _)
+      }
+    }
+
+    measure method "sum" in {
+      using(arrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        var sum = 0
+        while (i < until) {
+          sum += arr(i)
+          i += 1
+        }
+        if (sum == 0) ???
+      }
+
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.sum
+      }
+
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.sum
+      }
+
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.sum
+      }
+
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.sum
+      }
+    }
+
+    measure method "product" in {
+      using(arrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        var sum = 1
+        while (i < until) {
+          sum *= arr(i)
+          i += 1
+        }
+        if (sum == 1) ???
+      }
+
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.product
+      }
+
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.product
+      }
+
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.product
+      }
+
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.product
+      }
+    }
+
+    measure method "count" in {
+      using(arrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        var count = 0
+        while (i < until) {
+          if (arr(i) % 3 == 1) { count += 1}
+          i += 1
+        }
+        count
+      }
+
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.count(_ % 3 == 1)
+      }
+
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.count(_ % 3 == 1)
+      }
+
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.count(_ % 3 == 1)
+      }
+
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.count(_ % 3 == 1)
+      }
+    }
+
+    measure method "map" in {
+      using(arrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        val narr = new Array[Int](until)
+        while (i < until) {
+          narr(i) = math.sqrt(i).toInt
+          i += 1
+        }
+        narr
+      }
+
+      using(arrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.map(x => math.sqrt(x).toInt)
+      }
+
+      using(arrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.map(x => math.sqrt(x).toInt)
+      }
+
+      using(arrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.map(x => math.sqrt(x).toInt)
+      }
+
+      using(arrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.map(x => math.sqrt(x).toInt)
       }
     }
   }
+}
+
+
+
+
 
