@@ -20,7 +20,7 @@ object ConcsMacros {
   def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
-    val (lv, op) = c.functionExpr2Local[(U, U) => U](operator)
+    val (lv, op) = c.nonFunctionToLocal[(U, U) => U](operator)
     val calleeExpression = c.Expr[Concs.Ops[T]](c.applyPrefix)
     val result = reify {
       import scala.collection.parallel.workstealing._

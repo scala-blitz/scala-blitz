@@ -51,6 +51,15 @@ object Arrays {
 
     def newBuffer(conc: Conc[T]) = new ArrayMerger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
+    def concToTo(c: Conc[T]) = {
+      import workstealing.Ops._
+      import Par._
+
+      val array = new Array[T](c.size)
+      c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
+      new Par(array)
+    }
+
     final def +=(elem: T) = if (lastSize < lastChunk.length) {
       lastChunk(lastSize) = elem
       lastSize += 1
@@ -60,18 +69,6 @@ object Arrays {
       this += elem
     }
 
-    def result: Par[Array[T]] = {
-      import workstealing.Ops._
-      import Par._
-
-      pack()
-      val c = conc
-      clear()
-
-      val array = new Array[T](c.size)
-      c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
-      new Par(array)
-    }
   }
 
   class ArrayStealer[@specialized(Specializable.AllNumeric) T](val array: Array[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {

@@ -112,16 +112,22 @@ package object workstealing {
      *  Otherwise, stores the function literal to a local value
      *  and returns a pair of the local value definition and an ident tree.
      */
-    def functionExpr2Local[F](f: c.Expr[F]) = f.tree match {
+    def nonFunctionToLocal[F](f: c.Expr[F], prefix: String = "local") = f.tree match {
       case Function(_, _) =>
         (c.Expr[Unit](EmptyTree), c.Expr[F](f.tree))
       case _ =>
-        val localname = newTermName(c.fresh("local$"))
+        val localname = newTermName(c.fresh(prefix))
         (c.Expr[Unit](ValDef(Modifiers(), localname, TypeTree(), f.tree)), c.Expr[F](Ident(localname)))
     }
 
   }
 
 }
+
+
+
+
+
+
 
 

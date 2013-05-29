@@ -24,11 +24,11 @@ import scala.reflect.ClassTag
  *  `Chunk` nodes can be used for the conc lists to serve as ropes.
  *  Note that these ropes are balanced only if the chunk sizes differ up to a constant factor.
  */
-sealed abstract class Conc[+T] {
+sealed abstract class Conc[+T] extends Traversable[T] {
   
   def level: Int
   
-  def size: Int
+  override def size: Int
   
   def left: Conc[T]
   
@@ -39,6 +39,9 @@ sealed abstract class Conc[+T] {
   def length = size
 
   def toString(depth: Int): String = (" " * depth) + this + "\n" + right.toString(depth + 1) + "\n" + left.toString(depth + 1)
+
+  def foreach[U](f: T => U): Unit
+
 }
 
 
@@ -146,9 +149,10 @@ object Conc {
   final case object Zero extends Conc[Nothing] {
     def left = throw new UnsupportedOperationException("Zero.left")
     def right = throw new UnsupportedOperationException("Zero.right")
-    def size = 0
+    override def size = 0
     def level = 0
     override def toString(depth: Int) = (" " * depth) + this
+    def foreach[U](f: Nothing => U) {}
   }
 
   trait Leaf[@specialized(Int, Long, Float, Double) +T] extends Conc[T] {
@@ -160,26 +164,43 @@ object Conc {
   final case class Single[@specialized(Int, Long, Float, Double) T](elem: T) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Single.left")
     def right = throw new UnsupportedOperationException("Single.right")
-    def size = 1
+    override def size = 1
     def level = 0
     def elementAt(idx: Int) = elem
+    def foreach[U](f: T => U) = f(elem)
   }
 
-  final case class Chunk[@specialized(Int, Long, Float, Double) T](elems: Array[T], size: Int) extends Leaf[T] {
+  final case class Chunk[@specialized(Int, Long, Float, Double) T](elems: Array[T], override val size: Int) extends Leaf[T] {
     def left = throw new UnsupportedOperationException("Chunk.left")
     def right = throw new UnsupportedOperationException("Chunk.right")
     def level = 0
     def elementAt(idx: Int) = elems(idx)
-    override def toString = "Chunk(%s%s; %d)".format(elems.take(10).mkString(", "), if (size > 10) ", ..." else "", size)
+    def foreach[U](f: T => U) = {
+      var i = 0
+      while (i < size) {
+        f(elems(i))
+        i += 1
+      }
+    }
+    override def toString = "Chunk(%s%s; %d; %s)".format(elems.take(10).mkString(", "), if (size > 10) ", ..." else "", size, elems)
   }
 
   final class <>[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
+    (left, right) match {
+      case (cl: Chunk[_], cr: Chunk[_]) =>
+        assert(cl.elems ne cr.elems, (cl.elems.length, cl.size, cr.elems.length, cr.size))
+      case _ =>
+    }
     val level = {
       val llev = left.level
       val rlev = right.level
       1 + (if (llev > rlev) llev else rlev)
     }
-    val size = left.size + right.size
+    override val size = left.size + right.size
+    def foreach[U](f: T => U) = {
+      left.foreach(f)
+      right.foreach(f)
+    }
     override def toString = "<>(%d, %d)".format(level, size)
   }
 
@@ -244,7 +265,7 @@ object Conc {
       val rlev = right.level
       1 + (if (llev > rlev) llev else rlev)
     }
-    val size = left.size + right.size
+    override val size = left.size + right.size
     override def normalized: Conc[T] = {
       @tailrec def fold(l: Conc[T], tree: Conc[T]): Conc[T] = l match {
         case a: Append[T] =>
@@ -255,6 +276,10 @@ object Conc {
       }
 
       fold(this.left, this.right)
+    }
+    def foreach[U](f: T => U) = {
+      left.foreach(f)
+      right.foreach(f)
     }
     override def toString = "Append(%d, %d)".format(level, size)
   }
@@ -301,7 +326,7 @@ object Conc {
       val rlev = right.level
       1 + (if (llev > rlev) llev else rlev)
     }
-    val size = left.size + right.size
+    override val size = left.size + right.size
     override def normalized: Conc[T] = {
       @tailrec def fold(tree: Conc[T], r: Conc[T]): Conc[T] = r match {
         case p: Prepend[T] =>
@@ -312,6 +337,10 @@ object Conc {
       }
 
       fold(this.left, this.right)
+    }
+    def foreach[U](f: T => U) = {
+      left.foreach(f)
+      right.foreach(f)
     }
     override def toString = "Prepend(%d, %d)".format(level, size)
   }
@@ -352,7 +381,7 @@ object Conc {
     }
   }
 
-  val INITIAL_SIZE = 8
+  val INITIAL_SIZE = 4
   val DEFAULT_MAX_SIZE = 4096
 
   trait BufferLike[T, +To, Repr <: BufferLike[T, To, Repr]] extends MergerLike[T, To, Repr] {
@@ -367,6 +396,7 @@ object Conc {
 
     private[parallel] final def pack() {
       if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
+      if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
     }
 
     private[parallel] final def expand() {
@@ -378,7 +408,7 @@ object Conc {
     }
 
     def clear() = {
-      lastChunk = new Array[T](8)
+      lastChunk = new Array[T](INITIAL_SIZE)
       lastSize = 0
       conc = Zero
     }
@@ -396,11 +426,18 @@ object Conc {
       res
     }
 
-    def +=(elem: T): Repr
-    def result: To
+    protected def concToTo(c: Conc[T]): To
+
+    def result: To = {
+      pack()
+      val res = conc
+      clear()
+
+      concToTo(res)
+    }
   }
 
-  final class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](
+  class Buffer[@specialized(Int, Long, Float, Double) T: ClassTag](
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
     private[parallel] var lastChunk: Array[T],
@@ -414,6 +451,8 @@ object Conc {
 
     def newBuffer(conc: Conc[T]) = new Buffer(maxChunkSize, conc, new Array[T](INITIAL_SIZE), 0)
 
+    def concToTo(c: Conc[T]) = c
+
     final def +=(elem: T) = if (lastSize < lastChunk.length) {
       lastChunk(lastSize) = elem
       lastSize += 1
@@ -423,11 +462,31 @@ object Conc {
       this += elem
     }
 
-    def result = {
-      pack()
-      val res = conc
-      clear()
-      res
+  }
+
+  class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
+    private[parallel] val maxChunkSize: Int,
+    private[parallel] var conc: Conc[T],
+    private[parallel] var lastChunk: Array[T],
+    private[parallel] var lastSize: Int
+  ) extends BufferLike[T, Par[Conc[T]], Merger[T]] with scala.collection.parallel.Merger[T, Par[Conc[T]]] {
+    def classTag = implicitly[ClassTag[T]]
+
+    def this(mcs: Int) = this(mcs, Zero, new Array[T](INITIAL_SIZE), 0)
+
+    def this() = this(DEFAULT_MAX_SIZE)
+
+    def newBuffer(conc: Conc[T]) = new Merger(maxChunkSize, conc, new Array[T](INITIAL_SIZE), 0)
+
+    def concToTo(c: Conc[T]) = new Par(c)
+
+    final def +=(elem: T) = if (lastSize < lastChunk.length) {
+      lastChunk(lastSize) = elem
+      lastSize += 1
+      this
+    } else {
+      expand()
+      this += elem
     }
 
   }
