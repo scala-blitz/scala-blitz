@@ -19,8 +19,10 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
 
   /* generators */
 
-  val arraySizes = Gen.enumeration("size")(1000000, 3000000, 5000000)
-  val arrays = for (size <- arraySizes) yield (0 until size).toArray
+  val smallSizes = Gen.enumeration("size")(1000000, 3000000, 5000000)
+  val smallArrays = for (size <- smallSizes) yield (0 until size).toArray
+  val largeSizes = Gen.enumeration("size")(10000000, 30000000, 50000000)
+  val largeArrays = for (size <- largeSizes) yield (0 until size).toArray
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -46,7 +48,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
   ) in {
 
     measure method "fold" in {
-      using(arrays) curve ("Sequential") in { a =>
+      using(largeArrays) curve ("Sequential") in { a =>
         var i = 0
         val until = a.length
         var sum = 0
@@ -57,28 +59,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(largeArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.fold(0)(_ + _)
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(largeArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.fold(0)(_ + _)
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(largeArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.fold(0)(_ + _)
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(largeArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
@@ -87,7 +89,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "reduce" in {
-      using(arrays) curve ("Array") in { a =>
+      using(largeArrays) curve ("Sequential") in { a =>
         var i = 0
         val until = a.length
         var sum = 0
@@ -98,25 +100,25 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      using(arrays) curve ("Par-1") in { a =>
+      using(largeArrays) curve ("Par-1") in { a =>
         import workstealing.Ops._
         implicit val s = s1
         a.toPar.reduce(_ + _)
       }
 
-      using(arrays) curve ("Par-2") in { a =>
+      using(largeArrays) curve ("Par-2") in { a =>
         import workstealing.Ops._
         implicit val s = s2
         a.toPar.reduce(_ + _)
       }
 
-      using(arrays) curve ("Par-4") in { a =>
+      using(largeArrays) curve ("Par-4") in { a =>
         import workstealing.Ops._
         implicit val s = s4
         a.toPar.reduce(_ + _)
       }
 
-      using(arrays) curve ("Par-8") in { a =>
+      using(largeArrays) curve ("Par-8") in { a =>
         import workstealing.Ops._
         implicit val s = s8
         a.toPar.reduce(_ + _)
@@ -124,7 +126,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "aggregate" in {
-      using(arrays) curve ("Sequential") in { arr =>
+      using(largeArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
         var sum = 0
@@ -135,28 +137,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(largeArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.aggregate(0)(_ + _)(_ + _)
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(largeArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.aggregate(0)(_ + _)(_ + _)
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(largeArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.aggregate(0)(_ + _)(_ + _)
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(largeArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
@@ -165,7 +167,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "sum" in {
-      using(arrays) curve ("Sequential") in { arr =>
+      using(largeArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
         var sum = 0
@@ -176,28 +178,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         if (sum == 0) ???
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(largeArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.sum
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(largeArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.sum
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(largeArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.sum
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(largeArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
@@ -206,7 +208,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "product" in {
-      using(arrays) curve ("Sequential") in { arr =>
+      using(largeArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
         var sum = 1
@@ -217,28 +219,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         if (sum == 1) ???
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(largeArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.product
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(largeArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.product
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(largeArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.product
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(largeArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
@@ -247,7 +249,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "count" in {
-      using(arrays) curve ("Sequential") in { arr =>
+      using(largeArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
         var count = 0
@@ -258,28 +260,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         count
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(largeArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.count(_ % 3 == 1)
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(largeArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.count(_ % 3 == 1)
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(largeArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.count(_ % 3 == 1)
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(largeArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
@@ -288,7 +290,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "map" in {
-      using(arrays) curve ("Sequential") in { arr =>
+      using(smallArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
         val narr = new Array[Int](until)
@@ -299,28 +301,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         narr
       }
 
-      using(arrays) curve ("Par-1") in { arr =>
+      using(smallArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
         val pa = arr.toPar
         pa.map(x => math.sqrt(x).toInt)
       }
 
-      using(arrays) curve ("Par-2") in { arr =>
+      using(smallArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
         val pa = arr.toPar
         pa.map(x => math.sqrt(x).toInt)
       }
 
-      using(arrays) curve ("Par-4") in { arr =>
+      using(smallArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
         val pa = arr.toPar
         pa.map(x => math.sqrt(x).toInt)
       }
 
-      using(arrays) curve ("Par-8") in { arr =>
+      using(smallArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
         val pa = arr.toPar
