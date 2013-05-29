@@ -240,7 +240,7 @@ class ParArrayTest extends FunSuite with Timeouts {
       val pa = a.toPar
       val pam = pa.map(_ + 1)
 
-      assert(rm == pam, r + ".map: " + rm + ", " + pam)
+      assert(rm == pam.seq.toSeq, r + ".map: " + rm + ", " + pam.seq.toBuffer)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -248,8 +248,8 @@ class ParArrayTest extends FunSuite with Timeouts {
   }
 
   test("map") {
-    // testMap(0 until 0)
-    // runForSizes(testMap)
+    testMap(0 until 0)
+    runForSizes(testMap)
   }
 
 }

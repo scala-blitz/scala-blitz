@@ -114,7 +114,7 @@ object ArraysMacros {
         new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
-          def apply(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyerN.splice.apply(from, to, zero, callee.array)
+          def apply(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyerN.splice.apply(from, to, zero, callee.array.seq)
         }
       ctx.splice.invokeParallelOperation(stealer, kernel)
     }
@@ -206,7 +206,7 @@ object ArraysMacros {
         def apply(node: Node[T, CopyProgress], from: Int, until: Int) = {
           val status = node.READ_INTERMEDIATE
           val destarr = resultArray
-          val srcarr = callee.splice.array
+          val srcarr = callee.splice.array.seq
           var srci = from
           var desti = status.progress
           while (srci < until) {
@@ -221,7 +221,7 @@ object ArraysMacros {
     }
   }
 
-  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Array[T], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[Array[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.functionExpr2Local[T => S](func)
@@ -233,15 +233,16 @@ object ArraysMacros {
     val cmfName = newTermName(c.fresh("cmf"))
     val (cmfv, canmerge) = (
       c.Expr[Unit](ValDef(Modifiers(), cmfName, TypeTree(), cmf.tree)),
-      c.Expr[CanMergeFrom[Array[T], S, That]](Ident(cmfName))
+      c.Expr[CanMergeFrom[Par[Array[T]], S, That]](Ident(cmfName))
     )
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.array) }
     val stagExpr = reify { mergerExpr.splice.asInstanceOf[Arrays.ArrayMerger[S]].classTag }
-    val lengthExpr = reify { callee.splice.array.length }
+    val lengthExpr = reify { callee.splice.array.seq.length }
     val cmkernel = copyMapKernel(c)(f)(callee, reify { 0 }, lengthExpr)(stagExpr)
 
     val operation = reify {
       import scala.collection.parallel.workstealing.Arrays
+      import scala.reflect.ClassTag
       lv.splice
       cv.splice
       cmfv.splice

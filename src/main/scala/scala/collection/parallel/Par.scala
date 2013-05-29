@@ -6,7 +6,9 @@ import generic._
 
 
 
-class Par[+Repr](val seq: Repr)
+class Par[+Repr](val seq: Repr) {
+  override def toString = "Par(%s)".format(seq)
+}
 
 
 object Par {

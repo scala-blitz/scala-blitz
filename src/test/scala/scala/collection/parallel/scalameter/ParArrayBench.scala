@@ -42,7 +42,8 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     exec.independentSamples -> 6,
     exec.outliers.suspectPercent -> 40,
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
-    reports.regression.noiseMagnitude -> 0.15) in {
+    reports.regression.noiseMagnitude -> 0.15
+  ) in {
 
       measure method "fold" in {
         using(arrays) curve ("Sequential") in { a =>
@@ -286,5 +287,5 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }
       }
     }
-}
+  }
 

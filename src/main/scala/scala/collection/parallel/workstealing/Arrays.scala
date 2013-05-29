@@ -15,24 +15,27 @@ object Arrays {
   import WorkstealingTreeScheduler.{ Kernel, Node }
 
   trait Scope {
-    implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a.seq)
-    implicit def canMergeArray[T]: CanMergeFrom[Array[_], T, Par[Array[T]]] = ???
+    implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a)
+    implicit def canMergeArray[T: ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] = new CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] {
+      def apply(from: Par[Array[_]]) = new ArrayMerger[T](ctx)
+      def apply() = new ArrayMerger[T](ctx)
+    }
     implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
       def apply(pa: Par[Array[T]]) = ??? // TODO
     }
   }
 
-  class Ops[T](val array: Array[T]) extends AnyVal with Zippables.OpsLike[T, Array[T]] {
-    def stealer: PreciseStealer[T] = new ArrayStealer(array, 0, array.length)
+  class Ops[T](val array: Par[Array[T]]) extends AnyVal with Zippables.OpsLike[T, Par[Array[T]]] {
+    def stealer: PreciseStealer[T] = new ArrayStealer(array.seq, 0, array.seq.length)
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
     def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
     def count(p: T => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
-    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Array[T], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
   }
-  
+
   final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
