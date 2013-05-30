@@ -277,6 +277,26 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testMapWithCustomCanMergeFrom)
   }
 
+  def testFilter(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val rf = r.filter(_ % 3 == 0)
+
+      val a = r.toArray
+      val pa = a.toPar
+      val paf = pa.filter(_ % 3 == 0)
+
+      assert(rf == paf.seq.toSeq, r + ".filter: " + rf + ", " + paf.seq.toBuffer)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("filter") {
+    testFilter(0 until 0)
+    runForSizes(testFilter)
+  }
+
 }
 
 

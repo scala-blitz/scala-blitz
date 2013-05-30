@@ -34,6 +34,7 @@ object Arrays {
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
     def count(p: T => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
+    def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.filter[T]
   }
 
   final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](
@@ -70,6 +71,25 @@ object Arrays {
     }
 
   }
+
+  def newArrayMerger[T](pa: Par[Array[T]])(implicit ctx: WorkstealingTreeScheduler): ArrayMerger[T] = {
+    val am = pa.seq match {
+      case x: Array[AnyRef]  => new ArrayMerger[AnyRef](ctx)
+      case x: Array[Int]     => new ArrayMerger[Int](ctx)
+      case x: Array[Double]  => new ArrayMerger[Double](ctx)
+      case x: Array[Long]    => new ArrayMerger[Long](ctx)
+      case x: Array[Float]   => new ArrayMerger[Float](ctx)
+      case x: Array[Char]    => new ArrayMerger[Char](ctx)
+      case x: Array[Byte]    => new ArrayMerger[Byte](ctx)
+      case x: Array[Short]   => new ArrayMerger[Short](ctx)
+      case x: Array[Boolean] => new ArrayMerger[Boolean](ctx)
+      case x: Array[Unit]    => new ArrayMerger[Unit](ctx)
+      case null => throw new NullPointerException
+    }
+    am.asInstanceOf[ArrayMerger[T]]
+  }
+
+  def isArrayMerger[S, That](m: Merger[S, That]) = m.isInstanceOf[ArrayMerger[S]]
 
   class ArrayStealer[@specialized(Specializable.AllNumeric) T](val array: Array[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
     var padding8: Int = _

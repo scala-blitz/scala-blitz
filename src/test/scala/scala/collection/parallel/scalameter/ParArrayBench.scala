@@ -19,6 +19,8 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
 
   /* generators */
 
+  val tinySizes = Gen.enumeration("size")(100000, 300000, 500000)
+  val tinyArrays = for (size <- tinySizes) yield (0 until size).toArray
   val smallSizes = Gen.enumeration("size")(1000000, 3000000, 5000000)
   val smallArrays = for (size <- smallSizes) yield (0 until size).toArray
   val largeSizes = Gen.enumeration("size")(10000000, 30000000, 50000000)
@@ -327,6 +329,90 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         implicit val s = s8
         val pa = arr.toPar
         pa.map(x => math.sqrt(x).toInt)
+      }
+    }
+
+    final class IntBuffer {
+      var narr = new Array[Int](4)
+      var narrpos = 0
+      def pushback(x: Int) {
+        if (narrpos < narr.length) {
+          narr(narrpos) = x
+          narrpos += 1
+        } else {
+          val newnarr = new Array[Int](narr.length * 2)
+          Array.copy(narr, 0, newnarr, 0, narr.length)
+          narr = newnarr
+          pushback(x)
+        }
+      }
+    }
+
+    measure method "filter(mod3)" in {
+      using(smallArrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        val ib = new IntBuffer
+        while (i < until) {
+          if (i % 3 == 0) ib.pushback(i)
+          i += 1
+        }
+      }
+
+      using(smallArrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.filter(_ % 3 == 0)
+      }
+
+      using(smallArrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.filter(_ % 3 == 0)
+      }
+    }
+
+    def filterSqrt(x: Int) = math.cos(x).toInt > 0
+
+    measure method "filter(cos)" in {
+      using(tinyArrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val until = arr.length
+        val ib = new IntBuffer
+        while (i < until) {
+          if (filterSqrt(i)) ib.pushback(i)
+          i += 1
+        }
+      }
+
+      using(tinyArrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pa = arr.toPar
+        pa.filter(filterSqrt)
+      }
+
+      using(tinyArrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pa = arr.toPar
+        pa.filter(filterSqrt)
+      }
+
+      using(tinyArrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pa = arr.toPar
+        pa.filter(filterSqrt)
+      }
+
+      using(tinyArrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pa = arr.toPar
+        pa.filter(filterSqrt)
       }
     }
   }
