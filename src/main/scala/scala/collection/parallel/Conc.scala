@@ -186,11 +186,6 @@ object Conc {
   }
 
   final class <>[T] private[Conc] (val left: Conc[T], val right: Conc[T]) extends Conc[T] {
-    (left, right) match {
-      case (cl: Chunk[_], cr: Chunk[_]) =>
-        assert(cl.elems ne cr.elems, (cl.elems.length, cl.size, cr.elems.length, cr.size))
-      case _ =>
-    }
     val level = {
       val llev = left.level
       val rlev = right.level
@@ -381,6 +376,7 @@ object Conc {
     }
   }
 
+  val AFTER_MERGE_SIZE = 1
   val INITIAL_SIZE = 4
   val DEFAULT_MAX_SIZE = 4096
 
@@ -389,6 +385,8 @@ object Conc {
     private[parallel] var conc: Conc[T]
     private[parallel] var lastChunk: Array[T]
     private[parallel] var lastSize: Int
+    // private var call0: Array[StackTraceElement] = null
+    // private var thr0: Thread = null
 
     implicit def classTag: ClassTag[T]
 
@@ -396,7 +394,14 @@ object Conc {
 
     private[parallel] final def pack() {
       if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
-      if (lastSize > 0) conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
+    }
+
+    private[parallel] final def prepareForMerge() = this.synchronized {
+      if (lastSize > 0) {
+        conc = Append.apply(conc, new Chunk(lastChunk, lastSize))
+        lastChunk = new Array[T](AFTER_MERGE_SIZE)
+        lastSize = 0
+      }
     }
 
     private[parallel] final def expand() {
@@ -414,14 +419,11 @@ object Conc {
     }
 
     def merge(that: Repr) = {
-      this.pack()
-      that.pack()
+      this.prepareForMerge()
+      that.prepareForMerge()
 
       val resconc = this.conc <> that.conc
       val res = newBuffer(resconc)
-
-      this.clear()
-      that.clear()
 
       res
     }
