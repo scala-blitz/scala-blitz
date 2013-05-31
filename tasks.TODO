@@ -1,8 +1,10 @@
 Reducable interface:
  ☐ go through all operations in standard collections and filter them for the Reducable interface
+ ☐ foreach
  ☐ fold
  ☐ reduce
  ☐ aggregate
+ ☐ mapReduce -- should be easy to express in terms of aggregate
  ☐ max
  ☐ min
  ☐ sum
@@ -10,7 +12,6 @@ Reducable interface:
  ☐ map
  ☐ filter
  ☐ flatMap
- ☐ foreach
 
  ☐ contains\exists\containsSlice
  ☐ corresponds
@@ -19,6 +20,14 @@ Reducable interface:
  ☐ groupBy
  ☐ intersect
  ☐ sort
+ ☐ to
+
+
+ Zippable interface:
+ ☐ copyToArray
+ ☐ zip
+ ☐ zipWithIndex
+ ☐ zipView
 
 
 Parallel ranges:
@@ -28,6 +37,7 @@ Parallel ranges:
  ✔ max @done (13-05-27 14:24)
  ✔ min @done (13-05-27 14:24)
  ✔ sum @done (13-05-27 14:24)
+ ☐ mapReduce
  ☐ foreach
  ✔ product @done (13-05-27 14:25)
  ☐ copyToArray
@@ -37,6 +47,7 @@ Parallel ranges:
  ☐ every operation in the Reducable interface
  ☐ unit tests
  ☐ microbenchmarks
+ ☐ to
 
 Reducable:
  ☐ operations
@@ -52,33 +63,55 @@ Parallel concs:
  ✔ reduce @done (13-05-27 14:26)
  ☐ fold
  ☐ aggregate
+ ☐ mapReduce
  ☐ map
  ☐ filter
  ☐ flatMap
  ✔ copyToArray @done (13-05-27 14:26)
 
 Parallel arrays:
- ☐ operations
- ☐ unit tests
- ☐ microbenchmarks
+ ✔ reduce @done (13-05-31 10:44)
+ ✔ fold @done (13-05-31 10:44)
+ ✔ aggregate @done (13-05-31 10:44)
+ ✔ sum @done (13-05-31 10:44)
+ ✔ product @done (13-05-31 10:44)
+ ☐ mapReduce
+ ☐ foreach
+ ☐ min
+ ☐ max
+ ✔ map @done (13-05-31 10:44)
+ ✔ filter @done (13-05-31 10:44)
+ ☐ flatMap
+ ☐ zipView
 
 Parallel hash tables:
- ☐ operations
+ ☐ reduce
+ ☐ fold
+ ☐ aggregate
+ ☐ mapReduce
+ ☐ foreach
+ ☐ map
+ ☐ filter
  ☐ unit tests
  ☐ microbenchmarks
 
 Parallel n-ary tree operations:
- ☐ operations
+ ☐ reduce
+ ☐ fold
+ ☐ aggregate
+ ☐ mapReduce
+ ☐ foreach
+ ☐ map
+ ☐ filter
  ☐ unit tests
  ☐ microbenchmarks
+
 
 Synchronized stealers (non-lock free):
  ☐ see if we can do generically
 
 Splitting package:
  ☐ same interface for old parallel collections (implicit conversions in the same style as the workstealing package)
-
-
 
 To fix:
  ☐ argument expressions need to be assigned to a local var
