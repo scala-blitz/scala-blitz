@@ -35,6 +35,7 @@ object Arrays {
     def count(p: T => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
     def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.filter[T]
+    def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.flatMap[T, S, That]
   }
 
   final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](

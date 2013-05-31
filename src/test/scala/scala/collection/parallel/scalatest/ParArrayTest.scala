@@ -297,6 +297,27 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testFilter)
   }
 
+  def testFlatMap(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val list = List(2, 3)
+      val rf = r.flatMap(x => list.map(_ * x))
+
+      val a: Array[Int] = r.toArray
+      val pa = a.toPar
+      val paf = pa.flatMap(x => list.map(_ * x))
+
+      assert(rf == paf.seq.toSeq, r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("flatMap") {
+    testFlatMap(0 until 0)
+    runForSizes(testFlatMap)
+  }
+
 }
 
 

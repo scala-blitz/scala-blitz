@@ -415,6 +415,27 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         pa.filter(filterSqrt)
       }
     }
+
+    measure method "flatMap" in {
+      using(smallArrays) curve ("Sequential") in { arr =>
+        var i = 0
+        val lst = List(2, 3)
+        val until = arr.length
+        val ib = new IntBuffer
+        while (i < until) {
+          lst.foreach(y => ib.pushback(i * y))
+          i += 1
+        }
+      }
+
+      using(smallArrays) curve ("Par-1") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val other = List(2, 3)
+        val pa = arr.toPar
+          pa.flatMap(x => other.map(_ * x))
+      }
+    }
   }
 }
 
