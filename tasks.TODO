@@ -12,7 +12,6 @@ Reducable interface:
  ☐ map
  ☐ filter
  ☐ flatMap
-
  ☐ contains\exists\containsSlice
  ☐ corresponds
  ☐ distinct
@@ -21,14 +20,13 @@ Reducable interface:
  ☐ intersect
  ☐ sort
  ☐ to
-
+ ☐ have a variant of breakOut for parallel collections to allow mapping ranges to arbitrary collections
 
  Zippable interface:
  ☐ copyToArray
  ☐ zip
  ☐ zipWithIndex
  ☐ zipView
-
 
 Parallel ranges:
  ✔ fold @done (13-05-27 14:24)
