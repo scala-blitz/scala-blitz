@@ -80,7 +80,7 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testAggregate)
   }
 
- def testFold(r: Range): Unit = try {
+  def testFold(r: Range): Unit = try {
     failAfter(6 seconds) {
       val x = r.fold(0)(_ + _)
 
@@ -100,7 +100,7 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testFold)
   }
 
- def testSum(r: Range): Unit = try {
+  def testSum(r: Range): Unit = try {
     failAfter(6 seconds) {
       val x = r.sum
 
@@ -232,6 +232,150 @@ class ParArrayTest extends FunSuite with Timeouts {
     runForSizes(testFold)
   }
 
+  def testMin(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      val x = r.min
+
+      val a = r.toArray
+      val pa = a.toPar
+      val px = pa.min
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("min") {
+    runForSizes(testMin)
+  }
+
+  def testMinCustomOrdering(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      object myOrd extends Ordering[Int] {
+        def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
+      }
+      val x = r.max
+
+      val a = r.toArray
+      val pa = a.toPar
+      val px = pa.min(myOrd, scheduler)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("minCustomOrdering") {
+    runForSizes(testMin)
+  }
+
+  def testMax(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      val x = r.max
+
+      val a = r.toArray
+      val pa = a.toPar
+      val px = pa.max
+
+      assert(x == px, r + ": " + x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("max") {
+    runForSizes(testMax)
+  }
+
+  def testMaxCustomOrdering(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      object myOrd extends Ordering[Int] {
+        def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
+      }
+      val x = r.min
+
+      val a = r.toArray
+      val pa = a.toPar
+      val px = pa.max(myOrd, scheduler)
+
+      assert(x == px, x + ", " + px)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("maxCustomOrdering") {
+    runForSizes(testMaxCustomOrdering)
+  }
+
+  def testFind(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      val toBeFound = r.max
+      val toNotBeFound = toBeFound + 1
+
+      val a = r.toArray
+      val pa = a.toPar
+      val shouldBeFound = pa.find(_ == toBeFound)
+      assert(shouldBeFound.isDefined && shouldBeFound.get == toBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
+      val shouldNotBeFound = pa.find(_ == toNotBeFound)
+      assert(shouldNotBeFound.isEmpty, r + ": " + shouldNotBeFound + ", None")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("find") {
+    runForSizes(testFind)
+  }
+
+  def testExists(r: Range): Unit = try {
+    failAfter(4 seconds) {
+      val toBeFound = r.max
+      val toNotBeFound = toBeFound + 1
+
+      val a = r.toArray
+      val pa = a.toPar
+      val shouldBeFound = pa.exists(_ == toBeFound)
+      assert(shouldBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
+      val shouldNotBeFound = pa.exists(_ == toNotBeFound)
+      assert(!shouldNotBeFound, r + ": " + shouldNotBeFound + ", false")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("exists") {
+    runForSizes(testExists)
+  }
+
+  def testForAll(r: Range): Unit = try {
+    failAfter(4 seconds) {
+
+      val a = r.toArray
+      val pa = a.toPar
+      val mx = r.last
+      val shouldBe = pa.forall(_ > Int.MinValue)
+      assert(shouldBe, r + ": " + shouldBe + ", true")
+      val shouldNotBe = pa.forall(_ < mx - 1)
+      assert(!shouldNotBe, r + ": " + shouldNotBe + ", false")
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for range: " + r)
+  }
+
+  test("forAll") {
+    runForSizes(testForAll)
+  }
+
   def testMap(r: Range): Unit = try {
     failAfter(6 seconds) {
       val rm = r.map(_ + 1)
@@ -298,20 +442,4 @@ class ParArrayTest extends FunSuite with Timeouts {
   }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
