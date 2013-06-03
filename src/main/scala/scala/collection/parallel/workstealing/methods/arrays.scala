@@ -10,6 +10,7 @@ import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node
 import scala.collection.parallel.generic._
 import scala.collection.parallel.Par
 import scala.collection.parallel.Merger
+import Optimiser.c2opt
 
 
 

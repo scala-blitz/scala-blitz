@@ -19,6 +19,8 @@ object Par {
 
   implicit def par2zippable[T, Repr](r: Par[Repr])(implicit isZippable: IsZippable[Repr, T]): Zippable[T] = isZippable(r)
 
+  class assume extends scala.annotation.StaticAnnotation
+
 }
 
 

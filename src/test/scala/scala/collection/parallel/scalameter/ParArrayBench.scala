@@ -433,7 +433,10 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         implicit val s = s1
         val other = List(2, 3)
         val pa = arr.toPar
-          pa.flatMap(x => other.map(_ * x))
+        for {
+          x <- pa
+          y <- other
+        } yield (x * y): @unchecked
       }
     }
   }

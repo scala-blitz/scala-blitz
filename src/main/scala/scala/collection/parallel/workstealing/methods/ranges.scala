@@ -8,6 +8,7 @@ import scala.collection.parallel.generic._
 import collection.parallel.Par
 import collection.parallel.workstealing._
 import collection.parallel.Configuration
+import Optimiser._
 
 
 
@@ -282,9 +283,9 @@ object RangesMacros {
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[Option[Int]] {
         def zero = None
-        def combine(a: Option[Int], b: Option[Int]) =  if(a.isDefined) a else b
+        def combine(a: Option[Int], b: Option[Int]) = if (a.isDefined) a else b
         def apply0(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], at: Int) = {
-          if(pred.splice(at)) {
+          if (pred.splice(at)) {
             terminationCause = ResultFound
             Some(at)
           }
@@ -297,7 +298,7 @@ object RangesMacros {
             if(pred.splice(i)) result = Some(i)
             i += 1
           }
-          if(result.isDefined) terminationCause =  ResultFound
+          if(result.isDefined) terminationCause = ResultFound
           result
         }
         def applyN(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int, stride: Int) = {
@@ -323,7 +324,6 @@ object RangesMacros {
     }
 
     c.inlineAndReset(result)
-
   }
 
   def forall(c: Context)(p: c.Expr[Int => Boolean])( ctx:c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {

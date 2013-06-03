@@ -7,7 +7,6 @@ import scala.reflect.macros._
 
 
 
-
 package object workstealing {
 
   /* utilities */
@@ -40,13 +39,6 @@ package object workstealing {
 
   object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
     def validateResult[R](r: R) = if (r.isInstanceOf[Option[_]]) r else ???
-  }
-
-  /* macro utilities */
-
-  implicit def Util(context: Context) = new Util[context.type](context)
-
-  class Util[C <: Context](val c: C) {
   }
 
 }

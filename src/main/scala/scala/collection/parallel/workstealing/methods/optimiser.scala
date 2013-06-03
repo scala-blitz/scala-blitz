@@ -3,22 +3,35 @@ package scala.collection.parallel.workstealing.methods
 
 
 import scala.reflect.macros._
+import scala.collection._
 
 
 
 class Optimiser[C <: Context](val c: C) {
   import c.universe._
 
+  val MapName = newTermName("map")
+  val ForeachName = newTermName("foreach")
+  val uncheckedTpe = typeOf[scala.unchecked]
+
+  object collections {
+    def TypeSymbolSet(s: Type*) = s.map(_.typeSymbol).toSet
+    val pureMap = TypeSymbolSet(
+      typeOf[List[_]], typeOf[Array[_]], typeOf[Vector[_]], typeOf[mutable.ArrayBuffer[_]], typeOf[mutable.ListBuffer[_]], typeOf[Stream[_]]
+    )
+  }
+
   def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] =
     c.Expr[T](c resetAllAttrs inlineFunctionApply(expr.tree))
 
   def inlineFunctionApply(tree: Tree): Tree = {
     val ApplyName = newTermName("apply")
+
     object inliner extends Transformer {
       override def transform(tree: Tree): Tree = {
         tree match {
           case ap @ Apply(Select(prefix, ApplyName), args) =>
-            def function2block(params: List[ValDef], body: Tree): Block = {
+            def inlineToLocals(params: List[ValDef], body: Tree): Block = {
               if (params.length != args.length)
                 c.abort(c.enclosingPosition, "incorrect arity: " + (params.length, args.length))
               val paramVals = params.zip(args).map {
@@ -31,20 +44,21 @@ class Optimiser[C <: Context](val c: C) {
               }
               Block(paramVals, Block(paramVals2, body))
             }
-            def nestedFunction2Block(t: Tree): Tree = t match {
+            def functionToBlock(t: Tree): Tree = t match {
               case Function(params, body) =>
-                function2block(params, body)
+                inlineToLocals(params, body)
               case Block(stats, t2) =>
-                Block(stats, nestedFunction2Block(t2))
+                Block(stats, functionToBlock(t2))
               case x =>
                 ap
             }
-            super.transform(nestedFunction2Block(prefix))
+            super.transform(functionToBlock(prefix))
           case _ =>
             super.transform(tree)
         }
       }
     }
+
     inliner.transform(tree)
   }
 
@@ -59,7 +73,8 @@ class Optimiser[C <: Context](val c: C) {
       prefix
     case Apply(Select(prefix, name), args) =>
       prefix
-    case _ => c.prefix.tree
+    case _ =>
+      c.prefix.tree
   }
 
   /** Used to generate a local val for a function expression,
@@ -77,17 +92,46 @@ class Optimiser[C <: Context](val c: C) {
       (c.Expr[Unit](ValDef(Modifiers(), localname, TypeTree(), f.tree)), c.Expr[F](Ident(localname)))
   }
 
-  /** Optimizes maps followed directly by a foreach into just foreach loops.
+  object FusableMapBlock {
+    def unapply(t: Tree): Option[Tree] = t match {
+      case Apply(Apply(TypeApply(Select(prefix, MapName), _), List(PureFunction())), implicits) if hasPureMapOp(prefix) =>
+        Some(t)
+      case Apply(Apply(Select(prefix, MapName), List(PureFunction())), implicits) if hasPureMapOp(prefix) =>
+        Some(t)
+      case Block(stats, result) =>
+        unapply(result)
+      case _ =>
+        None
+    }
+    def hasPureMapOp(prefix: Tree): Boolean = {
+      val widenedType = prefix.tpe.widen
+      val sym = widenedType.typeSymbol
+      collections.pureMap contains sym
+    }
+    object PureFunction {
+      def isUnchecked(tpe: Type) = tpe match {
+        case AnnotatedType(annots, _, _) => annots.exists(_.tpe == uncheckedTpe)
+        case _ => false
+      }
+      def unapply(tt: Tree): Boolean = tt match {
+        case Typed(Function(_, _), tt: TypeTree) => isUnchecked(tt.tpe)
+        case Function(_, body) => isUnchecked(body.tpe)
+      }
+    }
+  }
+
+  /** Optimizes occurrences of a map followed directly by a foreach into just foreach loops.
    */
   def mapForeachFusion(tree: Tree): Tree = {
-    val MapName = newTermName("map")
-    val ForeachName = newTermName("foreach")
-    
     object fusion extends Transformer {
       override def transform(tree: Tree): Tree = {
         tree match {
-          case _ =>
+          case Apply(TypeApply(Select(FusableMapBlock(m), ForeachName), _), List(Function(params, body))) =>
+            super.transform(tree)
+          case Apply(Select(FusableMapBlock(m), ForeachName), List(Function(params, body))) =>
             println(tree)
+            super.transform(tree)
+          case _ =>
             super.transform(tree)
         }
       }
@@ -102,9 +146,18 @@ class Optimiser[C <: Context](val c: C) {
    */
   def optimise[T](expr: c.Expr[T]): c.Expr[T] = {
     val tree = expr.tree
+    println(tree)
     val inltree = inlineFunctionApply(tree)
-    val opttree = mapForeachFusion(inltree)
-    c.Expr[T](opttree)
+    val fustree = mapForeachFusion(inltree)
+    val opttree = fustree
+    c.Expr[T](c resetAllAttrs opttree)
   }
 
 }
+
+
+object Optimiser {
+  implicit def c2opt(c: Context) = new Optimiser[c.type](c)
+}
+
+
