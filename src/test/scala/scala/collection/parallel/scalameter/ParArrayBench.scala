@@ -9,7 +9,7 @@ import scala.reflect.ClassTag
 
 
 class ParArrayBench extends PerformanceTest.Regression with Serializable {
-  val TEST_DERIVATIVE_METHODS = false
+  val TEST_DERIVATIVE_METHODS = sys.props.get("scala.collection.parallel.scalameter.ParArrayBench.test_derivative_methods").map(_.toBoolean).getOrElse(true)
   import Par._
   import workstealing.WorkstealingTreeScheduler
   import workstealing.WorkstealingTreeScheduler.Config
@@ -305,7 +305,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           var found = false
           var result = -1
           while (i < to && !found) {
-            if (needle == arr(i) * sin(arr(i))) {
+            if (needle == arr(i) * math.sin(arr(i))) {
               found = true
               result = i
             }
@@ -319,7 +319,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           implicit val s = s1
           val pr = arr.toPar
           val mx = arr.last + 1
-          pr.find(x => x * sin(x) == mx)
+          pr.find(x => x * math.sin(x) == mx)
         }
 
         using(largeArrays) curve ("Par-2") in { arr =>
@@ -327,7 +327,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           implicit val s = s2
           val pr = arr.toPar
           val mx = arr.last + 1
-          pr.find(x => x * sin(x) == mx)
+          pr.find(x => x * math.sin(x) == mx)
         }
 
         using(largeArrays) curve ("Par-4") in { arr =>
@@ -335,7 +335,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           implicit val s = s4
           val pr = arr.toPar
           val mx = arr.last + 1
-          pr.find(x => x * sin(x) == mx)
+          pr.find(x => x * math.sin(x) == mx)
         }
 
         using(largeArrays) curve ("Par-8") in { arr =>
@@ -343,7 +343,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           implicit val s = s8
           val pr = arr.toPar
           val mx = arr.last + 1
-          pr.find(x => x * sin(x) == mx)
+          pr.find(x => x * math.sin(x) == mx)
         }
       }
 
