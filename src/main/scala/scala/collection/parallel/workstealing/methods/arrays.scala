@@ -10,7 +10,7 @@ import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node
 import scala.collection.parallel.generic._
 import scala.collection.parallel.Par
 import scala.collection.parallel.Merger
-import Optimiser.c2opt
+import Optimizer.c2opt
 
 
 
@@ -343,7 +343,9 @@ object ArraysMacros {
       cmb.result
     }
 
-    c.inlineAndReset(operation)
+    val r = c.inlineAndReset(operation)
+    println(r)
+    r
   }
 
 }

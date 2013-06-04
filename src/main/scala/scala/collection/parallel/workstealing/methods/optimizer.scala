@@ -7,7 +7,7 @@ import scala.collection._
 
 
 
-class Optimiser[C <: Context](val c: C) {
+class Optimizer[C <: Context](val c: C) {
   import c.universe._
 
   val MapName = newTermName("map")
@@ -92,30 +92,75 @@ class Optimiser[C <: Context](val c: C) {
       (c.Expr[Unit](ValDef(Modifiers(), localname, TypeTree(), f.tree)), c.Expr[F](Ident(localname)))
   }
 
-  object FusableMapBlock {
-    def unapply(t: Tree): Option[Tree] = t match {
-      case Apply(Apply(TypeApply(Select(prefix, MapName), _), List(PureFunction())), implicits) if hasPureMapOp(prefix) =>
-        Some(t)
-      case Apply(Apply(Select(prefix, MapName), List(PureFunction())), implicits) if hasPureMapOp(prefix) =>
-        Some(t)
-      case Block(stats, result) =>
-        unapply(result)
-      case _ =>
-        None
-    }
-    def hasPureMapOp(prefix: Tree): Boolean = {
-      val widenedType = prefix.tpe.widen
-      val sym = widenedType.typeSymbol
-      collections.pureMap contains sym
-    }
-    object PureFunction {
-      def isUnchecked(tpe: Type) = tpe match {
-        case AnnotatedType(annots, _, _) => annots.exists(_.tpe == uncheckedTpe)
-        case _ => false
+  def hasPureMapOp(prefix: Tree): Boolean = {
+    val widenedType = prefix.tpe.widen
+    val sym = widenedType.typeSymbol
+    collections.pureMap contains sym
+  }
+
+  class Fusion(PrimaryOpName: TermName, SecondaryOpName: TermName, primaryOpPure: Tree => Boolean) extends Transformer {
+    object FusablePrimaryBlock {
+      def unapply(tree: Tree): Option[(Tree, Function, Tree => Tree)] = {
+        def unapply(f: Tree => Tree, t: Tree): Option[(Tree, Function, Tree => Tree)] = t match {
+          case Apply(Apply(TypeApply(Select(prefix, PrimaryOpName), _), List(PureFunction(primaryFunc))), implicits) if primaryOpPure(prefix) =>
+            Some((prefix, primaryFunc, f))
+          case Apply(Apply(Select(prefix, PrimaryOpName), List(PureFunction(primaryFunc))), implicits) if primaryOpPure(prefix) =>
+            Some((prefix, primaryFunc, f))
+          case Block(stats, result) =>
+            unapply(t => f(Block(stats, t)), result)
+          case _ =>
+            None
+        }
+        unapply(t => t, tree)
       }
-      def unapply(tt: Tree): Boolean = tt match {
-        case Typed(Function(_, _), tt: TypeTree) => isUnchecked(tt.tpe)
-        case Function(_, body) => isUnchecked(body.tpe)
+      object PureFunction {
+        def isUnchecked(tpe: Type) = tpe match {
+          case AnnotatedType(annots, _, _) => annots.exists(_.tpe == uncheckedTpe)
+          case _ => false
+        }
+        def unapply(tt: Tree): Option[Function] = tt match {
+          case Typed(f @ Function(_, _), tt: TypeTree) => if (isUnchecked(tt.tpe)) Some(f) else unapply(f)
+          case f @ Function(_, body) => if (isUnchecked(body.tpe)) Some(f) else None
+          case _ => None
+        }
+      }
+    }
+  
+    object FusablePattern {
+      def unapply(tree: Tree): Option[(Tree, Function, Function, Tree => Tree, (Tree, Function) => Tree)] = tree match {
+        case Apply(TypeApply(Select(FusablePrimaryBlock(callee, primFunc, makeBlock), SecondaryOpName), targs), List(secondFunc @ Function(params, body))) =>
+          Some((callee, primFunc, secondFunc, makeBlock, (t, f) => Apply(TypeApply(Select(t, SecondaryOpName), targs), List(f))))
+        case Apply(Select(FusablePrimaryBlock(callee, primFunc, makeBlock), SecondaryOpName), List(secondFunc @ Function(params, body))) =>
+          Some((callee, primFunc, secondFunc, makeBlock, (t, f) => Apply(Select(t, SecondaryOpName), List(f))))
+        case _ =>
+          None
+      }
+    }
+
+    override def transform(tree: Tree): Tree = {
+      def fuse(callee: Tree, pf: Function, sf: Function, makeBlock: Tree => Tree, makeSecondary: (Tree, Function) => Tree): Tree = {
+        val localName = newTermName(c.fresh("local"))
+        val fusedFunc = (pf, sf) match {
+          case (Function(List(pparam), pbody), Function(List(sparam), sbody)) =>
+            Function(List(pparam), Block(
+              List(
+                ValDef(Modifiers(), localName, TypeTree(), pbody)
+              ),
+              Apply(sf, List(Ident(localName)))
+            ))
+        }
+        val call = makeSecondary(callee, fusedFunc)
+        val block = makeBlock(call)
+        block
+      }
+
+      tree match {
+        case FusablePattern(callee, pf, sf, makeBlock, makeSecondary) =>
+          val ntree = fuse(callee, pf, sf, makeBlock, makeSecondary)
+          println(ntree)
+          super.transform(ntree)
+        case _ =>
+          super.transform(tree)
       }
     }
   }
@@ -123,20 +168,7 @@ class Optimiser[C <: Context](val c: C) {
   /** Optimizes occurrences of a map followed directly by a foreach into just foreach loops.
    */
   def mapForeachFusion(tree: Tree): Tree = {
-    object fusion extends Transformer {
-      override def transform(tree: Tree): Tree = {
-        tree match {
-          case Apply(TypeApply(Select(FusableMapBlock(m), ForeachName), _), List(Function(params, body))) =>
-            super.transform(tree)
-          case Apply(Select(FusableMapBlock(m), ForeachName), List(Function(params, body))) =>
-            println(tree)
-            super.transform(tree)
-          case _ =>
-            super.transform(tree)
-        }
-      }
-    }
-
+    val fusion = new Fusion(MapName, ForeachName, hasPureMapOp)
     fusion.transform(tree)
   }
 
@@ -146,7 +178,6 @@ class Optimiser[C <: Context](val c: C) {
    */
   def optimise[T](expr: c.Expr[T]): c.Expr[T] = {
     val tree = expr.tree
-    println(tree)
     val inltree = inlineFunctionApply(tree)
     val fustree = mapForeachFusion(inltree)
     val opttree = fustree
@@ -156,8 +187,8 @@ class Optimiser[C <: Context](val c: C) {
 }
 
 
-object Optimiser {
-  implicit def c2opt(c: Context) = new Optimiser[c.type](c)
+object Optimizer {
+  implicit def c2opt(c: Context) = new Optimizer[c.type](c)
 }
 
 

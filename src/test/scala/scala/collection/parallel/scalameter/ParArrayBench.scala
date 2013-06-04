@@ -417,26 +417,67 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "flatMap" in {
-      using(smallArrays) curve ("Sequential") in { arr =>
+      using(tinyArrays) curve ("Sequential") in { arr =>
         var i = 0
-        val lst = List(2, 3)
+        val lst = List(2, 3, 5, 7, 11)
         val until = arr.length
         val ib = new IntBuffer
         while (i < until) {
-          lst.foreach(y => ib.pushback(i * y))
+          lst.foreach(y => ib.pushback(arr(i) * y))
           i += 1
         }
       }
 
-      using(smallArrays) curve ("Par-1") in { arr =>
+      using(tinyArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
-        val other = List(2, 3)
-        val pa = arr.toPar
+        val other = List(2, 3, 5, 7, 11)
+          val pa = arr.toPar
         for {
           x <- pa
           y <- other
-        } yield (x * y): @unchecked
+        } yield {
+          x * y
+        }: @unchecked
+      }
+
+      using(tinyArrays) curve ("Par-2") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val other = List(2, 3, 5, 7, 11)
+          val pa = arr.toPar
+        for {
+          x <- pa
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+
+      using(tinyArrays) curve ("Par-4") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val other = List(2, 3, 5, 7, 11)
+          val pa = arr.toPar
+        for {
+          x <- pa
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+
+      using(tinyArrays) curve ("Par-8") in { arr =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val other = List(2, 3, 5, 7, 11)
+          val pa = arr.toPar
+        for {
+          x <- pa
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
       }
     }
   }

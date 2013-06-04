@@ -10,7 +10,7 @@ import collection.parallel.workstealing._
 import collection.parallel.Configuration
 import scala.collection.parallel.Conc
 import scala.math
-import Optimiser._
+import Optimizer._
 
 
 

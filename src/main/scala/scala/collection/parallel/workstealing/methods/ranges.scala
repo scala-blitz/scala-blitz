@@ -8,7 +8,7 @@ import scala.collection.parallel.generic._
 import collection.parallel.Par
 import collection.parallel.workstealing._
 import collection.parallel.Configuration
-import Optimiser._
+import Optimizer._
 
 
 
