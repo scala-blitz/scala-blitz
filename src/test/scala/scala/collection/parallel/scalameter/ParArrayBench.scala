@@ -297,15 +297,14 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
-      measure method "find" in {
-        using(largeArrays) curve ("Sequential") in { arr =>
+      measure method "find*" in {
+        using(smallArrays) curve ("Sequential") in { arr =>
           var i = 0
           val to = arr.length
-          val needle = arr.last + 1
           var found = false
           var result = -1
           while (i < to && !found) {
-            if (needle == arr(i) * math.sin(arr(i))) {
+            if (2.0 == math.sin(arr(i))) {
               found = true
               result = i
             }
@@ -314,36 +313,32 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
           result
         }
 
-        using(largeArrays) curve ("Par-1") in { arr =>
+        using(smallArrays) curve ("Par-1") in { arr =>
           import workstealing.Ops._
           implicit val s = s1
           val pr = arr.toPar
-          val mx = arr.last + 1
-          pr.find(x => x * math.sin(x) == mx)
+          pr.find(x => math.sin(x) == 2.0)
         }
 
-        using(largeArrays) curve ("Par-2") in { arr =>
+        using(smallArrays) curve ("Par-2") in { arr =>
           import workstealing.Ops._
           implicit val s = s2
           val pr = arr.toPar
-          val mx = arr.last + 1
-          pr.find(x => x * math.sin(x) == mx)
+          pr.find(x => math.sin(x) == 2.0)
         }
 
-        using(largeArrays) curve ("Par-4") in { arr =>
+        using(smallArrays) curve ("Par-4") in { arr =>
           import workstealing.Ops._
           implicit val s = s4
           val pr = arr.toPar
-          val mx = arr.last + 1
-          pr.find(x => x * math.sin(x) == mx)
+          pr.find(x => math.sin(x) == 2.0)
         }
 
-        using(largeArrays) curve ("Par-8") in { arr =>
+        using(smallArrays) curve ("Par-8") in { arr =>
           import workstealing.Ops._
           implicit val s = s8
           val pr = arr.toPar
-          val mx = arr.last + 1
-          pr.find(x => x * math.sin(x) == mx)
+          pr.find(x => math.sin(x) == 2.0)
         }
       }
 
