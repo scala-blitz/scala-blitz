@@ -50,7 +50,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     reports.regression.noiseMagnitude -> 0.15) in {
 
       if (TEST_DERIVATIVE_METHODS) { //derivative of aggregate
-        measure method "fold" in {
+        measure method "fold*" in {
           using(smallArrays) curve ("Sequential") in { a =>
             var i = 0
             val until = a.length
@@ -92,7 +92,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
-      measure method "reduce" in {
+      measure method "reduce*" in {
         using(smallArrays) curve ("Sequential") in { a =>
           var i = 0
           val until = a.length
@@ -129,7 +129,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }
       }
 
-      measure method "aggregate" in {
+      measure method "aggregate*" in {
         using(smallArrays) curve ("Sequential") in { arr =>
           var i = 0
           val until = arr.length
@@ -255,13 +255,13 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }
       }
       if (TEST_DERIVATIVE_METHODS) { //derivative of aggregate
-        measure method "count" in {
+        measure method "count*" in {
           using(smallArrays) curve ("Sequential") in { arr =>
             var i = 0
             val until = arr.length
             var count = 0
             while (i < until) {
-              if (arr(i) % 3 == 1) { count += 1 }
+              if ((arr(i) * arr(i)) % 3 == 1) { count += 1 }
               i += 1
             }
             count
@@ -271,28 +271,28 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
             import workstealing.Ops._
             implicit val s = s1
             val pa = arr.toPar
-            pa.count(_ % 3 == 1)
+            pa.count(x => (x * x) % 3 == 1)
           }
 
           using(smallArrays) curve ("Par-2") in { arr =>
             import workstealing.Ops._
             implicit val s = s2
             val pa = arr.toPar
-            pa.count(_ % 3 == 1)
+            pa.count(x => (x * x) % 3 == 1)
           }
 
           using(smallArrays) curve ("Par-4") in { arr =>
             import workstealing.Ops._
             implicit val s = s4
             val pa = arr.toPar
-            pa.count(_ % 3 == 1)
+            pa.count(x => (x * x) % 3 == 1)
           }
 
           using(smallArrays) curve ("Par-8") in { arr =>
             import workstealing.Ops._
             implicit val s = s8
             val pa = arr.toPar
-            pa.count(_ % 3 == 1)
+            pa.count(x => (x * x) % 3 == 1)
           }
         }
       }
