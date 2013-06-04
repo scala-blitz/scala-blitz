@@ -343,9 +343,7 @@ object ArraysMacros {
       cmb.result
     }
 
-    val r = c.inlineAndReset(operation)
-    println(r)
-    r
+    c.inlineAndReset(operation)
   }
 
 }

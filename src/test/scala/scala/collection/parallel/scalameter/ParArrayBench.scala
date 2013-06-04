@@ -471,7 +471,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         import workstealing.Ops._
         implicit val s = s8
         val other = List(2, 3, 5, 7, 11)
-          val pa = arr.toPar
+        val pa = arr.toPar
         for {
           x <- pa
           y <- other

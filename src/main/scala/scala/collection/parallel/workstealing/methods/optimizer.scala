@@ -31,6 +31,7 @@ class Optimizer[C <: Context](val c: C) {
       override def transform(tree: Tree): Tree = {
         tree match {
           case ap @ Apply(Select(prefix, ApplyName), args) =>
+            println("inlining: " + ap)
             def inlineToLocals(params: List[ValDef], body: Tree): Block = {
               if (params.length != args.length)
                 c.abort(c.enclosingPosition, "incorrect arity: " + (params.length, args.length))
@@ -139,7 +140,7 @@ class Optimizer[C <: Context](val c: C) {
 
     override def transform(tree: Tree): Tree = {
       def fuse(callee: Tree, pf: Function, sf: Function, makeBlock: Tree => Tree, makeSecondary: (Tree, Function) => Tree): Tree = {
-        val localName = newTermName(c.fresh("local"))
+        val localName = newTermName(c.fresh("primaryfunres$"))
         val fusedFunc = (pf, sf) match {
           case (Function(List(pparam), pbody), Function(List(sparam), sbody)) =>
             Function(List(pparam), Block(
