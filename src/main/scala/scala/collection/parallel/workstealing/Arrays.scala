@@ -138,21 +138,10 @@ object Arrays {
 
   type CopyProgress = ProgressStatus
 
-  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, CopyProgress] {
+  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, Unit] {
     import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
-    override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
-    }
-    override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
-      val stealer = newnode.stealer.asPrecise
-      val completed = stealer.elementsCompleted
-      val arrstart = oldnode.READ_INTERMEDIATE.start + completed
-      val leftarrstart = arrstart
-      val rightarrstart = arrstart + newnode.left.child.stealer.asPrecise.elementsRemaining
-      newnode.left.child.WRITE_INTERMEDIATE(new ProgressStatus(leftarrstart, leftarrstart))
-      newnode.right.child.WRITE_INTERMEDIATE(new ProgressStatus(rightarrstart, rightarrstart))
-    }
-    def zero = null
-    def combine(a: ProgressStatus, b: ProgressStatus) = null
+    def zero: Unit = null
+    def combine(a: Unit, b: Unit) = null
     def resultArray: Array[S]
   }
 

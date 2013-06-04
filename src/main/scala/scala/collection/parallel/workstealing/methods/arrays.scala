@@ -287,23 +287,17 @@ object ArraysMacros {
       new Arrays.CopyMapArrayKernel[T, S] {
         import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
         import scala.collection.parallel.workstealing.Arrays.CopyProgress
-        override def afterCreateRoot(root: Ref[T, CopyProgress]) {
-          root.child.WRITE_INTERMEDIATE(new CopyProgress(from.splice, from.splice))
-        }
         def resultArray = sarray
-        def apply(node: Node[T, CopyProgress], from: Int, until: Int) = {
-          val status = node.READ_INTERMEDIATE
-          val destarr = resultArray
+        def apply(node: Node[T, Unit], from: Int, until: Int) = {
           val srcarr = callee.splice.array.seq
           var srci = from
-          var desti = status.progress
+          var desti = from
           while (srci < until) {
-            destarr(desti) = f.splice(srcarr(srci))
+            sarray(desti) = f.splice(srcarr(srci))
             srci += 1
             desti += 1
           }
-          status.progress += (until - from)
-          status
+          ()
         }
       }
     }
