@@ -304,7 +304,12 @@ class ParArrayTest extends FunSuite with Timeouts {
 
       val a: Array[Int] = r.toArray
       val pa = a.toPar
-      val paf = pa.flatMap(x => list.map(_ * x))
+      val paf = for {
+        x <- pa
+        y <- list
+      } yield {
+        x * y
+      }: @unchecked
 
       assert(rf == paf.seq.toSeq, r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
     }

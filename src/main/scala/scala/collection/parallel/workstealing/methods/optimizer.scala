@@ -28,10 +28,20 @@ class Optimizer[C <: Context](val c: C) {
     val ApplyName = newTermName("apply")
 
     object inliner extends Transformer {
+      object InlineablePattern {
+        def unapply(tree: Tree): Option[(Tree, List[Tree])] = tree match {
+          case Apply(Select(prefix, ApplyName), args) =>
+            Some((prefix, args))
+          case Apply(prefix @ Function(_, _), args) =>
+            Some((prefix, args))
+          case _ =>
+            None
+        }
+      }
+
       override def transform(tree: Tree): Tree = {
         tree match {
-          case ap @ Apply(Select(prefix, ApplyName), args) =>
-            println("inlining: " + ap)
+          case InlineablePattern(prefix, args) =>
             def inlineToLocals(params: List[ValDef], body: Tree): Block = {
               if (params.length != args.length)
                 c.abort(c.enclosingPosition, "incorrect arity: " + (params.length, args.length))
@@ -51,7 +61,7 @@ class Optimizer[C <: Context](val c: C) {
               case Block(stats, t2) =>
                 Block(stats, functionToBlock(t2))
               case x =>
-                ap
+                tree
             }
             super.transform(functionToBlock(prefix))
           case _ =>
@@ -158,7 +168,6 @@ class Optimizer[C <: Context](val c: C) {
       tree match {
         case FusablePattern(callee, pf, sf, makeBlock, makeSecondary) =>
           val ntree = fuse(callee, pf, sf, makeBlock, makeSecondary)
-          println(ntree)
           super.transform(ntree)
         case _ =>
           super.transform(tree)

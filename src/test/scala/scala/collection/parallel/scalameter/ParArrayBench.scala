@@ -37,6 +37,24 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     exec.independentSamples -> 1,
     reports.regression.noiseMagnitude -> 0.75)
 
+  /* utils */
+
+  final class IntBuffer {
+    var narr = new Array[Int](4)
+    var narrpos = 0
+    def pushback(x: Int) {
+      if (narrpos < narr.length) {
+        narr(narrpos) = x
+        narrpos += 1
+      } else {
+        val newnarr = new Array[Int](narr.length * 2)
+        Array.copy(narr, 0, newnarr, 0, narr.length)
+        narr = newnarr
+        pushback(x)
+      }
+    }
+  }
+
   /* tests */
 
   performance of "Par[Array]" config (
@@ -332,22 +350,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    final class IntBuffer {
-      var narr = new Array[Int](4)
-      var narrpos = 0
-      def pushback(x: Int) {
-        if (narrpos < narr.length) {
-          narr(narrpos) = x
-          narrpos += 1
-        } else {
-          val newnarr = new Array[Int](narr.length * 2)
-          Array.copy(narr, 0, newnarr, 0, narr.length)
-          narr = newnarr
-          pushback(x)
-        }
-      }
-    }
-
     measure method "filter(mod3)" in {
       using(smallArrays) curve ("Sequential") in { arr =>
         var i = 0
@@ -417,22 +419,23 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "flatMap" in {
-      using(tinyArrays) curve ("Sequential") in { arr =>
+      using(smallArrays) curve ("Sequential") in { arr =>
         var i = 0
-        val lst = List(2, 3, 5, 7, 11)
+        val other = List(2, 3)
         val until = arr.length
         val ib = new IntBuffer
         while (i < until) {
-          lst.foreach(y => ib.pushback(arr(i) * y))
+          val elem = arr(i)
+          other.foreach(y => ib.pushback(elem * y))
           i += 1
         }
       }
 
-      using(tinyArrays) curve ("Par-1") in { arr =>
+      using(smallArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
-        val other = List(2, 3, 5, 7, 11)
-          val pa = arr.toPar
+        val other = List(2, 3)
+        val pa = arr.toPar
         for {
           x <- pa
           y <- other
@@ -441,11 +444,11 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }: @unchecked
       }
 
-      using(tinyArrays) curve ("Par-2") in { arr =>
+      using(smallArrays) curve ("Par-2") in { arr =>
         import workstealing.Ops._
         implicit val s = s2
-        val other = List(2, 3, 5, 7, 11)
-          val pa = arr.toPar
+        val other = List(2, 3)
+        val pa = arr.toPar
         for {
           x <- pa
           y <- other
@@ -454,11 +457,11 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }: @unchecked
       }
 
-      using(tinyArrays) curve ("Par-4") in { arr =>
+      using(smallArrays) curve ("Par-4") in { arr =>
         import workstealing.Ops._
         implicit val s = s4
-        val other = List(2, 3, 5, 7, 11)
-          val pa = arr.toPar
+        val other = List(2, 3)
+        val pa = arr.toPar
         for {
           x <- pa
           y <- other
@@ -467,10 +470,10 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
         }: @unchecked
       }
 
-      using(tinyArrays) curve ("Par-8") in { arr =>
+      using(smallArrays) curve ("Par-8") in { arr =>
         import workstealing.Ops._
         implicit val s = s8
-        val other = List(2, 3, 5, 7, 11)
+        val other = List(2, 3)
         val pa = arr.toPar
         for {
           x <- pa
