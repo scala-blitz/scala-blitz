@@ -39,15 +39,16 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
 
   /* utils */
 
-  final class IntBuffer {
-    var narr = new Array[Int](4)
+  class SimpleBuffer[@specialized(Int) T: ClassTag] {
+    var narr = new Array[T](4)
     var narrpos = 0
-    def pushback(x: Int) {
+    def pushback(x: T): this.type = {
       if (narrpos < narr.length) {
         narr(narrpos) = x
         narrpos += 1
+        this
       } else {
-        val newnarr = new Array[Int](narr.length * 2)
+        val newnarr = new Array[T](narr.length * 2)
         Array.copy(narr, 0, newnarr, 0, narr.length)
         narr = newnarr
         pushback(x)
@@ -350,11 +351,14 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
       }
     }
 
-    measure method "filter(mod3)" in {
+    measure method "filter(mod3)" config (
+      exec.minWarmupRuns -> 80,
+      exec.maxWarmupRuns -> 160
+    ) in {
       using(smallArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
-        val ib = new IntBuffer
+        val ib = new SimpleBuffer[Int]
         while (i < until) {
           if (i % 3 == 0) ib.pushback(i)
           i += 1
@@ -382,7 +386,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
       using(tinyArrays) curve ("Sequential") in { arr =>
         var i = 0
         val until = arr.length
-        val ib = new IntBuffer
+        val ib = new SimpleBuffer[Int]
         while (i < until) {
           if (filterSqrt(i)) ib.pushback(i)
           i += 1
@@ -419,11 +423,12 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
     }
 
     measure method "flatMap" in {
+      val other = List(2, 3)
+
       using(smallArrays) curve ("Sequential") in { arr =>
         var i = 0
-        val other = List(2, 3)
         val until = arr.length
-        val ib = new IntBuffer
+        val ib = new SimpleBuffer[Int]
         while (i < until) {
           val elem = arr(i)
           other.foreach(y => ib.pushback(elem * y))
@@ -434,7 +439,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable {
       using(smallArrays) curve ("Par-1") in { arr =>
         import workstealing.Ops._
         implicit val s = s1
-        val other = List(2, 3)
         val pa = arr.toPar
         for {
           x <- pa
