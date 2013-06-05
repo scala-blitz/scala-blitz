@@ -12,6 +12,7 @@ class Optimizer[C <: Context](val c: C) {
 
   /* utilities */
 
+  val ApplyName = newTermName("apply")
   val MapName = newTermName("map")
   val FlatMapName = newTermName("flatMap")
   val ForeachName = newTermName("foreach")
@@ -84,13 +85,9 @@ class Optimizer[C <: Context](val c: C) {
 
   /* inlining */
 
-  def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] =
-    c.Expr[T](c resetAllAttrs inlineFunctionApply(expr.tree))
+  object Inlining {
 
-  def inlineFunctionApply(tree: Tree): Tree = {
-    val ApplyName = newTermName("apply")
-
-    object inliner extends Transformer {
+    class Optimization extends Transformer {
       object InlineablePattern {
         def unapply(tree: Tree): Option[(Tree, List[Tree])] = tree match {
           case Apply(Select(prefix, ApplyName), args) =>
@@ -101,7 +98,6 @@ class Optimizer[C <: Context](val c: C) {
             None
         }
       }
-
       override def transform(tree: Tree): Tree = {
         tree match {
           case InlineablePattern(prefix, args) =>
@@ -132,13 +128,17 @@ class Optimizer[C <: Context](val c: C) {
         }
       }
     }
+    
+  }
 
-    inliner.transform(tree)
+  def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] = {
+    val inliner = new Inlining.Optimization
+    c.Expr[T](c resetAllAttrs inliner.transform(expr.tree))
   }
 
   /* fusion */
 
-  class Fusion {
+  object Fusion {
   
     class OpApply(val OpName: TermName)(calleeConstraint: Tree => Boolean = _ => true) {
       def unapply(tree: Tree): Option[(Tree, Function, (Tree, Function) => Tree)] = tree match {
@@ -173,7 +173,6 @@ class Optimizer[C <: Context](val c: C) {
     }
   
     object Rule {
-
       object Empty extends Rule {
         def unapply(tree: Tree) = None
       }
@@ -241,7 +240,6 @@ class Optimizer[C <: Context](val c: C) {
             ))
         }
       }
-  
     }
 
     class Optimization(val rules: Fusion.Rule) extends Transformer {
@@ -257,24 +255,25 @@ class Optimizer[C <: Context](val c: C) {
   
   }
 
-  val Fusion = new Fusion
-
-  /** Optimizes occurrences of a map followed directly by a foreach into foreach loops,
-   *  and flatMap followed directly by a foreach into nested foreach loops.
-   */
-  def flatMapFusion(tree: Tree): Tree = {
-    val fusion = new Fusion.Optimization(new Fusion.Rule.Composite(
-      Fusion.Rule.MapForeach,
-      Fusion.Rule.FlatMapForeach
-    ))
-    fusion.transform(tree)
-  }
+  /* optimizations */
 
   /** Optimizes the following patterns:
    *  - function literal application
    *  - map/foreach fusion
    */
   def optimise[T](expr: c.Expr[T]): c.Expr[T] = {
+    def inlineFunctionApply(tree: Tree): Tree = {
+      val inliner = new Inlining.Optimization
+      inliner.transform(tree)
+    }
+    def flatMapFusion(tree: Tree): Tree = {
+      val fusion = new Fusion.Optimization(new Fusion.Rule.Composite(
+        Fusion.Rule.MapForeach,
+        Fusion.Rule.FlatMapForeach
+      ))
+      fusion.transform(tree)
+    }
+
     val tree = expr.tree
     val inltree = inlineFunctionApply(tree)
     val fustree = flatMapFusion(inltree)
