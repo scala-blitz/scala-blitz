@@ -67,7 +67,45 @@ object Syntax {
     }: @unchecked
   }
 
+  def flatMap2() {
+    import workstealing.Ops._
+
+    implicit val ws: Scheduler = null
+    val list = List(2, 3, 5)
+    val pa: Par[Array[Int]] = Array(1, 2, 3).toPar
+    pa.flatMap(x => list.map((_ * x): @unchecked))
+  }
+
+  def flatMap3() {
+    import workstealing.Ops._
+
+    implicit val ws: Scheduler = null
+    val list = List(2, 3, 5)
+    val pa: Par[Array[Int]] = Array(1, 2, 3).toPar
+    for {
+      x <- pa
+      y <- list
+      z <- list
+    } yield {
+      x * y * z
+    }: @unchecked
+  }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
