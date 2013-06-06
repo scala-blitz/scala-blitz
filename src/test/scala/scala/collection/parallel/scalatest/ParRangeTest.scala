@@ -240,6 +240,7 @@ class ParRangeTest extends FunSuite with Timeouts {
     runForSizes(testProductWithCustomNumeric)
   }
 
+ 
   def testMin(r: Range): Unit = try {
     failAfter(4 seconds) {
       val x = r.min

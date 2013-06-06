@@ -8,6 +8,7 @@ import org.scalameter.api._
 
 
 class ParRangeBench extends PerformanceTest.Regression with Serializable {
+  val TEST_DERIVATIVE_METHODS = sys.props.get("scala.collection.parallel.scalameter.ParRangeBench.test_derivative_methods").map(_.toBoolean).getOrElse(true)
   import Par._
   import workstealing.WorkstealingTreeScheduler
   import workstealing.WorkstealingTreeScheduler.Config
@@ -20,7 +21,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
 
   val sizes = Gen.enumeration("size")(50000000, 100000000, 150000000)
   val ranges = for (size <- sizes) yield 0 until size
-  val rangesAndArrays = for(size <- sizes) yield (0 until size, new Array[Int](size))
+  val rangesAndArrays = for (size <- sizes) yield (0 until size, new Array[Int](size))
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -32,63 +33,63 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
     exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
-    reports.regression.noiseMagnitude -> 0.15
-  )
+    reports.regression.noiseMagnitude -> 0.15)
 
   val pcopts = Seq[(String, Any)](
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
     exec.independentSamples -> 1,
-    reports.regression.noiseMagnitude -> 0.75
-  )
+    reports.regression.noiseMagnitude -> 0.75)
 
   performance of "Par[Range]" in {
-    measure method "fold" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var sum = 0
-        while (i <= to) {
-          sum += i
-          i += 1
-        }
-        if (sum == 0) ???
-      }
-
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          val sum = r.par.sum
+    if (TEST_DERIVATIVE_METHODS) { //defined in terms of aggregate
+      measure method "fold" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var sum = 0
+          while (i <= to) {
+            sum += i
+            i += 1
+          }
           if (sum == 0) ???
         }
-      }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.fold(0)(_ + _)
-      }
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            val sum = r.par.sum
+            if (sum == 0) ???
+          }
+        }
 
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.fold(0)(_ + _)
-      }
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.fold(0)(_ + _)
+        }
 
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.fold(0)(_ + _)
-      }
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.fold(0)(_ + _)
+        }
 
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.fold(0)(_ + _)
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.fold(0)(_ + _)
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.fold(0)(_ + _)
+        }
       }
     }
 
@@ -185,262 +186,263 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         pr.aggregate(0)(_ + _)(_ + _)
       }
     }
+    if (TEST_DERIVATIVE_METHODS) { //defined in terms of reduce
+      measure method "min" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var min = Int.MaxValue
+          while (i <= to) {
+            if (i < min) min = i
+            i = i + 1
+          }
+        }
 
-    measure method "min" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var min = Int.MaxValue
-        while (i <= to) {
-          if (i < min) min = i
-          i = i + 1
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.min
+          }
+        }
+
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.min
+        }
+
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.min
+        }
+
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.min
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.min
         }
       }
 
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.min
+      measure method "max" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var max = Int.MinValue
+          while (i <= to) {
+            if (i > max) max = i
+            i = i + 1
+          }
         }
-      }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.min
-      }
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.max
+          }
+        }
 
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.min
-      }
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.max
+        }
 
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.min
-      }
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.max
+        }
 
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.min
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.max
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.max
+        }
       }
     }
 
-    measure method "max" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var max = Int.MinValue
-        while (i <= to) {
-          if (i > max) max = i
-          i = i + 1
+    if (TEST_DERIVATIVE_METHODS) { //defined in terms of reduce
+      measure method "sum" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var sum = 0
+          while (i <= to) {
+            sum += i
+            i += 1
+          }
+          if (sum == 0) ???
+        }
+
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.sum
+          }
+        }
+
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.sum
+        }
+
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.sum
+        }
+
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.sum
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.sum
         }
       }
 
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.max
+      measure method "product" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var sum = 1
+          while (i <= to) {
+            sum *= i
+            i += 1
+          }
+          if (sum == 1) ???
         }
-      }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.max
-      }
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.product
+          }
+        }
 
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.max
-      }
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.product
+        }
 
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.max
-      }
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.product
+        }
 
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.max
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.product
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.product
+        }
       }
     }
 
-    measure method "sum" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var sum = 0
-        while (i <= to) {
-          sum += i
-          i += 1
+    if (TEST_DERIVATIVE_METHODS) { //defined in terms of aggregate
+      measure method "count" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var count = 0
+          while (i <= to) {
+            if (i % 3 == 1) { count += 1 }
+            i += 1
+          }
+          count
         }
-        if (sum == 0) ???
-      }
 
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.sum
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.count(_ % 3 == 1)
+          }
         }
-      }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.sum
-      }
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.count(_ % 3 == 1)
+        }
 
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.sum
-      }
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.count(_ % 3 == 1)
+        }
 
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.sum
-      }
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.count(_ % 3 == 1)
+        }
 
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.sum
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.count(_ % 3 == 1)
+        }
       }
     }
-
-    measure method "product" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var sum = 1
-        while (i <= to) {
-          sum *= i
-          i += 1
-        }
-        if (sum == 1) ???
-      }
-
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.product
-        }
-      }
-
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.product
-      }
-
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.product
-      }
-
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.product
-      }
-
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.product
-      }
-    }
-
-
-
-    measure method "count" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var count = 0
-        while (i <= to) {
-          if(i % 3 == 1) { count +=1 }
-          i += 1
-        }
-        count
-      }
-
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.count(_ % 3 == 1)
-        }
-      }
-
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.count(_ % 3 == 1)
-      }
-
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.count(_ % 3 == 1)
-      }
-
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.count(_ % 3 == 1)
-      }
-
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.count(_ % 3 == 1)
-      }
-    }
-
 
     measure method "find" config (opts: _*) in {
-      using(ranges) curve ("Sequential") config(
+      using(ranges) curve ("Sequential") config (
         exec.benchRuns -> 30,
         exec.independentSamples -> 3,
-        reports.regression.noiseMagnitude -> 0.75
-      ) in { r =>
-        var i = r.head
-        val to = r.last
-        var found = false
-        var result = -1
-        while (i <= to && !found) {
-          if (i == to) {
-            found = true
-            result = i
+        reports.regression.noiseMagnitude -> 0.75) in { r =>
+          var i = r.head
+          val to = r.last
+          var found = false
+          var result = -1
+          while (i <= to && !found) {
+            if (i == to) {
+              found = true
+              result = i
+            }
+            i += 1
           }
-          i += 1
+          result
         }
-	result
-      }
 
       performance of "extra" config (pcopts: _*) in {
         using(ranges) curve ("pc") in { r =>
@@ -481,105 +483,106 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         pr.find(_ == mx)
       }
     }
-
-    measure method "exists" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var result = false
-        while (i <= to && (!result)) {
-          if (to == i) {
-            result = true
+    if (TEST_DERIVATIVE_METHODS) { //defined in terms of find
+      measure method "exists" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var result = false
+          while (i <= to && (!result)) {
+            if (to == i) {
+              result = true
+            }
+            i += 1
           }
-          i += 1
+          if (!result) ???
         }
-        if (!result) ???
-      }
 
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            val mx = r.last + 1
+            r.par.exists(_ == mx)
+          }
+        }
+
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
           val mx = r.last + 1
-          r.par.exists(_ == mx)
+          pr.exists(_ == mx)
+        }
+
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          val mx = r.last + 1
+          pr.exists(_ == mx)
+        }
+
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          val mx = r.last + 1
+          pr.exists(_ == mx)
+        }
+
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          val mx = r.last + 1
+          pr.exists(_ == mx)
         }
       }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        val mx = r.last + 1
-        pr.exists(_ == mx)
-      }
-
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        val mx = r.last + 1
-        pr.exists(_ == mx)
-      }
-
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        val mx = r.last + 1
-        pr.exists(_ == mx)
-      }
-
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        val mx = r.last + 1
-        pr.exists(_ == mx)
-      }
-    }
-
-    measure method "forall" config (opts: _*) in {
-      using(ranges) curve ("Sequential") in { r =>
-        var i = r.head
-        val to = r.last
-        var result = true
-        while (i <= to && result) {
-          result = i < Int.MaxValue
-          i += 1
+      measure method "forall" config (opts: _*) in {
+        using(ranges) curve ("Sequential") in { r =>
+          var i = r.head
+          val to = r.last
+          var result = true
+          while (i <= to && result) {
+            result = i < Int.MaxValue
+            i += 1
+          }
+          if (!result) ???
         }
-        if (!result) ???
-      }
 
-      performance of "extra" config (pcopts: _*) in {
-        using(ranges) curve ("pc") in { r =>
-          r.par.forall(_ < Int.MaxValue)
+        performance of "extra" config (pcopts: _*) in {
+          using(ranges) curve ("pc") in { r =>
+            r.par.forall(_ < Int.MaxValue)
+          }
         }
-      }
 
-      using(ranges) curve ("Par-1") in { r =>
-        import workstealing.Ops._
-        implicit val s = s1
-        val pr = r.toPar
-        pr.forall(_ < Int.MaxValue)
-      }
+        using(ranges) curve ("Par-1") in { r =>
+          import workstealing.Ops._
+          implicit val s = s1
+          val pr = r.toPar
+          pr.forall(_ < Int.MaxValue)
+        }
 
-      using(ranges) curve ("Par-2") in { r =>
-        import workstealing.Ops._
-        implicit val s = s2
-        val pr = r.toPar
-        pr.forall(_ < Int.MaxValue)
-      }
+        using(ranges) curve ("Par-2") in { r =>
+          import workstealing.Ops._
+          implicit val s = s2
+          val pr = r.toPar
+          pr.forall(_ < Int.MaxValue)
+        }
 
-      using(ranges) curve ("Par-4") in { r =>
-        import workstealing.Ops._
-        implicit val s = s4
-        val pr = r.toPar
-        pr.forall(_ < Int.MaxValue)
-      }
+        using(ranges) curve ("Par-4") in { r =>
+          import workstealing.Ops._
+          implicit val s = s4
+          val pr = r.toPar
+          pr.forall(_ < Int.MaxValue)
+        }
 
-      using(ranges) curve ("Par-8") in { r =>
-        import workstealing.Ops._
-        implicit val s = s8
-        val pr = r.toPar
-        pr.forall(_ < Int.MaxValue)
+        using(ranges) curve ("Par-8") in { r =>
+          import workstealing.Ops._
+          implicit val s = s8
+          val pr = r.toPar
+          pr.forall(_ < Int.MaxValue)
+        }
       }
     }
 
@@ -618,7 +621,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         val r = rra._1
         val a = rra._2
         val pr = r.toPar
-        pr.copyToArray(a) 
+        pr.copyToArray(a)
       }
 
       using(rangesAndArrays) curve ("Par-4") in { rra =>

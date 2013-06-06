@@ -29,10 +29,15 @@ object Arrays {
     def stealer: PreciseStealer[T] = new ArrayStealer(array.seq, 0, array.seq.length)
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
-    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T,U]
-    def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T,U]
-    def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T,U]
-    def count(p: T => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T]
+    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T, U]
+    def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T, U]
+    def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T, U]
+    def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.min[T, U]
+    def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.max[T, U]
+    def find[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro methods.ArraysMacros.find[T, U]
+    def exists[U >: T](p: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.exists[T, U]
+    def forall[U >: T](p: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.forall[T, U]
+    def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T, U]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
     def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.filter[T]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.flatMap[T, S, That]
@@ -43,8 +48,7 @@ object Arrays {
     private[parallel] var conc: Conc[T],
     private[parallel] var lastChunk: Array[T],
     private[parallel] var lastSize: Int,
-    private val ctx: WorkstealingTreeScheduler
-  ) extends Conc.BufferLike[T, Par[Array[T]], ArrayMerger[T]] with collection.parallel.Merger[T, Par[Array[T]]] {
+    private val ctx: WorkstealingTreeScheduler) extends Conc.BufferLike[T, Par[Array[T]], ArrayMerger[T]] with collection.parallel.Merger[T, Par[Array[T]]] {
     def classTag = implicitly[ClassTag[T]]
 
     def this(mcs: Int, ctx: WorkstealingTreeScheduler) = this(mcs, Conc.Zero, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
@@ -75,16 +79,16 @@ object Arrays {
 
   def newArrayMerger[T](pa: Par[Array[T]])(implicit ctx: WorkstealingTreeScheduler): ArrayMerger[T] = {
     val am = pa.seq match {
-      case x: Array[AnyRef]  => new ArrayMerger[AnyRef](ctx)
-      case x: Array[Int]     => new ArrayMerger[Int](ctx)
-      case x: Array[Double]  => new ArrayMerger[Double](ctx)
-      case x: Array[Long]    => new ArrayMerger[Long](ctx)
-      case x: Array[Float]   => new ArrayMerger[Float](ctx)
-      case x: Array[Char]    => new ArrayMerger[Char](ctx)
-      case x: Array[Byte]    => new ArrayMerger[Byte](ctx)
-      case x: Array[Short]   => new ArrayMerger[Short](ctx)
+      case x: Array[AnyRef] => new ArrayMerger[AnyRef](ctx)
+      case x: Array[Int] => new ArrayMerger[Int](ctx)
+      case x: Array[Double] => new ArrayMerger[Double](ctx)
+      case x: Array[Long] => new ArrayMerger[Long](ctx)
+      case x: Array[Float] => new ArrayMerger[Float](ctx)
+      case x: Array[Char] => new ArrayMerger[Char](ctx)
+      case x: Array[Byte] => new ArrayMerger[Byte](ctx)
+      case x: Array[Short] => new ArrayMerger[Short](ctx)
       case x: Array[Boolean] => new ArrayMerger[Boolean](ctx)
-      case x: Array[Unit]    => new ArrayMerger[Unit](ctx)
+      case x: Array[Unit] => new ArrayMerger[Unit](ctx)
       case null => throw new NullPointerException
     }
     am.asInstanceOf[ArrayMerger[T]]
@@ -107,14 +111,14 @@ object Arrays {
       nextProgress += 1
       res
     } else throw new NoSuchElementException
-  
+
     def hasNext: Boolean = nextProgress < nextUntil
-  
+
     def split: (ArrayStealer[T], ArrayStealer[T]) = {
       val total = elementsRemainingEstimate
       psplit(total / 2)
     }
-  
+
     def psplit(leftSize: Int): (ArrayStealer[T], ArrayStealer[T]) = {
       val ls = decode(READ_PROGRESS)
       val lu = ls + leftSize
@@ -135,26 +139,12 @@ object Arrays {
 
   type CopyProgress = ProgressStatus
 
-  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, CopyProgress] {
-    import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
-    override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
-    }
-    override def afterExpand(oldnode: Node[T, ProgressStatus], newnode: Node[T, ProgressStatus]) {
-      val stealer = newnode.stealer.asPrecise
-      val completed = stealer.elementsCompleted
-      val arrstart = oldnode.READ_INTERMEDIATE.start + completed
-      val leftarrstart = arrstart
-      val rightarrstart = arrstart + newnode.left.child.stealer.asPrecise.elementsRemaining
-      newnode.left.child.WRITE_INTERMEDIATE(new ProgressStatus(leftarrstart, leftarrstart))
-      newnode.right.child.WRITE_INTERMEDIATE(new ProgressStatus(rightarrstart, rightarrstart))
-    }
-    def zero = null
-    def combine(a: ProgressStatus, b: ProgressStatus) = null
+  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, Unit] {
+    import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+    def zero: Unit = null
+    def combine(a: Unit, b: Unit) = null
     def resultArray: Array[S]
   }
 
 }
-
-
-
 
