@@ -228,15 +228,12 @@ class Optimizer[C <: Context](val c: C) {
           case (Function(List(pparam), pbody), Function(List(sparam), sbody)) =>
             val primaryResName = newTermName(c.fresh("primaryres$"))
             val nestedResName = newTermName(c.fresh("nestedres$"))
-            Function(List(pparam), Block(
-              List(ValDef(Modifiers(), primaryResName, TypeTree(), pbody)),
-              Apply(
-                Select(Ident(primaryResName), ForeachName),
-                List(Function(
-                  List(ValDef(Modifiers(), nestedResName, TypeTree(), EmptyTree)),
-                  Apply(sf, List(Ident(nestedResName)))
-                ))
-              )
+            Function(List(pparam), Apply(
+              Select(pbody, ForeachName),
+              List(Function(
+                List(ValDef(Modifiers(), nestedResName, TypeTree(), EmptyTree)),
+                Apply(sf, List(Ident(nestedResName)))
+              ))
             ))
         }
       }
@@ -246,7 +243,7 @@ class Optimizer[C <: Context](val c: C) {
       override def transform(tree: Tree): Tree = {
         tree match {
           case rules(fused) =>
-            super.transform(fused)
+            transform(fused)
           case _ =>
             super.transform(tree)
         }
