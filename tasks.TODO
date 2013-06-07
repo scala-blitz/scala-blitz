@@ -1,3 +1,116 @@
+Reducable interface:
+ ☐ go through all operations in standard collections and filter them for the Reducable interface
+ ☐ foreach
+ ☐ fold
+ ☐ reduce
+ ☐ aggregate
+ ☐ mapReduce -- should be easy to express in terms of aggregate
+ ☐ max
+ ☐ min
+ ☐ sum
+ ☐ product
+ ☐ map
+ ☐ filter
+ ☐ flatMap
+ ☐ contains\exists\containsSlice
+ ☐ corresponds
+ ☐ distinct
+ ☐ forall
+ ☐ groupBy
+ ☐ intersect
+ ☐ sort
+ ☐ to
+ ☐ have a variant of breakOut for parallel collections to allow mapping ranges to arbitrary collections
+
+ Zippable interface:
+ ☐ copyToArray
+ ☐ zip
+ ☐ zipWithIndex
+ ☐ zipView
+
+Parallel ranges:
+ ✔ fold @done (13-05-27 14:24)
+ ✔ reduce @done (13-05-27 14:24)
+ ✔ aggregate @done (13-05-27 14:24)
+ ✔ max @done (13-05-27 14:24)
+ ✔ min @done (13-05-27 14:24)
+ ✔ sum @done (13-05-27 14:24)
+ ☐ mapReduce
+ ☐ foreach
+ ✔ product @done (13-05-27 14:25)
+ ☐ copyToArray
+ ☐ map
+ ☐ filter
+ ☐ flatMap
+ ☐ every operation in the Reducable interface
+ ☐ unit tests
+ ☐ microbenchmarks
+ ☐ to
+
+Reducable:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Zippable:
+ ☐ operations
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Parallel concs:
+ ✔ reduce @done (13-05-27 14:26)
+ ☐ fold
+ ☐ aggregate
+ ☐ mapReduce
+ ☐ map
+ ☐ filter
+ ☐ flatMap
+ ✔ copyToArray @done (13-05-27 14:26)
+
+Parallel arrays:
+ ✔ reduce @done (13-05-31 10:44)
+ ✔ fold @done (13-05-31 10:44)
+ ✔ aggregate @done (13-05-31 10:44)
+ ✔ sum @done (13-05-31 10:44)
+ ✔ product @done (13-05-31 10:44)
+ ☐ mapReduce
+ ☐ foreach
+ ☐ min
+ ☐ max
+ ✔ map @done (13-05-31 10:44)
+ ✔ filter @done (13-05-31 10:44)
+ ✔ flatMap @done (13-06-07 17:50)
+ ☐ zipView
+
+Parallel hash tables:
+ ☐ reduce
+ ☐ fold
+ ☐ aggregate
+ ☐ mapReduce
+ ☐ foreach
+ ☐ map
+ ☐ filter
+ ☐ unit tests
+ ☐ microbenchmarks
+
+Parallel n-ary tree operations:
+ ☐ reduce
+ ☐ fold
+ ☐ aggregate
+ ☐ mapReduce
+ ☐ foreach
+ ☐ map
+ ☐ filter
+ ☐ unit tests
+ ☐ microbenchmarks
+
+
+Synchronized stealers (non-lock free):
+ ☐ see if we can do generically
+
+Splitting package:
+ ☐ same interface for old parallel collections (implicit conversions in the same style as the workstealing package)
+
 To fix:
  ☐ argument expressions need to be assigned to a local var
  ☐ parallel array operations need to be specialized
@@ -5,7 +118,7 @@ To fix:
  ☐ implement all the basic parallel operations
  ✔ add combiner support @done (13-03-01 17:02)
  ☐ fix exception handling
- ☐ replace volatile reads with unsafe calls
+ ✔ replace volatile reads with unsafe calls @done (13-04-26 13:49)
 
 Todo items:
  ☐ write a comprehensive suite of unit tests
