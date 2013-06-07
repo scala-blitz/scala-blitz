@@ -79,7 +79,7 @@ Parallel arrays:
  ☐ max
  ✔ map @done (13-05-31 10:44)
  ✔ filter @done (13-05-31 10:44)
- ☐ flatMap
+ ✔ flatMap @done (13-06-07 17:50)
  ☐ zipView
 
 Parallel hash tables:

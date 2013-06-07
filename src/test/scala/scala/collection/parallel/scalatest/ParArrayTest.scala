@@ -11,11 +11,9 @@ import workstealing.Ops._
 
 
 
-class ParArrayTest extends FunSuite with Timeouts {
+class ParArrayTest extends FunSuite with Timeouts with Tests[Array[Int]] with ParArraySnippets {
 
-  implicit val scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin()
-
-  def runForSizes(method: Range => Unit) {
+  def testForSizes(method: Range => Unit) {
     for (i <- 1 to 1000) {
       method(0 to i)
       method(i to 0 by -1)
@@ -38,433 +36,218 @@ class ParArrayTest extends FunSuite with Timeouts {
     }
   }
 
-  def testReduce(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.reduce(_ + _)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.reduce(_ + _)
-
-      assert(x == px, r + ".reduce: " + x + ", " + px)
-    }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for array: " + r)
-  }
+  def targetCollections(r: Range) = Seq(r.toArray)
 
   test("reduce") {
+    val rt = (r: Range) => r.reduce(_ + _)
+    val at = (a: Array[Int]) => reduceParallel(a)
     intercept[UnsupportedOperationException] {
-      testReduce(0 until 0)
+      testOperationForSize(0 until 0)(rt)(at)
     }
-    runForSizes(testReduce)
-  }
-
-  def testAggregate(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.aggregate(0)(_ + _, _ + _)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.aggregate(0)(_ + _)(_ + _)
-
-      assert(x == px, x + ", " + px)
-    }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+    testOperation(testEmpty = false)(rt)(at)
   }
 
   test("aggregate") {
-    testAggregate(0 until 0)
-    runForSizes(testAggregate)
-  }
-
-  def testFold(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.fold(0)(_ + _)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.fold(0)(_ + _)
-
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.aggregate(0)(_ + _, _ + _)
+    } {
+      a => aggregateParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("fold") {
-    testFold(0 until 0)
-    runForSizes(testFold)
-  }
-
-  def testSum(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.sum
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.sum
-
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.fold(0)(_ + _)
+    } {
+      a => foldParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("sum") {
-    testSum(0 until 0)
-    runForSizes(testSum)
-  }
-
-  def testSumWithCustomNumeric(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      object mynum extends Numeric[Int] {
-        // Members declared in scala.math.Numeric
-        def fromInt(x: Int): Int = ???
-        def minus(x: Int, y: Int): Int = ???
-        def negate(x: Int): Int = ???
-        def plus(x: Int, y: Int): Int = math.min(x, y)
-        def times(x: Int, y: Int): Int = ???
-        def toDouble(x: Int): Double = ???
-        def toFloat(x: Int): Float = ???
-        def toInt(x: Int): Int = ???
-        def toLong(x: Int): Long = ???
-        override def zero = Int.MaxValue
-        override def one = ???
-
-        // Members declared in scala.math.Ordering
-        def compare(x: Int, y: Int): Int = ???
-      }
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.sum(mynum, scheduler)
-      val x = if (r.isEmpty) Int.MaxValue else r.min
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.sum
+    } {
+      a => sumParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("sumCustomNumeric") {
-    testSumWithCustomNumeric(0 until 0)
-    runForSizes(testSumWithCustomNumeric)
-  }
-
-  def testProduct(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.product
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.product
-
-      assert(x == px, x + ", " + px)
+    object customNum extends Numeric[Int] {
+      def fromInt(x: Int): Int = ???
+      def minus(x: Int, y: Int): Int = ???
+      def negate(x: Int): Int = ???
+      def plus(x: Int, y: Int): Int = math.min(x, y)
+      def times(x: Int, y: Int): Int = ???
+      def toDouble(x: Int): Double = ???
+      def toFloat(x: Int): Float = ???
+      def toInt(x: Int): Int = ???
+      def toLong(x: Int): Long = ???
+      override def zero = Int.MaxValue
+      override def one = ???
+      def compare(x: Int, y: Int): Int = ???
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+
+    testOperation() {
+      r => r.toArray.sum(customNum)
+    } {
+      a => sumParallel(a, customNum)
+    }
   }
 
   test("product") {
-    testSum(0 until 0)
-    runForSizes(testProduct)
-  }
-
-  def testProductWithCustomNumeric(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      object mynum extends Numeric[Int] {
-        // Members declared in scala.math.Numeric
-        def fromInt(x: Int): Int = ???
-        def minus(x: Int, y: Int): Int = ???
-        def negate(x: Int): Int = ???
-        def plus(x: Int, y: Int): Int = ???
-        def times(x: Int, y: Int): Int = math.max(x, y)
-        def toDouble(x: Int): Double = ???
-        def toFloat(x: Int): Float = ???
-        def toInt(x: Int): Int = ???
-        def toLong(x: Int): Long = ???
-        override def zero = ???
-        override def one = Int.MinValue
-
-        // Members declared in scala.math.Ordering
-        def compare(x: Int, y: Int): Int = ???
-      }
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.product(mynum, scheduler)
-      val x = if (r.isEmpty) Int.MinValue else r.max
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.product
+    } {
+      a => productParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("productCustomNumeric") {
-    testProductWithCustomNumeric(0 until 0)
-    runForSizes(testProductWithCustomNumeric)
-  }
-
-  def testCount(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.count(_ % 3 == 1)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.count(_ % 3 == 1)
-
-      assert(x == px, x + ", " + px)
+    object customNum extends Numeric[Int] {
+      def fromInt(x: Int): Int = ???
+      def minus(x: Int, y: Int): Int = ???
+      def negate(x: Int): Int = ???
+      def plus(x: Int, y: Int): Int = ???
+      def times(x: Int, y: Int): Int = math.max(x, y)
+      def toDouble(x: Int): Double = ???
+      def toFloat(x: Int): Float = ???
+      def toInt(x: Int): Int = ???
+      def toLong(x: Int): Long = ???
+      override def zero = ???
+      override def one = Int.MinValue
+      def compare(x: Int, y: Int): Int = ???
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+
+    testOperation() {
+      r => r.toArray.product(customNum)
+    } {
+      a => productParallel(a, customNum)
+    }
   }
 
   test("count") {
-    testFold(0 until 0)
-    runForSizes(testFold)
-  }
-
-  def testMin(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      val x = r.min
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.min
-
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.count(_ % 2 == 0)
+    } {
+      a => countParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("min") {
-    runForSizes(testMin)
-  }
-
-  def testMinCustomOrdering(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      object myOrd extends Ordering[Int] {
-        def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
-      }
-      val x = r.max
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.min(myOrd, scheduler)
-
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.min
+    } {
+      a => minParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("minCustomOrdering") {
-    runForSizes(testMin)
-  }
-
-  def testMax(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      val x = r.max
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.max
-
-      assert(x == px, r + ": " + x + ", " + px)
+    object customOrd extends Ordering[Int] {
+      def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+    testOperation() {
+      r => r.min(customOrd)
+    } {
+      a => minParallel(a, customOrd)
+    }
   }
 
   test("max") {
-    runForSizes(testMax)
-  }
-
-  def testMaxCustomOrdering(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      object myOrd extends Ordering[Int] {
-        def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
-      }
-      val x = r.min
-
-      val a = r.toArray
-      val pa = a.toPar
-      val px = pa.max(myOrd, scheduler)
-
-      assert(x == px, x + ", " + px)
+    testOperation() {
+      r => r.max
+    } {
+      a => maxParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
   }
 
   test("maxCustomOrdering") {
-    runForSizes(testMaxCustomOrdering)
-  }
-
-  def testFind(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      val toBeFound = r.max
-      val toNotBeFound = toBeFound + 1
-
-      val a = r.toArray
-      val pa = a.toPar
-      val shouldBeFound = pa.find(_ == toBeFound)
-      assert(shouldBeFound.isDefined && shouldBeFound.get == toBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
-      val shouldNotBeFound = pa.find(_ == toNotBeFound)
-      assert(shouldNotBeFound.isEmpty, r + ": " + shouldNotBeFound + ", None")
+    object customOrd extends Ordering[Int] {
+      def compare(x: Int, y: Int) = if (x < y) 1 else if (x > y) -1 else 0
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+    testOperation() {
+      r => r.max(customOrd)
+    } {
+      a => maxParallel(a, customOrd)
+    }
   }
 
   test("find") {
-    runForSizes(testFind)
-  }
-
-  def testExists(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      val toBeFound = r.max
-      val toNotBeFound = toBeFound + 1
-
-      val a = r.toArray
-      val pa = a.toPar
-      val shouldBeFound = pa.exists(_ == toBeFound)
-      assert(shouldBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
-      val shouldNotBeFound = pa.exists(_ == toNotBeFound)
-      assert(!shouldNotBeFound, r + ": " + shouldNotBeFound + ", false")
+    testOperation() {
+      r => r.find(_ == Int.MaxValue)
+    } {
+      a => findParallel(a, Int.MaxValue)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
+    testOperation() {
+      r => r.find(_ == r.last)
+    } {
+      a => findParallel(a, a.last)
+    }
   }
 
   test("exists") {
-    runForSizes(testExists)
-  }
-
-  def testForAll(r: Range): Unit = try {
-    failAfter(4 seconds) {
-
-      val a = r.toArray
-      val pa = a.toPar
-      val mx = r.last
-      val shouldBe = pa.forall(_ > Int.MinValue)
-      assert(shouldBe, r + ": " + shouldBe + ", true")
-      val shouldNotBe = pa.forall(_ < mx - 1)
-      assert(!shouldNotBe, r + ": " + shouldNotBe + ", false")
+    testOperation() {
+      r => r.exists(_ == Int.MaxValue)
+    } {
+      a => existsParallel(a, Int.MaxValue)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
-  }
-
-  test("forAll") {
-    runForSizes(testForAll)
-  }
-
-  def testMap(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val rm = r.map(_ + 1)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val pam = pa.map(_ + 1)
-
-      assert(rm == pam.seq.toSeq, r + ".map: " + rm + ", " + pam.seq.toBuffer)
+    testOperation() {
+      r => r.exists(_ == r.last)
+    } {
+      a => existsParallel(a, a.last)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for array: " + r)
   }
+
+  test("forall") {
+    testOperation() {
+      r => r.forall(_ < Int.MaxValue)
+    } {
+      a => forallSmallerParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.forall(_ < r.last)
+    } {
+      a => forallSmallerParallel(a, a.last)
+    }
+  }
+
+  def arrayComparison[T](range: Range, r: Seq[T], pa: Par[Array[T]]) = r == pa.seq.toBuffer
+
+  def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
   test("map") {
-    testMap(0 until 0)
-    runForSizes(testMap)
-  }
-
-  def testMapWithCustomCanMergeFrom(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      object customcmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Array[_]], Int, Par[Conc[Int]]] {
-        def apply(from: Par[Array[_]]) = new Conc.Merger[Int]
-        def apply() = new Conc.Merger[Int]
-      }
-
-      val rm = r.map(_ + 1)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val pcm = pa.map(_ + 1)(customcmf, scheduler)
-
-      assert(rm == pcm.seq.toBuffer, r + ".map: " + rm + ", " + pcm.seq.toString(0) + ", " + pcm.seq.mkString("Conc(", ", ", ")"))
+    testOperation(comparison = arrayComparison[Int]) {
+      r => r.map(_ + 1)
+    } {
+      a => mapParallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for array: " + r)
   }
 
   test("mapCustomCanMergeFrom") {
-    testMapWithCustomCanMergeFrom(0 until 0)
-    runForSizes(testMapWithCustomCanMergeFrom)
-  }
-
-  def testFilter(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val rf = r.filter(_ % 3 == 0)
-
-      val a = r.toArray
-      val pa = a.toPar
-      val paf = pa.filter(_ % 3 == 0)
-
-      assert(rf == paf.seq.toSeq, r + ".filter: " + rf + ", " + paf.seq.toBuffer)
+    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Array[_]], Int, Par[Conc[Int]]] {
+      def apply(from: Par[Array[_]]) = new Conc.Merger[Int]
+      def apply() = new Conc.Merger[Int]
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for array: " + r)
+    testOperation(comparison = concComparison[Int]) {
+      r => r.map(_ + 1)
+    } {
+      a => mapParallel[Conc[Int]](a, customCmf)
+    }
   }
 
   test("filter") {
-    testFilter(0 until 0)
-    runForSizes(testFilter)
-  }
-
-  def testFlatMap(r: Range): Unit = try {
-    failAfter(6 seconds) {
-      val list = List(2, 3)
-      val rf = r.flatMap(x => list.map(_ * x))
-
-      val a: Array[Int] = r.toArray
-      val pa = a.toPar
-      val paf = for {
-        x <- pa
-        y <- list
-      } yield {
-        x * y
-      }: @unchecked
-
-      assert(rf == paf.seq.toSeq, r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
+    testOperation(comparison = arrayComparison[Int]) {
+      r => r.filter(_ % 3 == 0)
+    } {
+      a => filterMod3Parallel(a)
     }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for array: " + r)
   }
 
   test("flatMap") {
-    testFlatMap(0 until 0)
-    runForSizes(testFlatMap)
+    testOperation(comparison = arrayComparison[Int]) {
+      r => for (x <- r; y <- other) yield x * y
+    } {
+      a => flatMapParallel(a)
+    }
   }
 
 }

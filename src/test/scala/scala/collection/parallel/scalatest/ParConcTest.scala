@@ -12,11 +12,9 @@ import workstealing.Ops._
 
 
 
-class ParConcTest extends FunSuite with Timeouts {
+class ParConcTest extends FunSuite with Timeouts with Tests[Conc[Int]] with ParConcSnippets {
 
-  implicit val scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin()
-
-  def runForSizes(method: Range => Unit) {
+  def testForSizes(method: Range => Unit) {
     for (i <- 1 to 1000) {
       method(0 to i)
       method(i to 0 by -1)
@@ -39,6 +37,13 @@ class ParConcTest extends FunSuite with Timeouts {
     }
   }
 
+  def targetCollections(r: Range) = Seq(
+    createConc(r),
+    createFlatConc(r, 32),
+    createFlatConc(r, 128),
+    createFlatConc(r, 1024)
+  )
+
   def createConc(r: Range): Conc[Int] = {
     var c: Conc[Int] = Zero
     for (i <- r) c = c <> (Single(i): Conc[Int])
@@ -52,27 +57,13 @@ class ParConcTest extends FunSuite with Timeouts {
     conc
   }
 
-  def testReduce(r: Range, cf: Range => Conc[Int]): Unit = try {
-    failAfter(6 seconds) {
-      val x = r.reduce(_ + _)
-
-      val c = cf(r)
-      val pc = c.toPar
-      val px = pc.reduce(_ + _)
-
-      assert(x == px, r + ".reduce: " + x + ", " + px)
-    }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for conc: " + r)
-  }
-
   test("reduce") {
+    val rt = (r: Range) => r.reduce(_ + _)
+    val ct = (c: Conc[Int]) => reduceParallel(c)
     intercept[UnsupportedOperationException] {
-      testReduce(0 until 0, createConc)
+      testOperationForSize(0 until 0)(rt)(ct)
     }
-    runForSizes(testReduce(_, createConc))
-    runForSizes(testReduce(_, createFlatConc(_, 128)))
+    testOperation(testEmpty = false)(rt)(ct)
   }
 
   def testCopyToArray(r: Range, cf: Range => Conc[Int]): Unit = try {
@@ -90,10 +81,19 @@ class ParConcTest extends FunSuite with Timeouts {
       assert(false, "timeout for conc: " + r)
   }
 
+  val array1 = new Array[Int](1000000)
+  val array2 = new Array[Int](1000000)
+
+  def copyComparison(r: Range, u: Unit, v: Unit) = {
+    array1.take(r.size) sameElements array2.take(r.size)
+  }
+
   test("copyToArray") {
-    runForSizes(testCopyToArray(_, createConc))
-    runForSizes(testCopyToArray(_, createFlatConc(_, 32)))
-    runForSizes(testCopyToArray(_, createFlatConc(_, 1024)))
+    testOperation(comparison = copyComparison) {
+      r => r.copyToArray(array1, 0, r.size)
+    } {
+      c => copyToArrayParallel((c, array2))
+    }
   }
 
 }
