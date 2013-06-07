@@ -240,7 +240,6 @@ class ParRangeTest extends FunSuite with Timeouts {
     runForSizes(testProductWithCustomNumeric)
   }
 
- 
   def testMin(r: Range): Unit = try {
     failAfter(4 seconds) {
       val x = r.min
@@ -389,7 +388,7 @@ class ParRangeTest extends FunSuite with Timeouts {
       var i = 0
       while (i < start) { assert(dest(i) == 0); i += 1 }
       while (i < len) { assert(dest(i) == r(i - start)); i += 1 }
-      while (i < dest.length) { assert(dest(i) == 0); i += 1    }
+      while (i < dest.length) { assert(dest(i) == 0); i += 1 }
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -400,5 +399,91 @@ class ParRangeTest extends FunSuite with Timeouts {
     runForSizes(testCopyToArray)
   }
 
-}
+  def testMap(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val rm = r.map(_ + 1)
 
+      val pr = r.toPar
+      val pam = pr.map(_ + 1)
+
+      assert(rm == pam.seq.toSeq, () => r + ".map: " + rm + ", " + pam.seq.toBuffer)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("map") {
+    testMap(0 until 0)
+    runForSizes(testMap)
+  }
+
+  def testMapWithCustomCanMergeFrom(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      object customcmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Conc[Int]]] {
+        def apply(from: Par[Range]) = new Conc.Merger[Int]
+        def apply() = new Conc.Merger[Int]
+      }
+
+      val rm = r.map(_ + 1)
+
+      val pr = r.toPar
+      val pcm = pr.map(_ + 1)(customcmf, scheduler)
+
+      assert(rm == pcm.seq.toBuffer, () => r + ".map: " + rm + ", " + pcm.seq.toString(0) + ", " + pcm.seq.mkString("Conc(", ", ", ")"))
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("mapCustomCanMergeFrom") {
+    testMapWithCustomCanMergeFrom(0 until 0)
+    runForSizes(testMapWithCustomCanMergeFrom)
+  }
+
+  def testFlatMap(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val list = List(2, 3)
+      val rf = r.flatMap(x => list.map(_ * x))
+
+      val pr = r.toPar
+      val paf = for {
+        x <- pr
+        y <- list
+      } yield {
+        x * y
+      }: @unchecked
+
+      assert(rf == paf.seq.toSeq, ()=>r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("flatMap") {
+    testFlatMap(0 until 0)
+    runForSizes(testFlatMap)
+  }
+
+  def testFilter(r: Range): Unit = try {
+    failAfter(6 seconds) {
+      val rf = r.filter(_ % 3 == 0)
+
+      val pr = r.toPar
+      val prf = pr.filter(_ % 3 == 0)
+
+      assert(rf == prf.seq.toSeq, ()=>r + ".filter: " + rf + ", " + prf.seq.toBuffer)
+    }
+  } catch {
+    case e: exceptions.TestFailedDueToTimeoutException =>
+      assert(false, "timeout for array: " + r)
+  }
+
+  test("filter") {
+    testFilter(0 until 0)
+    runForSizes(testFilter)
+  }
+}
+ 

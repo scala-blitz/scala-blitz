@@ -22,6 +22,10 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
   val sizes = Gen.enumeration("size")(50000000, 100000000, 150000000)
   val ranges = for (size <- sizes) yield 0 until size
   val rangesAndArrays = for (size <- sizes) yield (0 until size, new Array[Int](size))
+  val smallSizes = Gen.enumeration("size")(1000000, 3000000, 5000000)
+  val smallRanges = for (size <- smallSizes) yield (0 until size)
+  val tinySizes = Gen.enumeration("size")(100000, 300000, 500000)
+  val tinyRanges = for (size <- tinySizes) yield (0 until size)
   @transient lazy val s1 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(1))
   @transient lazy val s2 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(2))
   @transient lazy val s4 = new WorkstealingTreeScheduler.ForkJoin(new Config.Default(4))
@@ -642,6 +646,186 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable {
         pr.copyToArray(a)
       }
     }
+
+    measure method "map" in {
+      using(smallRanges) curve ("Sequential") in { r =>
+        var i = 0
+        val until = r.length
+        val narr = new Array[Int](until)
+        while (i < until) {
+          narr(i) = math.sqrt(i).toInt
+          i += 1
+        }
+        narr
+      }
+
+      using(smallRanges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.map(x => math.sqrt(x).toInt)
+      }
+
+      using(smallRanges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.map(x => math.sqrt(x).toInt)
+      }
+
+      using(smallRanges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.map(x => math.sqrt(x).toInt)
+      }
+
+      using(smallRanges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        pr.map(x => math.sqrt(x).toInt)
+      }
+    }
+
+    measure method "filter(mod3)" config (
+      exec.minWarmupRuns -> 80,
+      exec.maxWarmupRuns -> 160
+    ) in {
+      using(smallRanges) curve ("Sequential") in { r =>
+        var i = 0
+        val until = r.length
+        val ib = new SimpleBuffer[Int]
+        while (i < until) {
+          if (i % 3 == 0) ib.pushback(i)
+          i += 1
+        }
+      }
+
+      using(smallRanges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.filter(_ % 3 == 0)
+      }
+
+      using(smallRanges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.filter(_ % 3 == 0)
+      }
+
+    }
+
+    def filterSqrt(x: Int) = math.cos(x).toInt > 0
+
+    measure method "filter(cos)" in {
+      using(tinyRanges) curve ("Sequential") in { r =>
+        var i = 0
+        val until = r.length
+        val ib = new SimpleBuffer[Int]
+        while (i < until) {
+          if (filterSqrt(i)) ib.pushback(i)
+          i += 1
+        }
+      }
+
+      using(tinyRanges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        pr.filter(filterSqrt)
+      }
+
+      using(tinyRanges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val pr = r.toPar
+        pr.filter(filterSqrt)
+      }
+
+      using(tinyRanges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val pr = r.toPar
+        pr.filter(filterSqrt)
+      }
+
+      using(tinyRanges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val pr = r.toPar
+        pr.filter(filterSqrt)
+      }
+    }
+
+    measure method "flatMap" in {
+      val other = List(2, 3)
+  
+      using(smallRanges) curve ("Sequential") in { r =>
+        var i = 0
+        val until = r.length
+        val ib = new SimpleBuffer[Int]
+        while (i < until) {
+          val elem = r(i)
+          other.foreach(y => ib.pushback(elem * y))
+          i += 1
+        }
+      }
+  
+      using(smallRanges) curve ("Par-1") in { r =>
+        import workstealing.Ops._
+        implicit val s = s1
+        val pr = r.toPar
+        for {
+          x <- pr
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+  
+      using(smallRanges) curve ("Par-2") in { r =>
+        import workstealing.Ops._
+        implicit val s = s2
+        val other = List(2, 3)
+        val pr = r.toPar
+        for {
+          x <- pr
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+  
+      using(smallRanges) curve ("Par-4") in { r =>
+        import workstealing.Ops._
+        implicit val s = s4
+        val other = List(2, 3)
+        val pr = r.toPar
+        for {
+          x <- pr
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+  
+      using(smallRanges) curve ("Par-8") in { r =>
+        import workstealing.Ops._
+        implicit val s = s8
+        val other = List(2, 3)
+        val pr = r.toPar
+        for {
+          x <- pr
+          y <- other
+        } yield {
+          x * y
+        }: @unchecked
+      }
+    }
+
 
   }
 

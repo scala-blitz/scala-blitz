@@ -384,7 +384,7 @@ class ParArrayTest extends FunSuite with Timeouts {
       val pa = a.toPar
       val pam = pa.map(_ + 1)
 
-      assert(rm == pam.seq.toSeq, r + ".map: " + rm + ", " + pam.seq.toBuffer)
+      assert(rm == pam.seq.toSeq, ()=>r + ".map: " + rm + ", " + pam.seq.toBuffer)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -409,7 +409,7 @@ class ParArrayTest extends FunSuite with Timeouts {
       val pa = a.toPar
       val pcm = pa.map(_ + 1)(customcmf, scheduler)
 
-      assert(rm == pcm.seq.toBuffer, r + ".map: " + rm + ", " + pcm.seq.toString(0) + ", " + pcm.seq.mkString("Conc(", ", ", ")"))
+      assert(rm == pcm.seq.toBuffer, ()=>r + ".map: " + rm + ", " + pcm.seq.toString(0) + ", " + pcm.seq.mkString("Conc(", ", ", ")"))
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -429,7 +429,7 @@ class ParArrayTest extends FunSuite with Timeouts {
       val pa = a.toPar
       val paf = pa.filter(_ % 3 == 0)
 
-      assert(rf == paf.seq.toSeq, r + ".filter: " + rf + ", " + paf.seq.toBuffer)
+      assert(rf == paf.seq.toSeq, ()=>r + ".filter: " + rf + ", " + paf.seq.toBuffer)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
@@ -455,7 +455,7 @@ class ParArrayTest extends FunSuite with Timeouts {
         x * y
       }: @unchecked
 
-      assert(rf == paf.seq.toSeq, r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
+      assert(rf == paf.seq.toSeq, ()=>r + ".flatMap: " + rf + ", " + paf.seq.toBuffer)
     }
   } catch {
     case e: exceptions.TestFailedDueToTimeoutException =>
