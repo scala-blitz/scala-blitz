@@ -210,9 +210,7 @@ class ParArrayTest extends FunSuite with Timeouts with Tests[Array[Int]] with Pa
     }
   }
 
-  def arrayComparison[T](range: Range, r: Seq[T], pa: Par[Array[T]]) = r == pa.seq.toBuffer
 
-  def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
   test("map") {
     testOperation(comparison = arrayComparison[Int]) {

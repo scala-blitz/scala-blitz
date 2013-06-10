@@ -13,7 +13,6 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
   /* config */
 
   def persistor = new SerializationPersistor
-
   val tiny = 100000
   val small = 1000000
   val large = 10000000
@@ -53,12 +52,12 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "aggregate" in {
       using(arrays(small)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(arrays(small))) curve ("Par") in { t => aggregateParallel(t._1)(t._2) }
-    }
+      }
 
     measure method "find(sin)" in {
       using(arrays(small)) curve ("Sequential") in findSinSequential
       using(withSchedulers(arrays(small))) curve ("Par") in { t => findSinParallel(t._1)(t._2) }
-    }
+      }
 
     measure method "map(sqrt)" in {
       using(arrays(small)) curve ("Sequential") in mapSqrtSequential
@@ -73,9 +72,9 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(arrays(small))) curve("Par") in { t => filterMod3Parallel(t._1)(t._2) }
       performance of "<old>" config(oldopts: _*) in {
         using(arrays(tiny)) curve ("ParArray") in { _.par.filter(_ % 3 == 0) }
+        }
       }
-    }
-
+     
     measure method "filter(cos)" in {
       using(arrays(tiny)) curve ("Sequential") in filterCosSequential
       using(withSchedulers(arrays(tiny))) curve("Par") in { t => filterCosParallel(t._1)(t._2) }
@@ -84,24 +83,24 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "flatMap" in {
       using(arrays(small)) curve ("Sequential") in flatMapSequential
       using(withSchedulers(arrays(small))) curve("Par") in { t => flatMapParallel(t._1)(t._2) }
-    }
-
+      }
+  
     performance of "<derivative>" in {
       measure method "fold(product)" in {
         using(arrays(small)) curve ("Sequential") in foldProductSequential
         using(withSchedulers(arrays(small))) curve("Par") in { t => foldProductParallel(t._1)(t._2) }
       }
-
+  
       measure method ("sum") in {
         using(arrays(small)) curve ("Sequential") in sumSequential
         using(withSchedulers(arrays(small))) curve("Par") in { t => sumParallel(t._1)(t._2) }
       }
-
+  
       measure method ("product") in {
         using(arrays(small)) curve ("Sequential") in productSequential
         using(withSchedulers(arrays(small))) curve("Par") in { t => productParallel(t._1)(t._2) }
       }
-
+  
       measure method ("count(squareMod3)") in {
         using(arrays(small)) curve ("Sequential") in countSquareMod3Sequential
         using(withSchedulers(arrays(small))) curve("Par") in { t => countSquareMod3Parallel(t._1)(t._2) }

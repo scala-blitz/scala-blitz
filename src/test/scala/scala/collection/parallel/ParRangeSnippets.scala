@@ -126,7 +126,7 @@ trait ParRangeSnippets {
 
   def countParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.count(x => (x & 0x1) == 0)
 
-  def findSequential(r: Range) = {
+  def findLastSequential(r: Range) = {
     var i = r.head
     val to = r.last
     var found = false
@@ -141,8 +141,28 @@ trait ParRangeSnippets {
     result
   }
 
-  def findParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
+  def findNotExistingSequential(r: Range) = {
+    var i = r.head
+    val to = r.last
+    var found = false
+    var result = -1
+    while (i <= to && !found) {
+      if (i == to) {
+        found = true
+        result = i
+      }
+      i += 1
+    }
+    result
+  }
+
+  def findLastParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
     val mx = r.last
+    r.toPar.find(_ == mx)
+  }
+
+  def findNotExistingParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
+    val mx = r.max + 1
     r.toPar.find(_ == mx)
   }
 
@@ -182,22 +202,104 @@ trait ParRangeSnippets {
     r.toPar.forall(_ == mx)
   }
 
-  def copyToArraySequential(rra: (Range, Array[Int])) {
-    val r = rra._1
-    val a = rra._2
-    var i = r.head
-    val to = r.last
-    while (i <= to) {
-      a(i) = i
-      i += 1
-    }
+  def copyAllToArraySequential(ra: (Range,Array[Int]))  = {
+    val r = ra._1
+    val a = ra._2
+    r.copyToArray(a)
+    a
   }
 
-  def copyToArrayParallel(rra: (Range, Array[Int]))(implicit s: WorkstealingTreeScheduler) = {
-    val r = rra._1
-    val a = rra._2
+  def copyAllToArrayParallel(ra: (Range,Array[Int]))(implicit s: WorkstealingTreeScheduler) = {
+    val a = ra._2
+    val r = ra._1
     r.toPar.copyToArray(a)
+    a
   }
+
+  def copyPartToArraySequential(r: Range)  = {
+    val start = r.size / 7
+    val len = 5 * (r.size / 7)
+    val dest = new Array[Int](len)
+    r.copyToArray(dest, start, len)
+    dest
+  }
+
+  def copyPartToArrayParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
+    val start = r.size / 7
+    val len = 5 * (r.size / 7)
+    val dest = new Array[Int](len)
+    r.toPar.copyToArray(dest, start, len)
+    dest
+  }
+
+  def mapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)
+  def mapParallel[Repr](r: Range, customCmf: collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)(customCmf, s)
+
+  def filterMod3Sequential(r: Range) = {
+    var i = r.head
+    val until = r.last + r.step
+    val ib = new SimpleBuffer[Int]
+    while (i != until) {
+      val elem = i
+      if (elem % 3 == 0) ib.pushback(elem)
+      i += r.step
+    }
+    ib.narr
+  }
+
+  def filterMod3Parallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(_ % 3 == 0)
+
+  def filterCosSequential(r: Range) = {
+    var i = r.head
+    val until = r.last + r.step
+    val ib = new SimpleBuffer[Int]
+    while (i != until) {
+      val elem = i
+      if (math.cos(elem) > 0.0) ib.pushback(elem)
+      i += r.step
+    }
+    ib.narr
+  }
+
+  def filterCosParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(x => math.cos(x) > 0.0)
+
+  val other = List(2, 3)
+
+  def flatMapSequential(r: Range) = {
+    var i = r.head
+    val until = r.last + r.step
+    val ib = new SimpleBuffer[Int]
+    while (i < until) {
+      val elem = i
+      other.foreach(y => ib.pushback(elem * y))
+      i += r.step
+    }
+    ib.narr
+  }
+
+  def flatMapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
+    val pr = r.toPar
+    for {
+      x <- pr
+      y <- other
+    } yield {
+      x * y
+    }: @unchecked
+  }
+
+  def mapSqrtSequential(r: Range) = {
+    var i = r.head
+    val until = r.last
+    val narr = new Array[Int](until)
+    while (i <= until) {
+      narr(i) = math.sqrt(i).toInt
+      i += 1
+    }
+    narr
+  }
+
+  def mapSqrtParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(x => math.sqrt(x).toInt)
+
 
 }
 
