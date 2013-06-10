@@ -36,6 +36,17 @@ object RangesMacros {
     invokeAggregateKernel[Int, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateZero(c), aggregate1[S](c)(init, seqoper), aggregateN[S](c)(init, seqoper))(ctx)
   }
 
+  def foreach(c: Context)(action: c.Expr[Int=>Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val (actionv, actiong) = c.nonFunctionToLocal[Int => Unit](action)
+    val init = c.universe.reify { a: Int => actiong.splice.apply(a) }
+    val seqoper = reify{(x:Unit, a:Int)=> actiong.splice.apply(a)}
+    val zero = reify{()}
+    val comboop = reify{(x:Unit, y:Unit) => ()}
+    invokeAggregateKernel[Int, Unit](c)(actionv)(zero)(comboop)(aggregateZero(c), aggregate1[Unit](c)(init, seqoper), aggregateN[Unit](c)(init, seqoper))(ctx)
+  }
+
   def sum[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 

@@ -177,6 +177,20 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     }
   }
 
+  test("foreach") {
+    testOperation() {
+      r => 
+      val ai = new java.util.concurrent.atomic.AtomicLong(0)
+      r.foreach(x=>  if (x % 100 == 0) ai.incrementAndGet())
+      ai.get
+    } {
+      p => 
+      val ai = new java.util.concurrent.atomic.AtomicLong(0)
+      p.toPar.foreach(x=> if (x % 100 == 0) ai.incrementAndGet())
+      ai.get
+    }
+  }
+
   def testFind(r: Range): Unit = try {
     failAfter(4 seconds) {
       val toBeFound = r.max
