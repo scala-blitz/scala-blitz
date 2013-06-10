@@ -288,17 +288,19 @@ trait ParRangeSnippets {
   }
 
   def mapSqrtSequential(r: Range) = {
-    var i = 0
-    val until = r.length
-    val narr = new Array[Int](until)
-    while (i < until) {
-      narr(i) = math.sqrt(i).toInt
+    var i = r.head
+    val until = r.last
+    val narr = new Array[Int](r.size)
+    while (i <= until) {
+      narr(i - r.head) = math.sqrt(i).toInt
       i += 1
     }
     narr
   }
 
   def mapSqrtParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(x => math.sqrt(x).toInt)
+
+
 }
 
 
