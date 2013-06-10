@@ -144,12 +144,12 @@ trait ParArraySnippets {
 
   def foreachSequential(a: Array[Int]) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    a.foreach(x=>  if (x % 100 == 0) ai.incrementAndGet())
+    a.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
   def foreachParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    a.toPar.foreach(x=> if (x % 100 == 0) ai.incrementAndGet())
+    a.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 

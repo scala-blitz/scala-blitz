@@ -249,13 +249,13 @@ trait ParRangeSnippets {
 
   def foreachSequential(r:Range) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    r.foreach(x=>  if (x % 100 == 0) ai.incrementAndGet())
+    r.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
   def foreachParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    r.toPar.foreach(x=> if (x % 100 == 0) ai.incrementAndGet())
+    r.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
