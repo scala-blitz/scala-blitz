@@ -36,7 +36,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
       method(i to 0 by -29)
       method(0 to i by 29)
     }
-
+ 
     method(1 to 5 by 1000)
     method(1 to 1 by 1000)
     method(1000 to 1 by -100000)
@@ -179,15 +179,9 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
 
   test("foreach") {
     testOperation() {
-      r => 
-      val ai = new java.util.concurrent.atomic.AtomicLong(0)
-      r.foreach(x=>  if (x % 100 == 0) ai.incrementAndGet())
-      ai.get
+      r => foreachSequential(r)
     } {
-      p => 
-      val ai = new java.util.concurrent.atomic.AtomicLong(0)
-      p.toPar.foreach(x=> if (x % 100 == 0) ai.incrementAndGet())
-      ai.get
+      p => foreachParallel(p)
     }
   }
 

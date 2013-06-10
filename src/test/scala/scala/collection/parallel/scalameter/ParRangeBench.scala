@@ -94,6 +94,16 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         using(withSchedulers(ranges(large))) curve ("Par") in { t => foldParallel(t._1)(t._2) }
       }
 
+      measure method "fold" in {
+        using(ranges(large)) curve ("Sequential") in foldSequential
+        using(withSchedulers(ranges(large))) curve ("Par") in { t => foldParallel(t._1)(t._2) }
+      }
+      
+      measure method "foreach" in {
+        using(ranges(small)) curve ("Sequential") in foreachSequential
+        using(withSchedulers(ranges(small))) curve ("Par") in { t => foreachParallel(t._1)(t._2) }
+      }
+
       measure method "min" in {
         using(ranges(large)) curve ("Sequential") in minSequential
         using(withSchedulers(ranges(large))) curve ("Par") in { t => minParallel(t._1)(t._2) }

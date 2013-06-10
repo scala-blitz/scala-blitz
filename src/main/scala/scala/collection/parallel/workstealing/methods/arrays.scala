@@ -51,6 +51,19 @@ object ArraysMacros {
     invokeAggregateKernel[T, U](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
+
+  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(action: c.Expr[U=>Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val (actionv, actiong) = c.nonFunctionToLocal[U => Unit](action)
+    val init = c.universe.reify { a: U => actiong.splice.apply(a) }
+    val seqoper = reify{(x:Unit, a:U)=> actiong.splice.apply(a)}
+    val zero = reify{()}
+    val comboop = reify{(x:Unit, y:Unit) => ()}
+    invokeAggregateKernel[T, Unit](c)(actionv)(zero)(comboop)(aggregateN[T,Unit](c)(init, seqoper))(ctx)
+  }
+
+
   def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
