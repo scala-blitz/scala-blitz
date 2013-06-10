@@ -31,12 +31,19 @@ trait Tests[Repr] extends Timeouts {
       failAfter(numSec seconds) {
         val x = rop(r)
         val px = collop(coll)
-        assert(comparison(r, x, px), "for: " + r + ": " + x + ", " + px)
+        val compResult = comparison(r, x, px)
+        if (!compResult) assert(compResult, "for: " + r + ": " + x + ", " + px)
       }
     } catch {
       case e: exceptions.TestFailedDueToTimeoutException =>
         assert(false, "timeout for: " + r)
     }
   }
+
+  def seqComparison[T](range : Range, x: Seq[T], y: Seq[T]) = x == y
+
+  def arrayComparison[T](range: Range, r: Seq[T], pa: Par[Array[T]]) = r == pa.seq.toBuffer
+
+  def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
 }

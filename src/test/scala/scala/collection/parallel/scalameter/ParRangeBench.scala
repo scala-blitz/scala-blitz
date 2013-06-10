@@ -13,6 +13,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
   def persistor = new SerializationPersistor
 
+  val tiny  =  300000
   val small = 3000000
   val large = 30000000
 
@@ -55,15 +56,38 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     }
 
     measure method "find" in {
-      using(ranges(large)) curve ("Sequential") in findSequential
-      using(withSchedulers(ranges(large))) curve ("Par") in { t => findParallel(t._1)(t._2) }
+      using(ranges(large)) curve ("Sequential") in findNotExistingSequential
+      using(withSchedulers(ranges(large))) curve ("Par") in { t => findNotExistingParallel(t._1)(t._2) }
     }
 
     measure method "copyToArray" in {
-      using(withArrays(ranges(large))) curve ("Sequential") in copyToArraySequential
-      using(withSchedulers(withArrays(ranges(large)))) curve ("Par") in { t => copyToArrayParallel(t._1)(t._2) }
+      using(withArrays(ranges(large))) curve ("Sequential") in copyAllToArraySequential
+      using(withSchedulers(withArrays(ranges(large)))) curve ("Par") in { t => copyAllToArrayParallel(t._1)(t._2) }
     }
 
+    measure method "map(sqrt)" in {
+      using(ranges(small)) curve ("Sequential") in mapSqrtSequential
+      using(withSchedulers(ranges(small))) curve ("Par") in { t => mapSqrtParallel(t._1)(t._2) }
+    }
+
+    measure method "filter(mod3)" config (
+      exec.minWarmupRuns -> 80,
+      exec.maxWarmupRuns -> 160
+    ) in {
+      using(ranges(small)) curve ("Sequential") in filterMod3Sequential
+      using(withSchedulers(ranges(small))) curve("Par") in { t => filterMod3Parallel(t._1)(t._2) }
+      }
+     
+    measure method "filter(cos)" in {
+      using(ranges(tiny)) curve ("Sequential") in filterCosSequential
+      using(withSchedulers(ranges(tiny))) curve("Par") in { t => filterCosParallel(t._1)(t._2) }
+    }
+
+    measure method "flatMap" in {
+      using(ranges(small)) curve ("Sequential") in flatMapSequential
+      using(withSchedulers(ranges(small))) curve("Par") in { t => flatMapParallel(t._1)(t._2) }
+      }
+  
     performance of "derivative" in {
       measure method "fold" in {
         using(ranges(large)) curve ("Sequential") in foldSequential
@@ -100,6 +124,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         using(withSchedulers(ranges(large))) curve ("Par") in { t => existsParallel(t._1)(t._2) }
       }
     }
-  }
+   }
+
 
 }

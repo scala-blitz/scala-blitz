@@ -36,16 +36,6 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
       method(i to 0 by -29)
       method(0 to i by 29)
     }
-    for (i <- 1000000 to 10000000 by 1000000) {
-      method(0 to i)
-      method(i to 0 by -1)
-      method(i to 0 by -91)
-      method(0 to i by 91)
-    }
-    for (i <- 1000 to 1 by -1) {
-      method(0 to i)
-      method(i to 0 by -1)
-    }
 
     method(1 to 5 by 1000)
     method(1 to 1 by 1000)
@@ -204,11 +194,19 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
   }
 
   test("find") {
+    //should be found
     testOperation() {
       r => r.find(_ == r.last)
     } {
-      p => findParallel(p)
+      p => findLastParallel(p)
     }
+    //should not be found
+    testOperation() {
+      r => r.find(_ == r.max + 1)
+    } {
+      p => findNotExistingParallel(p)
+    }
+
   }
 
   test("exists") {
@@ -227,5 +225,56 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     }
   }
 
+  test("copyAllToArray") {
+    testOperation(comparison = seqComparison[Int]) {
+      r => copyAllToArraySequential((r,new Array[Int](r.length)))
+    } {
+      p => copyAllToArrayParallel((p,new Array[Int](p.length)))
+    }
+  }
+
+  test("copyPartToArray") {
+    testOperation(comparison = seqComparison[Int]) {
+      r => copyPartToArraySequential(r)
+    } {
+      p => copyPartToArrayParallel(p)
+    }
+  }
+
+  test("map") {
+    testOperation(comparison = arrayComparison[Int]) {
+      r => r.map(_ + 1)
+    } {
+      p => mapParallel(p)
+    }
+  }
+
+  test("mapCustomCanMergeFrom") {
+    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Conc[Int]]] {
+        def apply(from: Par[Range]) = new Conc.Merger[Int]
+        def apply() = new Conc.Merger[Int]
+      }
+    testOperation(comparison = concComparison[Int]) {
+      r => r.map(_ + 1)
+    } {
+      a => mapParallel[Conc[Int]](a, customCmf)
+    }
+  }
+
+  test("filter") {
+    testOperation(comparison = arrayComparison[Int]) {
+      r => r.filter(_ % 3 == 0)
+    } {
+      a => filterMod3Parallel(a)
+    }
+  }
+
+  test("flatMap") {
+    testOperation(comparison = arrayComparison[Int]) {
+      r => for (x <- r; y <- other) yield x * y
+    } {
+      a => flatMapParallel(a)
+    }
+  }
 }
 
