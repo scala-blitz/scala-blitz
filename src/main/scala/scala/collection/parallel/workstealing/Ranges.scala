@@ -29,7 +29,7 @@ object Ranges {
 
   class Ops(val range: Par[collection.immutable.Range]) extends AnyVal with Zippables.OpsLike[Int, Par[collection.immutable.Range]] {
     def r = range.seq
-    def stealer: Stealer[Int] = new RangeStealer(r, 0, r.length)
+    def stealer: PreciseStealer[Int] = new RangeStealer(r, 0, r.length)
     override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]

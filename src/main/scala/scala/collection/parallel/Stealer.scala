@@ -5,7 +5,7 @@ package scala.collection.parallel
 
 
 
-trait Stealer[@specialized T] {
+trait Stealer[@specialized +T] {
 
   def next(): T
 

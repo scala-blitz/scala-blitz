@@ -31,7 +31,7 @@ object Concs {
 
   import WorkstealingTreeScheduler.{ Kernel, Node }
 
-  class ConcStealer[@specialized(Int, Long, Float, Double) T](val conc: Conc[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
+  class ConcStealer[@specialized(Int, Long, Float, Double) T](val conc: Conc[T], sidx: Int, eidx: Int) extends IndexedStealer.Flat[T](sidx, eidx) {
     val stack = new Array[Conc[T]](conc.level + 1)
     var depth = 0
     var idx = 0
@@ -132,27 +132,15 @@ object Concs {
       nextProgress += numElems
     }
 
+    type StealerType = ConcStealer[T]
+
+    def newStealer(start: Int, until: Int) = new ConcStealer(conc, start, until)
+
     def next(): T = if (hasNext) {
       val res = leaf.asInstanceOf[Conc.Leaf[T]].elementAt(idx)
       move1()
       res
     } else throw new NoSuchElementException
-  
-    def hasNext: Boolean = nextProgress < nextUntil
-  
-    def split: (ConcStealer[T], ConcStealer[T]) = {
-      val total = elementsRemainingEstimate
-      psplit(total / 2)
-    }
-  
-    def psplit(leftSize: Int): (ConcStealer[T], ConcStealer[T]) = {
-      val ls = decode(READ_PROGRESS)
-      val lu = ls + leftSize
-      val rs = lu
-      val ru = untilIndex
-
-      (new ConcStealer[T](conc, ls, lu), new ConcStealer[T](conc, rs, ru))
-    }
   }
 
   abstract class ConcKernel[@specialized(Int, Long, Float, Double) T, @specialized(Int, Long, Float, Double) R]

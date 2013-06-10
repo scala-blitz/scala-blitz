@@ -96,7 +96,7 @@ object Arrays {
 
   def isArrayMerger[S, That](m: Merger[S, That]) = m.isInstanceOf[ArrayMerger[S]]
 
-  class ArrayStealer[@specialized(Specializable.AllNumeric) T](val array: Array[T], sidx: Int, eidx: Int) extends IndexedStealer[T](sidx, eidx) {
+  class ArrayStealer[@specialized(Specializable.AllNumeric) T](val array: Array[T], sidx: Int, eidx: Int) extends IndexedStealer.Flat[T](sidx, eidx) {
     var padding8: Int = _
     var padding9: Int = _
     var padding10: Int = _
@@ -106,27 +106,15 @@ object Arrays {
     var padding14: Int = _
     var padding15: Int = _
 
+    type StealerType = ArrayStealer[T]
+
+    def newStealer(start: Int, until: Int) = new ArrayStealer(array, start, until)
+
     def next(): T = if (hasNext) {
       val res = array(nextProgress)
       nextProgress += 1
       res
     } else throw new NoSuchElementException
-
-    def hasNext: Boolean = nextProgress < nextUntil
-
-    def split: (ArrayStealer[T], ArrayStealer[T]) = {
-      val total = elementsRemainingEstimate
-      psplit(total / 2)
-    }
-
-    def psplit(leftSize: Int): (ArrayStealer[T], ArrayStealer[T]) = {
-      val ls = decode(READ_PROGRESS)
-      val lu = ls + leftSize
-      val rs = lu
-      val ru = untilIndex
-
-      (new ArrayStealer[T](array, ls, lu), new ArrayStealer[T](array, rs, ru))
-    }
   }
 
   abstract class ArrayKernel[@specialized(Specializable.AllNumeric) T, @specialized(Specializable.AllNumeric) R] extends IndexedStealer.IndexedKernel[T, R] {

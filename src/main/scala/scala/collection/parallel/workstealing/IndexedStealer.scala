@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 
 
 
-abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends PreciseStealer[T] {
+abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 
   @volatile var progress: Int = startIndex
@@ -60,10 +60,6 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
     }
   }
 
-  def elementsRemaining: Int = untilIndex - decode(READ_PROGRESS)
-
-  def totalElements: Int = untilIndex - startIndex
-
   protected def decode(p: Int) = if (p >= 0) p else -p - 1
 
   override def toString = {
@@ -80,12 +76,16 @@ object IndexedStealer {
 
   val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[IndexedStealer[_]].getDeclaredField("progress"))
 
-  abstract class Flat[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
-    type StealerType <: IndexedStealer[T]
+  abstract class Flat[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) with PreciseStealer[T] {
+    type StealerType <: Flat[T]
 
     def newStealer(start: Int, until: Int): StealerType
 
     def hasNext: Boolean = nextProgress < nextUntil
+
+    def elementsRemaining: Int = untilIndex - decode(READ_PROGRESS)
+
+    def totalElements: Int = untilIndex - startIndex
 
     def psplit(leftsize: Int): (StealerType, StealerType) = {
       val p = decode(READ_PROGRESS)
