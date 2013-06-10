@@ -290,7 +290,7 @@ trait ParRangeSnippets {
   def mapSqrtSequential(r: Range) = {
     var i = r.head
     val until = r.last
-    val narr = new Array[Int](until)
+    val narr = new Array[Int](r.size)
     while (i <= until) {
       narr(i) = math.sqrt(i).toInt
       i += 1
