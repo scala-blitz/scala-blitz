@@ -95,10 +95,11 @@ object Ranges {
     def apply1(node: Node[Int, R], from: Int, to: Int): R
     def applyN(node: Node[Int, R], from: Int, to: Int, stride: Int): R
   }
+
   abstract class CopyMapRangeKernel[@specialized S] extends IndexedStealer.IndexedKernel[Int, Unit] {
     import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
-    def zero: Unit = null
-    def combine(a: Unit, b: Unit) = null
+    def zero: Unit = ()
+    def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]
     def apply(node: Node[Int, Unit], chunkSize: Int): Unit = {
       val stealer = node.stealer.asInstanceOf[RangeStealer]
