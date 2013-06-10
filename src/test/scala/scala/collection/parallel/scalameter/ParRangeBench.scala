@@ -61,7 +61,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     }
 
     measure method "copyToArray" in {
-      using(withArrays(ranges(large))) curve ("Sequential") in copyAllToArraySequential
+      using(withArrays(ranges(small))) curve ("Sequential") in copyAllToArraySequential
       using(withSchedulers(withArrays(ranges(large)))) curve ("Par") in { t => copyAllToArrayParallel(t._1)(t._2) }
     }
 
