@@ -22,7 +22,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.maxWarmupRuns -> 90,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1024m -Xmx1024m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
+    exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15
   )
 
@@ -40,7 +40,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
-      performance of "<old>" config (pcopts: _*) in {
+      performance of "old" config (pcopts: _*) in {
         using(ranges(small)) curve ("pc") in { _.par.reduce(_ + _) }
       }
     }
@@ -48,7 +48,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => aggregateParallel(t._1)(t._2) }
-      performance of "<old>" config (pcopts: _*) in {
+      performance of "old" config (pcopts: _*) in {
         using(ranges(small)) curve ("pc") in { r =>
           r.par.aggregate(0)(_ + _, _ + _)
         }
@@ -62,7 +62,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "copyToArray" in {
       using(withArrays(ranges(small))) curve ("Sequential") in copyAllToArraySequential
-      using(withSchedulers(withArrays(ranges(large)))) curve ("Par") in { t => copyAllToArrayParallel(t._1)(t._2) }
+      using(withSchedulers(withArrays(ranges(small)))) curve ("Par") in { t => copyAllToArrayParallel(t._1)(t._2) }
     }
 
     measure method "map(sqrt)" in {
@@ -88,7 +88,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(ranges(small))) curve("Par") in { t => flatMapParallel(t._1)(t._2) }
       }
   
-    performance of "<derivative>" in {
+    performance of "derivative" in {
       measure method "fold" in {
         using(ranges(large)) curve ("Sequential") in foldSequential
         using(withSchedulers(ranges(large))) curve ("Par") in { t => foldParallel(t._1)(t._2) }
