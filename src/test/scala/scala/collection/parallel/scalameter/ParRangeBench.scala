@@ -39,7 +39,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
-      performance of "<old>" config (pcopts: _*) in {
+      performance of "old" config (pcopts: _*) in {
         using(ranges(small)) curve ("pc") in { _.par.reduce(_ + _) }
       }
     }
@@ -47,7 +47,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => aggregateParallel(t._1)(t._2) }
-      performance of "<old>" config (pcopts: _*) in {
+      performance of "old" config (pcopts: _*) in {
         using(ranges(small)) curve ("pc") in { r =>
           r.par.aggregate(0)(_ + _, _ + _)
         }
@@ -64,7 +64,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(withArrays(ranges(large)))) curve ("Par") in { t => copyToArrayParallel(t._1)(t._2) }
     }
 
-    performance of "<derivative>" in {
+    performance of "derivative" in {
       measure method "fold" in {
         using(ranges(large)) curve ("Sequential") in foldSequential
         using(withSchedulers(ranges(large))) curve ("Par") in { t => foldParallel(t._1)(t._2) }
