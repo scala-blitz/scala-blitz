@@ -10,7 +10,7 @@ import scala.collection._
 
 class HashStealerTest extends FunSuite {
   import Par._
-  import workstealing.Ops._
+  import parallel.workstealing.Ops._
 
   def createHash(sz: Int) = {
     val hm = mutable.HashMap[Int, Int]()
