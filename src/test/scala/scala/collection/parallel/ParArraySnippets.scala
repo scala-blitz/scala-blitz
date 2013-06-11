@@ -12,23 +12,6 @@ import workstealing.Ops._
 
 trait ParArraySnippets {
 
-  class SimpleBuffer[@specialized(Int) T: ClassTag] {
-    var narr = new Array[T](4)
-    var narrpos = 0
-    def pushback(x: T): this.type = {
-      if (narrpos < narr.length) {
-        narr(narrpos) = x
-        narrpos += 1
-        this
-      } else {
-        val newnarr = new Array[T](narr.length * 2)
-        Array.copy(narr, 0, newnarr, 0, narr.length)
-        narr = newnarr
-        pushback(x)
-      }
-    }
-  }
-
   def foldProductSequential(a: Array[Int]) = {
     var i = 0
     val until = a.length
@@ -157,6 +140,17 @@ trait ParArraySnippets {
       i += 1
     }
     narr
+  }
+
+  def foreachSequential(a: Array[Int]) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    a.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
+    ai.get
+  }
+  def foreachParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    a.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
+    ai.get
   }
 
   def mapSqrtParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.map(x => math.sqrt(x).toInt)

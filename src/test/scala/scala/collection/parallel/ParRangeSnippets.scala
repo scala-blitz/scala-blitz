@@ -247,6 +247,18 @@ trait ParRangeSnippets {
     ib.narr
   }
 
+  def foreachSequential(r:Range) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    r.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
+    ai.get
+  }
+
+  def foreachParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    r.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
+    ai.get
+  }
+
   def filterMod3Parallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(_ % 3 == 0)
 
   def filterCosSequential(r: Range) = {
@@ -290,9 +302,9 @@ trait ParRangeSnippets {
   def mapSqrtSequential(r: Range) = {
     var i = r.head
     val until = r.last
-    val narr = new Array[Int](until)
+    val narr = new Array[Int](r.size)
     while (i <= until) {
-      narr(i) = math.sqrt(i).toInt
+      narr(i - r.head) = math.sqrt(i).toInt
       i += 1
     }
     narr

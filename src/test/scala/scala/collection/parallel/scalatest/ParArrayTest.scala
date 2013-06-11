@@ -125,6 +125,14 @@ class ParArrayTest extends FunSuite with Timeouts with Tests[Array[Int]] with Pa
     }
   }
 
+  test("foreach") {
+    testOperation() {
+      r => foreachSequential(r.toArray)
+    } {
+      p => foreachParallel(p)
+    }
+  }
+
   test("count") {
     testOperation() {
       r => r.count(_ % 2 == 0)

@@ -90,6 +90,11 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
         using(arrays(small)) curve ("Sequential") in foldProductSequential
         using(withSchedulers(arrays(small))) curve("Par") in { t => foldProductParallel(t._1)(t._2) }
       }
+
+      measure method "foreach" in {
+        using(arrays(small)) curve ("Sequential") in foreachSequential
+        using(withSchedulers(arrays(small))) curve ("Par") in { t => foreachParallel(t._1)(t._2) }
+      }
   
       measure method ("sum") in {
         using(arrays(small)) curve ("Sequential") in sumSequential
