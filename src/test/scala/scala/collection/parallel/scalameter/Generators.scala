@@ -6,6 +6,7 @@ package scalameter
 import org.scalameter.api._
 import workstealing.WorkstealingTreeScheduler
 import workstealing.WorkstealingTreeScheduler.Config
+import scala.collection._
 
 
 
@@ -24,6 +25,11 @@ trait Generators {
     var cb = new Conc.Buffer[Int]
     for (i <- 0 until size) cb += i
     cb.result.normalized
+  }
+  def hashMaps(from: Int) = for (size <- sizes(from)) yield {
+    val hm = new mutable.HashMap[Int, Int]
+    for (i <- 0 until size) hm += ((i, i))
+    hm
   }
 
   def withArrays[Repr <% TraversableOnce[_]](gen: Gen[Repr]) = for (coll <- gen) yield (coll, new Array[Int](coll.size))

@@ -66,21 +66,6 @@ class ParConcTest extends FunSuite with Timeouts with Tests[Conc[Int]] with ParC
     testOperation(testEmpty = false)(rt)(ct)
   }
 
-  def testCopyToArray(r: Range, cf: Range => Conc[Int]): Unit = try {
-    failAfter(6 seconds) {
-      val array = new Array[Int](r.length)
-
-      val c = cf(r)
-      val pc = c.toPar
-      pc.copyToArray(array, 0, c.size)
-
-      assert(array.sameElements(r), r + " != " + array.mkString(", "))
-    }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for conc: " + r)
-  }
-
   val array1 = new Array[Int](1000000)
   val array2 = new Array[Int](1000000)
 

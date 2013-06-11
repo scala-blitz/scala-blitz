@@ -188,6 +188,7 @@ object ArraysMacros {
       found.splice.nonEmpty
     }
   }
+  
   def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Int, Int, R, Array[T]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 

@@ -34,7 +34,7 @@ object Hashes {
       val contents = hashmap.seq.hashTableContents
       new HashMapStealer(contents, 0, contents.table.length)
     }
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = ???
+    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.aggregate[K, V, S]
   }
 
   abstract class HashStealer[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
@@ -103,6 +103,14 @@ object Hashes {
       nextAt
     }
 
+  }
+
+  abstract class HashMapKernel[K, V, R] extends IndexedStealer.IndexedKernel[(K, V), R] {
+    def apply(node: Node[(K, V), R], chunkSize: Int): R = {
+      val stealer = node.stealer.asInstanceOf[HashMapStealer[K, V]]
+      apply(node, stealer.nextProgress, stealer.nextUntil)
+    }
+    def apply(node: Node[(K, V), R], from: Int, until: Int): R
   }
 
 }
