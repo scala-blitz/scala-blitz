@@ -180,55 +180,59 @@ object RangesMacros {
     c.inlineAndReset(result)
   }
 
-  def reduce[U >: Int: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def reduce[U >: Int: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[U,U](c)(c.universe.reify{x:U=>x})(operator)(ctx)
+
+  def mapReduce[U >: Int: c.WeakTypeTag, R:c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
-    val (lv, op) = c.nonFunctionToLocal[(U, U) => U](operator)
+    val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
+    val (mv, mop) = c.nonFunctionToLocal[U => R](mapper)
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val result = reify {
       import scala.collection.parallel.workstealing._
       lv.splice
+      mv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[ResultCell[U]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[Int, ResultCell[U]], node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]]) {
-          node.WRITE_INTERMEDIATE(new ResultCell[U])
+      val kernel = new scala.collection.parallel.workstealing.Ranges.RangeKernel[ResultCell[R]] {
+        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[Int, ResultCell[R]], node: WorkstealingTreeScheduler.Node[Int, ResultCell[R]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
-        def zero = new ResultCell[U]
-        def combine(a: ResultCell[U], b: ResultCell[U]) = {
+        def zero = new ResultCell[R]
+        def combine(a: ResultCell[R], b: ResultCell[R]) = {
           if (a eq b) a
           else if (a.isEmpty) b
           else if (b.isEmpty) a
           else {
-            val r = new ResultCell[U]
+            val r = new ResultCell[R]
             r.result = op.splice(a.result, b.result)
             r
           }
         }
-        def apply0(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], at: Int) = node.READ_INTERMEDIATE
-        def apply1(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int) = {
+        def apply0(node: WorkstealingTreeScheduler.Node[Int, ResultCell[R]], at: Int) = node.READ_INTERMEDIATE
+        def apply1(node: WorkstealingTreeScheduler.Node[Int, ResultCell[R]], from: Int, to: Int) = {
           val cell = node.READ_INTERMEDIATE
           var i = from + 1
-          var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
+          var sum: R = if (cell.isEmpty) mop.splice.apply(from) else op.splice(cell.result, mop.splice.apply(from))
           while (i <= to) {
-            sum = op.splice(sum, i)
+            sum = op.splice(sum, mop.splice.apply(i))
             i += 1
           }
           cell.result = sum
           cell
         }
-        def applyN(node: WorkstealingTreeScheduler.Node[Int, ResultCell[U]], from: Int, to: Int, stride: Int) = {
+        def applyN(node: WorkstealingTreeScheduler.Node[Int, ResultCell[R]], from: Int, to: Int, stride: Int) = {
           val cell = node.READ_INTERMEDIATE
           var i = from + stride
-          var sum: U = if (cell.isEmpty) from else op.splice(cell.result, from)
+          var sum: R = if (cell.isEmpty) mop.splice.apply(from) else op.splice(cell.result, mop.splice.apply(from))
           if (stride > 0) {
             while (i <= to) {
-              sum = op.splice(sum, i)
+              sum = op.splice(sum, mop.splice.apply(i))
               i += stride
             }
           } else {
             while (i >= to) {
-              sum = op.splice(sum, i)
+              sum = op.splice(sum, mop.splice.apply(i))
               i += stride
             }
           }

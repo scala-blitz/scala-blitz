@@ -40,6 +40,19 @@ trait ParArraySnippets {
 
   def reduceParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.reduce(_ + _)
 
+  def mapReduceSequential(a: Array[Int]) = {
+    var i = 0
+    val until = a.length
+    var sum = 1
+    while (i < until) {
+      sum += a(i) + 1
+      i += 1
+    }
+    sum
+  }
+
+  def mapReduceParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.mapReduce(_ + 1)(_ + _)
+
   def aggregateSequential(a: Array[Int]) = {
     var i = 0
     val until = a.length

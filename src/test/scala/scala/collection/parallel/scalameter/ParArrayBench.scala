@@ -49,6 +49,11 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
       }
     }
 
+    measure method "mapReduce" in {
+      using(arrays(large)) curve ("Sequential") in mapReduceSequential
+      using(withSchedulers(arrays(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
+    }
+
     measure method "aggregate" in {
       using(arrays(small)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(arrays(small))) curve ("Par") in { t => aggregateParallel(t._1)(t._2) }

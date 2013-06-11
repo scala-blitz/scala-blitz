@@ -256,5 +256,13 @@ class ParArrayTest extends FunSuite with Timeouts with Tests[Array[Int]] with Pa
     }
   }
 
+  test("mapReduce") {
+    testOperation() {
+      r => r.map(_ + 1).reduce(_ + _)
+    } {
+      a => mapReduceParallel(a)
+    }
+  }
+
 }
 

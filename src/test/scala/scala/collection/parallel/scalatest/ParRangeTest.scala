@@ -265,7 +265,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     testOperation(comparison = concComparison[Int]) {
       r => r.map(_ + 1)
     } {
-      a => mapParallel[Conc[Int]](a, customCmf)
+      p => mapParallel[Conc[Int]](p, customCmf)
     }
   }
 
@@ -273,7 +273,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     testOperation(comparison = arrayComparison[Int]) {
       r => r.filter(_ % 3 == 0)
     } {
-      a => filterMod3Parallel(a)
+      p => filterMod3Parallel(p)
     }
   }
 
@@ -281,7 +281,14 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     testOperation(comparison = arrayComparison[Int]) {
       r => for (x <- r; y <- other) yield x * y
     } {
-      a => flatMapParallel(a)
+      p => flatMapParallel(p)
+    }
+  }
+  test("mapReduce") {
+    testOperation() {
+      r => r.map(_ + 1).reduce(_ + _)
+    } {
+      p => mapReduceParallel(p)
     }
   }
 }

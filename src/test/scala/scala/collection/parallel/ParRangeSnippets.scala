@@ -23,7 +23,20 @@ trait ParRangeSnippets {
     if (sum == 0) ???
   }
 
+def mapReduceSequential(r: Range) = {
+    var i = r.head
+    val to = r.last
+    var sum = 0
+    while (i <= to) {
+      sum += i + 1
+      i += 1
+    }
+    if (sum == 0) ???
+  }
+
   def reduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.reduce(_ + _)
+
+  def mapReduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.mapReduce(_ + 1)(_ + _)
 
   def aggregateSequential(r: Range) = {
     var i = r.head

@@ -236,39 +236,42 @@ object ArraysMacros {
     c.inlineAndReset(result)
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[T,U,U](c)(c.universe.reify{x:U=>x})(operator)(ctx)
+
+  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[U=>R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
-    val (lv, op) = c.nonFunctionToLocal[(U, U) => U](operator)
+    val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
+    val (mv, mop) = c.nonFunctionToLocal[U => R](mapper)
     val calleeExpression = c.Expr[Arrays.Ops[T]](c.applyPrefix)
     val result = reify {
       import scala.collection.parallel.workstealing._
       lv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, ResultCell[U]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[U]], node: WorkstealingTreeScheduler.Node[T, ResultCell[U]]) {
-          node.WRITE_INTERMEDIATE(new ResultCell[U])
+      val kernel = new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, ResultCell[R]] {
+        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[R]], node: WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
-        def zero = new ResultCell[U]
-        def combine(a: ResultCell[U], b: ResultCell[U]) = {
+        def zero = new ResultCell[R]
+        def combine(a: ResultCell[R], b: ResultCell[R]) = {
           if (a eq b) a
           else if (a.isEmpty) b
           else if (b.isEmpty) a
           else {
-            val r = new ResultCell[U]
+            val r = new ResultCell[R]
             r.result = op.splice(a.result, b.result)
             r
           }
         }
-        def apply(node: Node[T, ResultCell[U]], from: Int, until: Int) = {
+        def apply(node: Node[T, ResultCell[R]], from: Int, until: Int) = {
           val array = node.stealer.asInstanceOf[Arrays.ArrayStealer[T]].array
           val rc = node.READ_INTERMEDIATE
           if (from < until) {
-            var sum: U = array(from)
+            var sum: R = mop.splice.apply(array(from))
             var i = from + 1
             while (i < until) {
-              sum = op.splice(sum, array(i))
+              sum = op.splice(sum, mop.splice.apply(array(i)))
               i += 1
             }
             if (rc.isEmpty) rc.result = sum
