@@ -35,6 +35,8 @@ object Hashes {
       new HashMapStealer(contents, 0, contents.table.length)
     }
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.aggregate[K, V, S]
+    override def fold[U >: (K, V)](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.fold[K, V, U]
+    def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashMapMacros.count[K, V, U]
   }
 
   abstract class HashStealer[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {

@@ -38,6 +38,13 @@ class ParHashMapBench extends PerformanceTest.Regression with Serializable with 
       using(withSchedulers(hashMaps(from))) curve("Par") in { t => aggregateParallel(t._1)(t._2) }
     }
 
+    performance of "derivative" in {
+      measure method "count" in {
+        using(hashMaps(from)) curve("Sequential") in countSequential
+        using(withSchedulers(hashMaps(from))) curve("Par") in { t => countParallel(t._1)(t._2) }
+      }
+    }
+
   }
 
 }

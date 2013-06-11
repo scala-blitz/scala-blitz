@@ -54,6 +54,12 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     testOperation(testEmpty = false)(rt)(ht)
   }
 
+  test("count") {
+    val rt = (r: Range) => r.count(_ % 2 == 0)
+    val ht = (h: HashMap[Int, Int]) => countParallel(h)
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
 }
 
 

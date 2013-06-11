@@ -59,4 +59,22 @@ object HashMapMacros {
     c.inlineAndReset(result)
   }
 
+  def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+    aggregate[K, V, U](c)(z)(op)(op)(ctx)
+  }
+
+  def count[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+    import c.universe._
+
+    val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
+    val combop = reify { (x: Int, y: Int) => x + y }
+    val seqop = reify { (cnt: Int, x: U) => if (pred.splice(x)) cnt + 1 else cnt }
+    val z = reify { 0 }
+
+    reify {
+      pv.splice
+      aggregate[K, V, Int](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
 }
