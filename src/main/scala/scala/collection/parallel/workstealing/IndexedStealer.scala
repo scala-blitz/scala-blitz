@@ -10,6 +10,8 @@ import scala.annotation.tailrec
 abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 
+  type StealerType <: IndexedStealer[T]
+
   @volatile var progress: Int = startIndex
   var nextProgress: Int = _
   var nextUntil: Int = _
@@ -60,6 +62,20 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
     }
   }
 
+  def newStealer(start: Int, until: Int): StealerType
+
+  def splitAtIndex(leftoffset: Int): (StealerType, StealerType) = {
+    val p = decode(READ_PROGRESS)
+    val mid = math.min(p + leftoffset, untilIndex)
+
+    val left = newStealer(p, mid)
+    val right = newStealer(mid, untilIndex)
+
+    (left, right)
+  }
+
+  def indicesRemaining: Int = untilIndex - decode(READ_PROGRESS)
+
   protected def decode(p: Int) = if (p >= 0) p else -p - 1
 
   override def toString = {
@@ -83,19 +99,11 @@ object IndexedStealer {
 
     def hasNext: Boolean = nextProgress < nextUntil
 
-    def elementsRemaining: Int = untilIndex - decode(READ_PROGRESS)
+    def elementsRemaining: Int = indicesRemaining
 
     def totalElements: Int = untilIndex - startIndex
 
-    def psplit(leftsize: Int): (StealerType, StealerType) = {
-      val p = decode(READ_PROGRESS)
-      val mid = math.min(p + leftsize, untilIndex)
-  
-      val left = newStealer(p, mid)
-      val right = newStealer(mid, untilIndex)
-  
-      (left, right)
-    }
+    def psplit(leftsize: Int): (StealerType, StealerType) = splitAtIndex(leftsize)
   
     def split: (StealerType, StealerType) = psplit(elementsRemainingEstimate / 2)
 
