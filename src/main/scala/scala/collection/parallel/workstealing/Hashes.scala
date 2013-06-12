@@ -108,14 +108,12 @@ object Hashes {
 
   class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](val width: Int)
   extends HashBuckets[K, (K, V), HashMapMerger[K, V], HashMap[K, V]] {
-    val keys = new Array[Conc.Buffer[K]](1 << width)
-    val vals = new Array[Conc.Buffer[V]](1 << width)
+    val keyvals = new Array[Unrolled.PairBuffer[K, V]](1 << width)
 
     def newHashBucket = new HashMapMerger(width)
 
     def clearBucket(i: Int) {
-      keys(i) = null
-      vals(i) = null
+      keyvals(i) = null
     }
 
     def mergeBucket(idx: Int, that: HashMapMerger[K, V], res: HashMapMerger[K, V]) {
@@ -141,15 +139,12 @@ object Hashes {
     def put(k: K, v: V): HashMapMerger[K, V] = {
       val hc = k.##
       val idx = bucketIndex(hc)
-      var bkey = keys(idx)
-      if (bkey eq null) {
-        keys(idx) = new Conc.Buffer
-        vals(idx) = new Conc.Buffer
+      var bucket = keyvals(idx)
+      if (bucket eq null) {
+        bucket = new Unrolled.PairBuffer[K, V]
+        keyvals(idx) = bucket
       }
-      val bval = vals(idx)
-      bkey = keys(idx)
-      bkey += k
-      bval += v
+      bucket.put(k, v)
       this
     }
 
