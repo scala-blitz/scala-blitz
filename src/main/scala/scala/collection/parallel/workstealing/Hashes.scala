@@ -136,18 +136,20 @@ object Hashes {
       }
     }
 
-    @inline def +=(kv: (K, V)): HashMapMerger[K, V] = this.put(kv._1, kv._2)
+    def +=(kv: (K, V)): HashMapMerger[K, V] = this.put(kv._1, kv._2)
 
     def put(k: K, v: V): HashMapMerger[K, V] = {
+      val kz = keys
+      val vz = vals
       val hc = k.##
-      val idx = bucketIndex(hc)
-      var bkey = keys(idx)
+      val idx = hc >>> HashBuckets.IRRELEVANT_BITS
+      var bkey = kz(idx)
       if (bkey eq null) {
-        keys(idx) = new Conc.Buffer
-        vals(idx) = new Conc.Buffer
+        kz(idx) = new Conc.Buffer
+        vz(idx) = new Conc.Buffer
+        bkey = kz(idx)
       }
-      val bval = vals(idx)
-      bkey = keys(idx)
+      val bval = vz(idx)
       bkey += k
       bval += v
       this

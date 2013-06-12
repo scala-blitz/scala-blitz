@@ -139,19 +139,20 @@ class HashesBench extends PerformanceTest.Regression with Serializable with Gene
         }
       }
 
-      using(sizes(from)) curve("HashMapMerger") in { sz =>
-        val merger = new workstealing.Hashes.HashMapMerger[Int, Int](32)
-        var i = 0
-        while (i < sz) {
-          val kv = (i, i)
-          merger += kv
-          i += 1
-        }
-      }
+      using(sizes(from)) curve("HashMapMerger") in hashMapMergerAdd
     }
 
   }
 
+  def hashMapMergerAdd(sz: Int) {
+    val merger = new workstealing.Hashes.HashMapMerger[Int, Int](32)
+    var i = 0
+    while (i < sz) {
+      val kv = (i, i)
+      merger += kv
+      i += 1
+    }
+  }
 
 }
 
