@@ -236,9 +236,9 @@ object ArraysMacros {
     c.inlineAndReset(result)
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[T,U,U](c)(c.universe.reify{x:U=>x})(operator)(ctx)
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[T, U, U](c)(c.universe.reify { x: U => x})(operator)(ctx)
 
-  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[U=>R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)

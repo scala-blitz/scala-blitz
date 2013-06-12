@@ -28,7 +28,7 @@ object Arrays {
   class Ops[T](val array: Par[Array[T]]) extends AnyVal with Zippables.OpsLike[T, Par[Array[T]]] {
     def stealer: PreciseStealer[T] = new ArrayStealer(array.seq, 0, array.seq.length)
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
-    def foreach[U >: T](action: U=>Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.ArraysMacros.foreach[T, U]
+    def foreach[U >: T](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.ArraysMacros.foreach[T, U]
     def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.ArraysMacros.mapReduce[T,T,R]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T, U]
