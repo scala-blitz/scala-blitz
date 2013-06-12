@@ -108,30 +108,32 @@ object Hashes {
 
   class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](val width: Int)
   extends HashBuckets[K, (K, V), HashMapMerger[K, V], HashMap[K, V]] {
-    val keyvals = new Array[Unrolled.PairBuffer[K, V]](1 << width)
+    val keys = new Array[Conc.Buffer[K]](1 << width)
+    val vals = new Array[Conc.Buffer[V]](1 << width)
 
     def newHashBucket = new HashMapMerger(width)
 
     def clearBucket(i: Int) {
-      keyvals(i) = null
+      keys(i) = null
+      vals(i) = null
     }
 
     def mergeBucket(idx: Int, that: HashMapMerger[K, V], res: HashMapMerger[K, V]) {
-      // val thisk = this.keys(idx)
-      // val thisv = this.vals(idx)
-      // val thatk = that.keys(idx)
-      // val thatv = that.vals(idx)
-      // if (thisk == null) {
-      //   res.keys(idx) = thatk
-      //   res.vals(idx) = thatv
-      // } else {
-      //   thisk.prepareForMerge()
-      //   thatk.prepareForMerge()
-      //   res.keys(idx) = thisk merge thatk
-      //   thisv.prepareForMerge()
-      //   thatv.prepareForMerge()
-      //   res.vals(idx) = thisv merge thatv
-      // }
+      val thisk = this.keys(idx)
+      val thisv = this.vals(idx)
+      val thatk = that.keys(idx)
+      val thatv = that.vals(idx)
+      if (thisk == null) {
+        res.keys(idx) = thatk
+        res.vals(idx) = thatv
+      } else {
+        thisk.prepareForMerge()
+        thatk.prepareForMerge()
+        res.keys(idx) = thisk merge thatk
+        thisv.prepareForMerge()
+        thatv.prepareForMerge()
+        res.vals(idx) = thisv merge thatv
+      }
     }
 
     @inline def +=(kv: (K, V)): HashMapMerger[K, V] = this.put(kv._1, kv._2)
@@ -139,12 +141,15 @@ object Hashes {
     def put(k: K, v: V): HashMapMerger[K, V] = {
       val hc = k.##
       val idx = bucketIndex(hc)
-      var bucket = keyvals(idx)
-      if (bucket eq null) {
-        bucket = new Unrolled.PairBuffer[K, V]
-        keyvals(idx) = bucket
+      var bkey = keys(idx)
+      if (bkey eq null) {
+        keys(idx) = new Conc.Buffer
+        vals(idx) = new Conc.Buffer
       }
-      bucket.put(k, v)
+      val bval = vals(idx)
+      bkey = keys(idx)
+      bkey += k
+      bval += v
       this
     }
 
