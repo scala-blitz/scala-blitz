@@ -140,6 +140,8 @@ class HashesBench extends PerformanceTest.Regression with Serializable with Gene
       }
 
       using(sizes(from)) curve("HashMapMerger") in hashMapMergerAdd
+
+      using(sizes(from / 10)) curve("ParHashMapCombiner") in parHahsMapCombinerAdd
     }
 
   }
@@ -150,6 +152,16 @@ class HashesBench extends PerformanceTest.Regression with Serializable with Gene
     while (i < sz) {
       val kv = (i, i)
       merger += kv
+      i += 1
+    }
+  }
+
+  def parHahsMapCombinerAdd(sz: Int) {
+    val cmb = collection.parallel.mutable.ParHashMapCombiner[Int, Int]
+    var i = 0
+    while (i < sz) {
+      val kv = (i, i)
+      cmb += kv
       i += 1
     }
   }
