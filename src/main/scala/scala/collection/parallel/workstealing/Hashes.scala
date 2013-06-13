@@ -106,12 +106,15 @@ object Hashes {
     }
   }
 
-  class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](val width: Int)
-  extends HashBuckets[K, (K, V), HashMapMerger[K, V], HashMap[K, V]] {
+  class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](
+    val width: Int,
+    val loadFactor: Int,
+    val ctx: WorkstealingTreeScheduler
+  ) extends HashBuckets[K, (K, V), HashMapMerger[K, V], Par[HashMap[K, V]]] {
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
 
-    def newHashBucket = new HashMapMerger(width)
+    def newHashBucket = new HashMapMerger(width, loadFactor, ctx)
 
     def clearBucket(i: Int) {
       keys(i) = null
@@ -155,7 +158,50 @@ object Hashes {
       this
     }
 
-    def result = null
+    def result = {
+      import Par._
+      import Ops._
+      val expectedSize = keys.foldLeft(0)(_ + _.size)
+      val tableLength = HashTable.powerOfTwo((expectedSize.toLong * 1000 / loadFactor + 1).toInt)
+      val table = new Array[HashEntry[K, DefaultEntry[K, V]]](tableLength)
+      val stealer = (0 until keys.length).toPar.stealer
+      val kernel = new HashMapMergerResultKernel(width, keys, vals, table)
+      val size = ctx.invokeParallelOperation(stealer, kernel)
+      val contents = new HashTable.Contents(
+        loadFactor,
+        table,
+        size,
+        HashTable.newThreshold(loadFactor, tableLength),
+        HashBuckets.IRRELEVANT_BITS,
+        null
+      )
+      (new HashMap(contents)).toPar
+    }
+  }
+
+  class HashMapMergerResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V](
+    val width: Int,
+    val keys: Array[Conc.Buffer[K]],
+    val vals: Array[Conc.Buffer[V]],
+    val table: Array[HashEntry[K, DefaultEntry[K, V]]]
+  ) extends IndexedStealer.IndexedKernel[Int, Int] {
+    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    def zero = 0
+    def combine(a: Int, b: Int) = a + b
+    def apply(node: Node[Int, Int], chunkSize: Int) = {
+      val stealer = node.stealer.asInstanceOf[Ranges.RangeStealer]
+      var i = stealer.nextProgress
+      val until = stealer.nextUntil
+      var total = 0
+      while (i < until) {
+        total += storeBucket(i)
+        i += 1
+      }
+      total
+    }
+    private def storeBucket(i: Int): Int = {
+      0
+    }
   }
 
   abstract class HashMapKernel[K, V, R] extends IndexedStealer.IndexedKernel[(K, V), R] {

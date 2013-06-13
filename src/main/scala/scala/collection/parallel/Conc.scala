@@ -418,6 +418,8 @@ object Conc {
       conc = Zero
     }
 
+    def size = conc.size + lastSize
+
     def merge(that: Repr) = {
       this.prepareForMerge()
       that.prepareForMerge()

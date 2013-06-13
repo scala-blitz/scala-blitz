@@ -129,7 +129,7 @@ object Arrays {
 
   type CopyProgress = ProgressStatus
 
-  abstract class CopyMapArrayKernel[T, @specialized S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, Unit] {
+  abstract class CopyMapArrayKernel[T, @specialized(Specializable.AllNumeric) S] extends scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, Unit] {
     import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
