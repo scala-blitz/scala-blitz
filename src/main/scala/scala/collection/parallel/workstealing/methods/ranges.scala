@@ -36,7 +36,7 @@ object RangesMacros {
     invokeAggregateKernel[Int, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateZero(c), aggregate1[S](c)(init, seqoper), aggregateN[S](c)(init, seqoper))(ctx)
   }
 
-  def foreach(c: Context)(action: c.Expr[Int=>Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+  def foreach(c: Context)(action: c.Expr[Int => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[Int => Unit](action)

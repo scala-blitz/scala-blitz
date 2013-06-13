@@ -10,6 +10,7 @@ import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node
 import scala.collection.parallel.generic._
 import scala.collection.parallel.Par
 import scala.collection.parallel.Merger
+import scala.collection.mutable.HashMap
 import Optimizer.c2opt
 
 
@@ -75,6 +76,71 @@ object HashMapMacros {
       pv.splice
       aggregate[K, V, Int](c)(z)(combop)(seqop)(ctx).splice
     }
+  }
+
+  def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Hashes.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
+    import c.universe._
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      new Hashes.HashMapKernel[K, V, Merger[S, That]] {
+        override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
+          node.WRITE_INTERMEDIATE(mergerExpr.splice)
+        }
+        def zero = null
+        def combine(a: Merger[S, That], b: Merger[S, That]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a merge b
+        def apply(node: Node[(K, V), Merger[S, That]], from: Int, until: Int) = {
+          val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashMapStealer[K, V]]
+          val table = stealer.table
+          val merger = node.READ_INTERMEDIATE
+          var i = from
+          while (i < until) {
+            var entries = table(i)
+            while (entries != null) {
+              import collection.mutable
+              import mutable.DefaultEntry
+              val de = entries.asInstanceOf[DefaultEntry[K, V]]
+              val kv = (de.key, de.value)
+              applyer.splice(merger, kv)
+              entries = entries.next
+            }
+            i += 1
+          }
+          merger
+        }
+      }
+    }
+  }
+
+  def filter[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(pred: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Par[HashMap[K, V]]] = {
+    import c.universe._
+
+    val (pv, p) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val mergerExpr = c.Expr[Hashes.HashMapMerger[K, V]] {
+      Apply(Select(Ident(newTermName("Hashes")), newTermName("newHashMapMerger")), List(Select(callee.tree, newTermName("hashmap"))))
+    }
+    val tkernel = transformerKernel[K, V, (K, V), Par[HashMap[K, V]]](c)(callee, mergerExpr, reify { (merger: Merger[(K, V), Par[HashMap[K, V]]], elem: (K, V)) => if (p.splice(elem)) merger += elem })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Hashes
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      pv.splice
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
   }
 
 }

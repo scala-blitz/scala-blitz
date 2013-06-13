@@ -466,21 +466,22 @@ object Conc {
       this += elem
     }
 
+    override def toString = "Conc.Buffer(%s)".format((conc <> Conc.Chunk(lastChunk, lastSize)).take(20).mkString(", "))
   }
 
-  class Merger[@specialized(Int, Long, Float, Double) T: ClassTag](
+  class ConcMerger[@specialized(Int, Long, Float, Double) T: ClassTag](
     private[parallel] val maxChunkSize: Int,
     private[parallel] var conc: Conc[T],
     private[parallel] var lastChunk: Array[T],
     private[parallel] var lastSize: Int
-  ) extends BufferLike[T, Par[Conc[T]], Merger[T]] with scala.collection.parallel.Merger[T, Par[Conc[T]]] {
+  ) extends BufferLike[T, Par[Conc[T]], ConcMerger[T]] with scala.collection.parallel.Merger[T, Par[Conc[T]]] {
     def classTag = implicitly[ClassTag[T]]
 
     def this(mcs: Int) = this(mcs, Zero, new Array[T](INITIAL_SIZE), 0)
 
     def this() = this(DEFAULT_MAX_SIZE)
 
-    def newBuffer(conc: Conc[T]) = new Merger(maxChunkSize, conc, new Array[T](INITIAL_SIZE), 0)
+    def newBuffer(conc: Conc[T]) = new ConcMerger(maxChunkSize, conc, new Array[T](INITIAL_SIZE), 0)
 
     def concToTo(c: Conc[T]) = new Par(c)
 

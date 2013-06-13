@@ -259,8 +259,8 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
 
   test("mapCustomCanMergeFrom") {
     object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Conc[Int]]] {
-        def apply(from: Par[Range]) = new Conc.Merger[Int]
-        def apply() = new Conc.Merger[Int]
+        def apply(from: Par[Range]) = new Conc.ConcMerger[Int]
+        def apply() = new Conc.ConcMerger[Int]
       }
     testOperation(comparison = concComparison[Int]) {
       r => r.map(_ + 1)

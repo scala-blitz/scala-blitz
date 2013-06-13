@@ -230,8 +230,8 @@ class ParArrayTest extends FunSuite with Timeouts with Tests[Array[Int]] with Pa
 
   test("mapCustomCanMergeFrom") {
     object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Array[_]], Int, Par[Conc[Int]]] {
-      def apply(from: Par[Array[_]]) = new Conc.Merger[Int]
-      def apply() = new Conc.Merger[Int]
+      def apply(from: Par[Array[_]]) = new Conc.ConcMerger[Int]
+      def apply() = new Conc.ConcMerger[Int]
     }
     testOperation(comparison = concComparison[Int]) {
       r => r.map(_ + 1)

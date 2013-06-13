@@ -37,6 +37,8 @@ trait ParHashMapSnippets {
 
   def countParallel(hm: collection.mutable.HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.count(_._2 % 2 == 0)
 
+  def filterParallel(hm: collection.mutable.HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.filter(_._2 % 5 != 0)
+
 }
 
 
