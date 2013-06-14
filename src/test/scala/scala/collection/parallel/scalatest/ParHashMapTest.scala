@@ -48,17 +48,17 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     hm
   }
 
-  // test("aggregate") {
-  //   val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
-  //   val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
-  //   testOperation()(rt)(ht)
-  // }
+  test("aggregate") {
+    val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
+    val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
+    testOperation()(rt)(ht)
+  }
 
-  // test("count") {
-  //   val rt = (r: Range) => r.count(_ % 2 == 0)
-  //   val ht = (h: HashMap[Int, Int]) => countParallel(h)
-  //   testOperation()(rt)(ht)
-  // }
+  test("count") {
+    val rt = (r: Range) => r.count(_ % 2 == 0)
+    val ht = (h: HashMap[Int, Int]) => countParallel(h)
+    testOperation()(rt)(ht)
+  }
 
   test("simple filter") {
     val hm = HashMap(0 -> 0, 1 -> 2, 2 -> 4, 3 -> 6, 4 -> 8, 5 -> 10, 6 -> 12)
