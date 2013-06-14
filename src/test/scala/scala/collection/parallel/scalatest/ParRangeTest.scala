@@ -185,22 +185,6 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     }
   }
 
-  def testFind(r: Range): Unit = try {
-    failAfter(4 seconds) {
-      val toBeFound = r.max
-      val toNotBeFound = toBeFound + 1
-
-      val pr = r.toPar
-      val shouldBeFound = pr.find(_ == toBeFound)
-      assert(shouldBeFound.isDefined && shouldBeFound.get == toBeFound, r + ": " + shouldBeFound + ", " + toBeFound)
-      val shouldNotBeFound = pr.find(_ == toNotBeFound)
-      assert(shouldNotBeFound.isEmpty, r + ": " + shouldNotBeFound + ", None")
-    }
-  } catch {
-    case e: exceptions.TestFailedDueToTimeoutException =>
-      assert(false, "timeout for range: " + r)
-  }
-
   test("find") {
     //should be found
     testOperation() {
