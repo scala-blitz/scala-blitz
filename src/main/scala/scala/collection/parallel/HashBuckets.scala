@@ -61,7 +61,8 @@ object HashBuckets {
     }
 
     def setSize(sz: Int) = tableSize = sz
-    def tryInsertEntry(k: K, v: V) {
+
+    def tryInsertEntry(k: K, v: V): Boolean = {
       var h = index(elemHashCode(k))
       val olde = table(h).asInstanceOf[DefaultEntry[K, V]]
 
@@ -79,9 +80,10 @@ object HashBuckets {
         val e = new DefaultEntry(k, v)
         e.next = olde
         table(h) = e
-        tableSize += 1
-      }
+        true
+      } else false
     }
+    
     protected def createNewEntry[X](key: K, x: X) = ???
   }
 

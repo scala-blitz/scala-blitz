@@ -48,22 +48,29 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     hm
   }
 
-  test("aggregate") {
-    val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
-    val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
-    testOperation(testEmpty = false)(rt)(ht)
-  }
+  // test("aggregate") {
+  //   val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
+  //   val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
+  //   testOperation()(rt)(ht)
+  // }
 
-  test("count") {
-    val rt = (r: Range) => r.count(_ % 2 == 0)
-    val ht = (h: HashMap[Int, Int]) => countParallel(h)
-    testOperation(testEmpty = false)(rt)(ht)
-  }
+  // test("count") {
+  //   val rt = (r: Range) => r.count(_ % 2 == 0)
+  //   val ht = (h: HashMap[Int, Int]) => countParallel(h)
+  //   testOperation()(rt)(ht)
+  // }
 
   test("simple filter") {
     val hm = HashMap(0 -> 0, 1 -> 2, 2 -> 4, 3 -> 6, 4 -> 8, 5 -> 10, 6 -> 12)
     val res = hm.toPar.filter(_._1 % 2 == 0)
+    val expected = HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12)
     assert(res.seq == HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12), (hm, res))
+  }
+
+  test("filter") {
+    val rt = (r: Range) => HashMap(r zip r: _*).filter(_._1 % 5 != 0)
+    val ht = (h: collection.mutable.HashMap[Int, Int]) => filterParallel(h)
+    testOperation(comparison = hashMapComparison[Int, Int])(rt)(ht)
   }
 
 }

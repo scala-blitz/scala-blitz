@@ -181,6 +181,7 @@ object Hashes {
       val stealer = (0 until keys.length).toPar.stealer
       val kernel = new HashMapMergerResultKernel(width, keys, vals, table)
       val size = ctx.invokeParallelOperation(stealer, kernel)
+      table.setSize(size)
       (new HashMap(table.hashTableContents)).toPar
     }
 
@@ -192,25 +193,26 @@ object Hashes {
     val keys: Array[Conc.Buffer[K]],
     val vals: Array[Conc.Buffer[V]],
     val table: HashBuckets.DefaultEntries[K, V]
-  ) extends IndexedStealer.IndexedKernel[Int, Unit] {
+  ) extends IndexedStealer.IndexedKernel[Int, Int] {
     override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
-    def zero = ()
-    def combine(a: Unit, b: Unit) = a
-    def apply(node: Node[Int, Unit], chunkSize: Int) {
+    def zero = 0
+    def combine(a: Int, b: Int) = a + b
+    def apply(node: Node[Int, Int], chunkSize: Int): Int = {
       val stealer = node.stealer.asInstanceOf[Ranges.RangeStealer]
       var i = stealer.nextProgress
       val until = stealer.nextUntil
+      var sum = 0
       while (i < until) {
-        storeBucket(i)
+        sum += storeBucket(i)
         i += 1
       }
+      sum
     }
-    private def storeBucket(i: Int) {
-      def traverse(ks: Conc[K], vs: Conc[V]): Unit = ks match {
+    private def storeBucket(i: Int): Int = {
+      def traverse(ks: Conc[K], vs: Conc[V]): Int = ks match {
         case knode: Conc.<>[K] =>
           val vnode = vs.asInstanceOf[Conc.<>[V]]
-          traverse(knode.left, vnode.left)
-          traverse(knode.right, vnode.right)
+          traverse(knode.left, vnode.left) + traverse(knode.right, vnode.right)
         case kchunk: Conc.Chunk[K] =>
           val kchunkarr = kchunk.elems
           val vchunkarr = vs.asInstanceOf[Conc.Chunk[V]].elems
@@ -220,14 +222,15 @@ object Hashes {
           while (i < until) {
             val k = kchunkarr(i)
             val v = vchunkarr(i)
-            table.tryInsertEntry(k, v)
+            if (table.tryInsertEntry(k, v)) total += 1
             i += 1
           }
+          total
         case _ =>
           sys.error("unreachable: " + ks)
       }
 
-      if (keys(i) ne null) traverse(keys(i).result, vals(i).result)
+      if (keys(i) ne null) traverse(keys(i).result.normalized, vals(i).result.normalized) else 0
     }
   }
 

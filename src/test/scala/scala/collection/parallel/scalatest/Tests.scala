@@ -6,6 +6,7 @@ package scalatest
 import org.scalatest._
 import org.scalatest.concurrent.Timeouts
 import org.scalatest.time.SpanSugar._
+import scala.collection._
 
 
 
@@ -45,5 +46,7 @@ trait Tests[Repr] extends Timeouts {
   def arrayComparison[T](range: Range, r: Seq[T], pa: Par[Array[T]]) = r == pa.seq.toBuffer
 
   def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
+
+  def hashMapComparison[K, V](range: Range, hm: mutable.HashMap[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
 
 }
