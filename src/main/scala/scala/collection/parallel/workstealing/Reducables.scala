@@ -25,8 +25,8 @@ object Reducables {
     def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.sum[T, U, Repr]
     def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.product[T, U, Repr]
     def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ReducablesMacros.count[T, U, Repr]
-    //def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.min[T, U, Repr]
-    //def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.max[T, U, Repr]
+    def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.min[T, U, Repr]
+    def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.max[T, U, Repr]
 
     def map[S, That](f: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = ???
     def stealer: Stealer[T]

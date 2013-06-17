@@ -40,9 +40,9 @@ object Ranges {
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
     override def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
     override def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
-    def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
+    override def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
     override def foreach[U >: Int](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.foreach[U]
-    def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
+    override def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
     def find(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
     def exists(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
     override def count[U >: Int](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count[U]

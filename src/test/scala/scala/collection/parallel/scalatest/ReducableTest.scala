@@ -139,7 +139,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     }
   }
 
-  /*test("min") {
+  test("min") {
     testOperation() {
       r => r.min
     } {
@@ -175,7 +175,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     } {
       p => maxParallel(p, customOrd)
     }
-  }*/
+  }
 
   test("foreach") {
     testOperation() {
