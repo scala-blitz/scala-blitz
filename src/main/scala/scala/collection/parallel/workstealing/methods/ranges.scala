@@ -1,7 +1,5 @@
 package scala.collection.parallel.workstealing.methods
 
-
-
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
@@ -12,8 +10,6 @@ import scala.collection.parallel.Configuration
 import scala.collection.parallel.Merger
 import Optimizer._
 import scala.reflect.ClassTag
-
-
 
 object RangesMacros {
 
@@ -36,14 +32,14 @@ object RangesMacros {
     invokeAggregateKernel[Int, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateZero(c), aggregate1[S](c)(init, seqoper), aggregateN[S](c)(init, seqoper))(ctx)
   }
 
-  def foreach(c: Context)(action: c.Expr[Int => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+  def foreach[U >: Int: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[Int => Unit](action)
     val init = c.universe.reify { a: Int => actiong.splice.apply(a) }
-    val seqoper = reify{(x:Unit, a:Int)=> actiong.splice.apply(a)}
-    val zero = reify{()}
-    val comboop = reify{(x:Unit, y:Unit) => ()}
+    val seqoper = reify { (x: Unit, a: Int) => actiong.splice.apply(a) }
+    val zero = reify { () }
+    val comboop = reify { (x: Unit, y: Unit) => () }
     invokeAggregateKernel[Int, Unit](c)(actionv)(zero)(comboop)(aggregateZero(c), aggregate1[Unit](c)(init, seqoper), aggregateN[Unit](c)(init, seqoper))(ctx)
   }
 
@@ -92,7 +88,7 @@ object RangesMacros {
     }
   }
 
-  def count(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+  def count[U>:Int: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (predicv, predic) = c.nonFunctionToLocal[Int => Boolean](p)
@@ -110,9 +106,9 @@ object RangesMacros {
     invokeAggregateKernel[Int, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateZero(c), aggregate1[Int](c)(init, seqoper), aggregateN[Int](c)(init, seqoper))(ctx)
   }
 
-  def aggregateZero[R: c.WeakTypeTag](c: Context): c.Expr[(Int, R) => R] = c.universe.reify { (at: Int, zero: R) => zero }
+  def aggregateZero[R: c.WeakTypeTag](c: Context): c.Expr[(Int, Ranges.RangeKernel[R]) => R] = c.universe.reify { (at: Int, kernel: Ranges.RangeKernel[R]) => kernel.zero }
 
-  def aggregate1[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, zero: R) =>
+  def aggregate1[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, kernel: Ranges.RangeKernel[R]) =>
     {
       val fin = if (from > to) from else to
       var i: Int = from + to - fin + 1
@@ -125,7 +121,7 @@ object RangesMacros {
     }
   }
 
-  def aggregateN[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, stride: Int, zero: R) =>
+  def aggregateN[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[R]) =>
     {
       var i = from + stride
       var sum: R = init.splice.apply(from)
@@ -144,7 +140,7 @@ object RangesMacros {
     }
   }
 
-  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, R) => R], applyer1: c.Expr[(Int, Int, R) => R], applyerN: c.Expr[(Int, Int, Int, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, Ranges.RangeKernel[R]) => R], applyer1: c.Expr[(Int, Int, Ranges.RangeKernel[R]) => R], applyerN: c.Expr[(Int, Int, Int, Ranges.RangeKernel[R]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
@@ -159,9 +155,9 @@ object RangesMacros {
         new scala.collection.parallel.workstealing.Ranges.RangeKernel[R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
-          def apply0(node: WorkstealingTreeScheduler.Node[Int, R], at: Int) = applyer0.splice.apply(at, zero)
-          def apply1(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyer1.splice.apply(from, to, zero)
-          def applyN(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, stride: Int) = applyerN.splice.apply(from, to, stride, zero)
+          def apply0(node: WorkstealingTreeScheduler.Node[Int, R], at: Int) = applyer0.splice.apply(at, this)
+          def apply1(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyer1.splice.apply(from, to, this)
+          def applyN(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, stride: Int) = applyerN.splice.apply(from, to, stride, this)
         }
       ctx.splice.invokeParallelOperation(stealer, kernel)
     }
@@ -180,9 +176,9 @@ object RangesMacros {
     c.inlineAndReset(result)
   }
 
-  def reduce[U >: Int: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[U,U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+  def reduce[U >: Int: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
 
-  def mapReduce[U >: Int: c.WeakTypeTag, R:c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def mapReduce[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
@@ -364,8 +360,9 @@ object RangesMacros {
     }
   }
 
-  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, arr: Array[U]) =>
+  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
+      val arr = kernel.zero
       val fin = if (from > to) from else to
       var i: Int = from + to - fin
       var dest: Int = start.splice + i - rhead.splice
@@ -380,8 +377,9 @@ object RangesMacros {
     }
   }
 
-  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, arr: Array[U]) =>
+  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
+      val arr = kernel.zero
       var i = from
       var dest = start.splice + (i - rhead.splice) / stride
       val dto = if (1 + (to - from) / stride < len.splice - dest - 1) to else from + (len.splice - dest - 1) * stride
@@ -560,7 +558,7 @@ object RangesMacros {
     c.inlineAndReset(operation)
   }
 
-  def flatMap[T>: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+  def flatMap[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -577,7 +575,7 @@ object RangesMacros {
       import scala.collection.parallel.workstealing.Arrays
       import scala.collection.parallel.workstealing.Ranges
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
-      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -601,7 +599,7 @@ object RangesMacros {
 
     val operation = reify {
       import scala.collection.parallel._
-      import scala.collection.parallel.workstealing.{Arrays,Ranges}
+      import scala.collection.parallel.workstealing.{ Arrays, Ranges }
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
       pv.splice

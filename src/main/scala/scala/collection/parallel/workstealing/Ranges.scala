@@ -23,7 +23,11 @@ object Ranges {
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
     implicit def rangeIsZippable = new IsZippable[Range, Int] {
-      def apply(pr: Par[Range]) = ???
+      def apply(pr: Par[Range]) = new Zippable[Int]{
+      def iterator = ???
+      def splitter =  ???
+      def stealer = new RangeStealer(pr.seq, 0, pr.seq.length)
+      }
     }
   }
 
@@ -31,17 +35,17 @@ object Ranges {
     def r = range.seq
     def stealer: PreciseStealer[Int] = new RangeStealer(r, 0, r.length)
     override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
-    def mapReduce[R](mapper: Int => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.RangesMacros.mapReduce[Int,R]
+    override def mapReduce[R](mapper: Int => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.RangesMacros.mapReduce[Int,R]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
-    def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
-    def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
-    def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
-    def foreach(action: Int => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.foreach
-    def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
+    override def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
+    override def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.product[U]
+    override def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
+    override def foreach[U >: Int](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.foreach[U]
+    override def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
     def find(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
     def exists(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
-    def count(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count
+    override def count[U >: Int](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count[U]
     def forall(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.forall
     override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.map[Int, S, That]
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray[U]
@@ -74,6 +78,11 @@ object Ranges {
     }
 
     def newStealer(s: Int, u: Int) = new RangeStealer(range, s, u)
+    override def toString = {
+    val p = READ_PROGRESS
+    val dp = decode(p)
+    "RangeStealer(id:%d, startIndex:%d, progress:%d, decodedProgress:%d, UntilIndex:%d, nextProgress:%d, nextUntil:%d)".format(java.lang.System.identityHashCode(this), startIndex, p, dp, untilIndex, nextProgress, nextUntil) 
+  }
   }
 
   abstract class RangeKernel[@specialized R] extends IndexedStealer.IndexedKernel[Int, R] {

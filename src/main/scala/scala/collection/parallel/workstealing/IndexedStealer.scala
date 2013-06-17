@@ -81,7 +81,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
   override def toString = {
     val p = READ_PROGRESS
     val dp = decode(p)
-    "IndexedStealer(%d, %d, %d)".format(startIndex, p, dp, untilIndex)
+    "IndexedStealer(%d, %d, %d, %d)".format(startIndex, p, dp, untilIndex) 
   }
 
 }
