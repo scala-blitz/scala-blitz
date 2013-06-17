@@ -75,9 +75,9 @@ trait ReducableSnippets {
     min
   }
 
-  def minParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.min
+  //def minParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.min
 
-  def minParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: WorkstealingTreeScheduler) = r.min(ord, s)
+  //def minParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: WorkstealingTreeScheduler) = r.min(ord, s)
 
   def maxSequential(r: Range) = {
     var i = r.head
@@ -90,9 +90,9 @@ trait ReducableSnippets {
     max
   }
 
-  def maxParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.max
+  //def maxParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.max
 
-  def maxParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: WorkstealingTreeScheduler) = r.max(ord, s)
+  //def maxParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: WorkstealingTreeScheduler) = r.max(ord, s)
 
   def sumSequential(r: Range) = {
     var i = r.head
