@@ -11,12 +11,18 @@ import scala.reflect.ClassTag
 trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
   import TreeStealer._
 
-  val isTree: IsTree[N]
   val root: N
   val totalSize: Int
-  val pathStack = new Array[Int](isTree.depthBound(totalSize) + 1)
-  val nodeStack = isTree.classTag.newArray(isTree.depthBound(totalSize) + 1)
+  val classTag: ClassTag[N]
+  val pathStack = new Array[Int](depthBound(totalSize) + 1)
+  val nodeStack = classTag.newArray(depthBound(totalSize) + 1)
   var depth: Int = 0
+
+  def totalChildren(n: N): Int
+  def child(n: N, idx: Int): N
+  def isLeaf(n: N): Boolean
+  def estimateSubtree(depth: Int, totalSize: Int): Int
+  def depthBound(totalSize: Int): Int
 
   private def checkBounds(idx: Int) = {
     if (idx < 0 || idx >= pathStack.length) throw new IndexOutOfBoundsException("idx: " + idx + ", length: " + pathStack.length)
@@ -39,44 +45,52 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
     unsafe.compareAndSwapInt(pathStack, OFFSET(idx), ov, nv)
   }
 
-  def encodeStolen(origin: Int, progress: Int): Int = {
+  final def encodeStolen(origin: Int, progress: Int): Int = {
     SPECIAL_MASK |
     STOLEN_MASK |
     ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
-  def encodeCompleted(origin: Int, progress: Int): Int = {
+  final def encodeCompleted(origin: Int, progress: Int): Int = {
     SPECIAL_MASK |
     COMPLETED_MASK |
     ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
-  def completed(code: Int): Boolean = ((code & COMPLETED_MASK) >>> COMPLETED_SHIFT) != 0
+  final def completed(code: Int): Boolean = ((code & COMPLETED_MASK) >>> COMPLETED_SHIFT) != 0
 
-  def stolen(code: Int): Boolean = ((code & STOLEN_MASK) >>> STOLEN_SHIFT) != 0
+  final def stolen(code: Int): Boolean = ((code & STOLEN_MASK) >>> STOLEN_SHIFT) != 0
 
-  def origin(code: Int): Int = ((code & ORIGIN_MASK) >>> ORIGIN_SHIFT)
+  final def origin(code: Int): Int = ((code & ORIGIN_MASK) >>> ORIGIN_SHIFT)
 
-  def progress(code: Int): Int = ((code & PROGRESS_MASK) >>> PROGRESS_SHIFT)
+  final def progress(code: Int): Int = ((code & PROGRESS_MASK) >>> PROGRESS_SHIFT)
 
-  def push(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth + 1, ov, nv)) {
+  final def special(code: Int): Boolean = (code & SPECIAL_MASK) != 0
+
+  final def push(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth + 1, ov, nv)) {
     val cidx = origin(nv)
-    nodeStack(depth + 1) = isTree.child(nodeStack(depth), cidx)
+    nodeStack(depth + 1) = child(nodeStack(depth), cidx)
     depth += 1
     true
   } else false
 
-  def pop(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth, ov, nv)) {
+  final def pop(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth, ov, nv)) {
     nodeStack(depth) = null
     depth -= 1
     true
   } else false
 
-  def switch(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth, ov, nv)) {
+  final def switch(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth, ov, nv)) {
     true
   } else false
+
+  final def peekprev = if (depth > 0) READ_STACK(depth - 1) else 0
+
+  final def peekcurr = READ_STACK(depth)
+
+  final def peeknext = READ_STACK(depth + 1)
 
 }
 
@@ -96,23 +110,17 @@ object TreeStealer {
   val SPECIAL_SHIFT = 31
   val SPECIAL_MASK = 0x80000000
 
-  abstract class IsTree[N] {
-    def totalChildren(n: N): Int
-    def child(n: N, idx: Int): N
-    def isLeaf(n: N): Boolean
-    def isExternal: Boolean
-    def estimateSubtree(depth: Int, totalSize: Int): Int
-    def depthBound(totalSize: Int): Int
-    def classTag: ClassTag[N]
-  }
-
-  abstract class IsExternalTree[@specialized(Int, Long, Float, Double) T, N] extends IsTree[N] {
-    def isExternal = true
-    def elementAtLeaf(idx: Int): T
+  abstract class ChunkIterator[@specialized(Int, Long, Float, Double) T] {
+    def hasNext: Boolean
+    def next(): T
   }
 
   trait External[@specialized(Int, Long, Float, Double) T, N >: Null <: AnyRef] extends TreeStealer[T, N] {
-    val isTree: IsExternalTree[T, N]
+    val chunkIterator: ChunkIterator[T]
+
+    def resetIterator(n: N): Unit
+
+    def elementAtLeaf(idx: Int): T
 
     final def state = {
       val code = READ_STACK(0)
@@ -121,7 +129,47 @@ object TreeStealer {
       else Stealer.AvailableOrOwned
     }
 
-    final def advance(step: Int): Int = ???
+    @tailrec final def advance(step: Int): Int = {
+      def isLast(prev: Int, curr: Int) = prev == 0 || {
+        val prevnode = nodeStack(depth - 1)
+        totalChildren(prevnode) == origin(curr)
+      }
+
+      val next = peeknext
+      val curr = peekcurr
+      val prev = peekprev
+
+      if (special(prev) && stolen(prev) || stolen(curr)) {
+        markStolen()
+        -1
+      } else {
+        val last = isLast(prev, curr)
+        val totalch = totalChildren(nodeStack(depth))
+        val p = progress(curr)
+        if (p < totalch) {
+          if (next == 0) {
+            // decide to batch - pop to completed
+            // or not to batch - push
+            ???
+            advance(step)
+          } else {
+            // if next origin identical - switch
+            // if next origin different - push
+            ???
+          }
+        } else {
+          if (next == 0) {
+            // if last node - pop to 0
+            // if not last - pop to completed
+            ???
+          } else {
+            // if next origin identical - error!
+            // if next origin different - push
+            ???
+          }
+        }
+      }
+    }
 
     @tailrec final def markCompleted(): Boolean = {
       val code = READ_STACK(0)
