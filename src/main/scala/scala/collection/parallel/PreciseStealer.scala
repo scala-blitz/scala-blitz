@@ -9,6 +9,9 @@ trait PreciseStealer[@specialized +T] extends Stealer[T] {
 
   def next(): T
 
+  /** ordinal number of element returned by subsequent next call */
+  def nextOffset: Int
+
   def hasNext: Boolean
 
   /** Commits to processing a block of elements by using `next` and `hasNext`.
