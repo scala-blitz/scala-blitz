@@ -153,14 +153,15 @@ object ArraysMacros {
         def combine(a: Option[Int], b: Option[Int]) = if (a.isDefined) a else b
         def apply(node: Node[T, Option[Int]], from: Int, to: Int) = {
           var i = from
-          var result: Option[Int] = None
+          
           val arr = callee.array.seq
-          while (i < to && result.isEmpty) {
-            if (pred.splice(arr(i))) result = Some(i)
+          while (i < to && !pred.splice(arr(i))) {
             i += 1
           }
-          if (result.isDefined) terminationCause = ResultFound
-          result
+          if (i<to) { terminationCause = ResultFound
+            Some(i)
+          }
+          else None
         }
       }
       val result = ctx.splice.invokeParallelOperation(stealer, kernel)
