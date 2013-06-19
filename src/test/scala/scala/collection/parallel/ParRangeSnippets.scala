@@ -211,8 +211,7 @@ def mapReduceSequential(r: Range) = {
   }
 
   def forallParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val mx = r.last + 1
-    r.toPar.forall(_ == mx)
+    r.toPar.forall(_ < Int.MaxValue)
   }
 
   def copyAllToArraySequential(ra: (Range,Array[Int]))  = {
