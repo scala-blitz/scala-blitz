@@ -139,13 +139,13 @@ trait ReducableSnippets {
 
   def countParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.count(x => (x & 0x1) == 0)
 
-  def findLastSequential(r: Range) = {
+  def findFirstSequential(r: Range) = {
     var i = r.head
     val to = r.last
     var found = false
     var result = -1
     while (i <= to && !found) {
-      if (i == to) {
+      if (i == 0) {
         found = true
         result = i
       }
@@ -160,7 +160,7 @@ trait ReducableSnippets {
     var found = false
     var result = -1
     while (i <= to && !found) {
-      if (i == to) {
+      if (i == Int.MinValue) {
         found = true
         result = i
       }
@@ -169,22 +169,38 @@ trait ReducableSnippets {
     result
   }
 
-  /*def findLastParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val mx = r.last
-    r.toPar.find(_ == mx)
+  def findFirstParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
+    r.find(_ == 0)
   }
 
-  def findNotExistingParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val mx = r.max + 1
-    r.toPar.find(_ == mx)
+  def findNotExistingParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
+    r.find(_ == Int.MinValue)
   }
+
+  def findSinSequential(r: Range) = {
+    var i = r.head
+    val to = r.last
+    var found = false
+    var result = -1
+    while (i != to  && !found) {
+      if (2.0 == math.sin(i)) {
+        found = true
+        result = i
+      }
+      i += 1
+    }
+    result
+  }
+
+  def findSinParallel(a: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = a.find(x => math.sin(x) == 2.0)
+
 
   def existsSequential(r: Range) = {
     var i = r.head
     val to = r.last
     var result = false
     while (i <= to && (!result)) {
-      if (to == i) {
+      if (i == 0) {
         result = true
       }
       i += 1
@@ -193,9 +209,8 @@ trait ReducableSnippets {
     else result
   }
 
-  def existsParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val mx = r.last + 1
-    r.toPar.exists(_ == mx)
+  def existsParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
+    r.exists(_ == 0)
   }
 
   def forallSequential(r: Range) = {
@@ -210,12 +225,11 @@ trait ReducableSnippets {
     else result
   }
 
-  def forallParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val mx = r.last + 1
-    r.toPar.forall(_ == mx)
+  def forallParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
+    r.forall(_ < Int.MaxValue)
   }
 
-  def copyAllToArraySequential(ra: (Range,Array[Int]))  = {
+  /*def copyAllToArraySequential(ra: (Range,Array[Int]))  = {
     val r = ra._1
     val a = ra._2
     r.copyToArray(a)
@@ -243,10 +257,10 @@ trait ReducableSnippets {
     val dest = new Array[Int](len)
     r.toPar.copyToArray(dest, start, len)
     dest
-  }
+  }*/
 
-  def mapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)
-  def mapParallel[Repr](r: Range, customCmf: collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)(customCmf, s)
+  def mapParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler):Par[Array[Int]] = r.map(_ + 1)
+  def mapParallel[Repr](r: Reducable[Int], customCmf: collection.parallel.generic.CanMergeFrom[Reducable[Int], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.map(_ + 1)(customCmf, s)
 
   def filterMod3Sequential(r: Range) = {
     var i = r.head
@@ -259,7 +273,7 @@ trait ReducableSnippets {
     }
     ib.narr
   }
-   */
+  
   def foreachSequential(r:Range) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
     r.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
@@ -310,7 +324,7 @@ trait ReducableSnippets {
     } yield {
       x * y
     }: @unchecked
-  }
+  }*/
 
   def mapSqrtSequential(r: Range) = {
     var i = r.head
@@ -323,7 +337,7 @@ trait ReducableSnippets {
     narr
   }
 
-  def mapSqrtParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(x => math.sqrt(x).toInt)
+  def mapSqrtParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.map(x => math.sqrt(x).toInt)
 
-  */
+ 
 }

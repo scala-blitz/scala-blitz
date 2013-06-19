@@ -185,12 +185,12 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     }
   }
 
-  /*test("find") {
+  test("find") {
     //should be found
     testOperation() {
-      r => r.find(_ == r.last)
+      r => r.find(_ == 0)
     } {
-      p => findLastParallel(p)
+      p => findFirstParallel(p)
     }
     //should not be found
     testOperation() {
@@ -203,7 +203,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
 
   test("exists") {
     testOperation() {
-      r => r.exists(_ == (r.last + 1))
+      r => r.exists(_ == 0)
     } {
       p => existsParallel(p)
     }
@@ -211,13 +211,13 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
 
   test("forall") {
     testOperation() {
-      r => r.forall(_ < r.last)
+      r => r.forall(_ < Int.MaxValue)
     } {
       p => forallParallel(p)
     }
   }
 
-  test("copyAllToArray") {
+  /*test("copyAllToArray") {
     testOperation(comparison = seqComparison[Int]) {
       r => copyAllToArraySequential((r,new Array[Int](r.length)))
     } {
@@ -231,7 +231,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     } {
       p => copyPartToArrayParallel(p)
     }
-  }
+  }*/
 
   test("map") {
     testOperation(comparison = arrayComparison[Int]) {
@@ -242,8 +242,8 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
   }
 
   test("mapCustomCanMergeFrom") {
-    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Conc[Int]]] {
-        def apply(from: Par[Range]) = new Conc.ConcMerger[Int]
+    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Reducable[Int], Int, Par[Conc[Int]]] {
+        def apply(from: Reducable[Int]) = new Conc.ConcMerger[Int]
         def apply() = new Conc.ConcMerger[Int]
       }
     testOperation(comparison = concComparison[Int]) {
@@ -253,7 +253,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     }
   }
 
-  test("filter") {
+  /*test("filter") {
     testOperation(comparison = arrayComparison[Int]) {
       r => r.filter(_ % 3 == 0)
     } {

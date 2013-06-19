@@ -36,6 +36,7 @@ object Ranges {
     def stealer: PreciseStealer[Int] = new RangeStealer(r, 0, r.length)
     override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.reduce[U]
     override def mapReduce[R](mapper: Int => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.RangesMacros.mapReduce[Int,R]
+    override def count[U >: Int](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count[U]
     override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.fold[U]
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro methods.RangesMacros.aggregate[S]
     override def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.RangesMacros.sum[U]
@@ -43,16 +44,16 @@ object Ranges {
     override def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.min[U]
     override def foreach[U >: Int](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.foreach[U]
     override def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.max[U]
-    def find(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find
-    def exists(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists
-    override def count[U >: Int](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.RangesMacros.count[U]
-    def forall(p: Int=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.forall
+    override def find[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[Int] = macro methods.RangesMacros.find[U]
+    override def exists[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.exists[U]
+    override def forall[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.RangesMacros.forall[U]
     override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.map[Int, S, That]
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray[U]
     def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray2[U]
     def copyToArray[U >: Int](arr: Array[U])(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray3[U]
     def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.flatMap[Int, S, That]
     def filter(pred: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.filter
+    def seq = range
   }
 
   /* stealer implementation */

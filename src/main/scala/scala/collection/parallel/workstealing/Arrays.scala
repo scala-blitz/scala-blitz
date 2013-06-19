@@ -40,13 +40,14 @@ object Arrays {
     override def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.product[T, U]
     override def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.min[T, U]
     override def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.max[T, U]
-    def find[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro methods.ArraysMacros.find[T, U]
-    def exists[U >: T](p: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.exists[T, U]
-    def forall[U >: T](p: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.forall[T, U]
+    override def find[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro methods.ArraysMacros.find[T, U]
+    override def exists[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.exists[T, U]
+    override def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ArraysMacros.forall[T, U]
     override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.ArraysMacros.count[T, U]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.map[T, S, That]
     def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.filter[T]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.flatMap[T, S, That]
+    def seq = array
   }
 
   final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](

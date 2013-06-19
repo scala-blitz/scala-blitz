@@ -8,6 +8,7 @@ import scala.collection.parallel.Par
 import scala.collection.parallel.workstealing._
 import scala.collection.parallel.Configuration
 import scala.collection.parallel.Merger
+import scala.collection.parallel.PreciseStealer
 import scala.reflect.ClassTag
 import scala.collection.parallel.workstealing.methods.Optimizer._
 import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.Node
@@ -141,6 +142,61 @@ object ReducablesMacros {
     c.inlineAndReset(result)
   }
 
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[T]] = {
+    import c.universe._
+
+    val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
+
+    val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
+    val result = reify {
+      import scala.collection.parallel.workstealing._
+      import methods._
+      lv.splice
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      val kernel = new scala.collection.parallel.workstealing.Reducables.ReducableKernel[T,Option[T]] {
+        def zero = None
+        def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
+        def apply(node: Node[T, Option[T]], chunkSize:Int) = {
+          var result: Option[T] = None
+          val stealer = node.stealer
+          while (stealer.hasNext && result.isEmpty) {
+            val next = stealer.next()
+            if (pred.splice(next)) result = Some(next)
+          }
+          if (result.isDefined) terminationCause = ResultFound
+          result
+        }
+      }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      result
+    }
+    c.inlineAndReset(result)
+  }
+
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val np = reify {
+      (x: T) => !p.splice(x)
+    }
+    val found = find[T, T, Repr](c)(np)(ctx)
+    reify {
+      found.splice.isEmpty
+    }
+  }
+
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val found = find[T, U, Repr](c)(p)(ctx)
+    reify {
+      found.splice.nonEmpty
+    }
+  }
+
+
+
   def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     import c.universe._
 
@@ -229,4 +285,100 @@ object ReducablesMacros {
       reduce[T, T, Repr](c)(op)(ctx).splice
     }
   }
+
+  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag,Repr: c.WeakTypeTag] (c: Context)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T,Repr]], ctx: c.Expr[WorkstealingTreeScheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
+    import c.universe._
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.ProgressStatus
+      val sTag = getTagForS.splice
+      val rootStealer = callee.splice.stealer.asInstanceOf[PreciseStealer[T]]
+      val len = rootStealer.totalElements
+      val sarray = sTag.newArray(len)
+      val kernel = new Reducables.CopyMapReducableKernel[T, S] {
+        import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+        import scala.collection.parallel.workstealing.Arrays.CopyProgress
+        def resultArray = sarray
+        def apply(node: Node[T, Unit], elementsToGet:Int) = {
+          val stealer = node.stealer.asInstanceOf[PreciseStealer[T]]
+          var desti = stealer.nextOffset
+          while (stealer.hasNext) {
+            sarray(desti) = f.splice(stealer.next)
+            desti += 1
+          }
+          ()
+        }
+      }
+      ctx.splice.invokeParallelOperation(rootStealer, kernel)
+      new Par(kernel.resultArray)
+    }
+  }
+
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr:c.WeakTypeTag](c: Context)(callee: c.Expr[Reducables.OpsLike[T,Repr]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Reducables.ReducableKernel[T, Merger[S, That]]] = {
+    import c.universe._
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      new Reducables.ReducableKernel[T, Merger[S, That]] {
+        override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
+          node.WRITE_INTERMEDIATE(mergerExpr.splice)
+        }
+        def zero = null
+        def combine(a: Merger[S, That], b: Merger[S, That]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a merge b
+        def apply(node: Node[T, Merger[S, That]], elementsCount: Int) = {
+          val merger = node.READ_INTERMEDIATE
+          val stealer = node.stealer
+          while (stealer.hasNext) {
+            val elem = stealer.next
+            applyer.splice(merger, elem)
+          }
+          merger
+        }
+      }
+    }
+  }
+
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr:c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (lv, f) = c.nonFunctionToLocal[T => S](func)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cmfv, canmerge) = c.nonFunctionToLocal(cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
+    val (mv, merger) = c.nonFunctionToLocal(mergerExpr, "merger")
+    val stagExpr = reify { merger.splice.asInstanceOf[Arrays.ArrayMerger[S]].classTag }
+    val cmkernel = invokeCopyMapKernel(c)(f)(callee, ctx)(stagExpr)
+    val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[S, That], elem: T) => merger += f.splice(elem) })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Arrays
+      import scala.collection.parallel.workstealing.Reducables
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.reflect.ClassTag
+      lv.splice
+      cv.splice
+      cmfv.splice
+      mv.splice
+
+      if (callee.splice.stealer.isInstanceOf[PreciseStealer[T]] && Arrays.isArrayMerger(merger.splice)) {
+        cmkernel.splice.asInstanceOf[That]
+      } else {
+        val stealer = callee.splice.stealer
+        val kernel = tkernel.splice
+        val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+        cmb.result
+      }
+    }
+
+    c.inlineAndReset(operation)
+  }
+
 }

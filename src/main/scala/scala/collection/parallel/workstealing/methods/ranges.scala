@@ -283,10 +283,10 @@ object RangesMacros {
     }
   }
 
-  def find(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
+  def find[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
-    val (lv, pred) = c.nonFunctionToLocal[Int => Boolean](p)
+    val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
     val result = reify {
@@ -339,7 +339,7 @@ object RangesMacros {
     c.inlineAndReset(result)
   }
 
-  def forall(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def forall[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -351,7 +351,7 @@ object RangesMacros {
     }
   }
 
-  def exists(c: Context)(p: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def exists[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find(c)(p)(ctx)

@@ -38,6 +38,7 @@ object Hashes {
     override def fold[U >: (K, V)](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.fold[K, V, U]
     override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashMapMacros.count[K, V, U]
     def filter(pred: ((K, V)) => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.filter[K, V]
+    def seq = hashmap
   }
 
   abstract class HashStealer[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
