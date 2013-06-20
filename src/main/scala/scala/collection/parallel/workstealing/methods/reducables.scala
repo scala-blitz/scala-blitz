@@ -381,4 +381,59 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
+    def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr:c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Repr, S, That]](cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
+    val applyer = reify {
+      (merger: Merger[S, That], elem: T) => f.splice(elem).foreach(merger += _)
+    }
+    val tkernel = transformerKernel(c)(callee, mergerExpr, c.optimise(applyer))
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Reducables
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+      import scala.reflect.ClassTag
+      lv.splice
+      cv.splice
+      cmfv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+
+  def filter[T:c.WeakTypeTag, Repr:c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler], ev:c.Expr[ClassTag[T]]): c.Expr[Par[Array[T]]] = {
+    import c.universe._
+
+    val (pv, p) = c.nonFunctionToLocal[T => Boolean](pred)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val mergerExpr = reify { new Arrays.ArrayMerger[T](ctx.splice)(ev.splice) }
+    val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[T, Par[Array[T]]], elem: T) => if (p.splice(elem)) merger += elem })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.{Arrays,Reducables}
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      pv.splice
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
 }

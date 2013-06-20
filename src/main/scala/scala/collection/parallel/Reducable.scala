@@ -1,5 +1,5 @@
 package scala.collection.parallel
-
+import scala.reflect.ClassTag
 
 
 

@@ -62,7 +62,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
 
   test("simple filter") {
     val hm = HashMap(0 -> 0, 1 -> 2, 2 -> 4, 3 -> 6, 4 -> 8, 5 -> 10, 6 -> 12)
-    val res = hm.toPar.filter(_._1 % 2 == 0)
+    val res = hm.toPar.filter{x:(Int,Int)=>x._1 % 2 == 0}
     val expected = HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12)
     assert(res.seq == HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12), (hm, res))
   }

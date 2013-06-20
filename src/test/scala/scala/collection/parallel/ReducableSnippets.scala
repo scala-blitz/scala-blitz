@@ -286,7 +286,7 @@ trait ReducableSnippets {
     ai.get
   }
 
-  /*def filterMod3Parallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(_ % 3 == 0)
+  def filterMod3Parallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.filter(_ % 3 == 0)
 
   def filterCosSequential(r: Range) = {
     var i = r.head
@@ -300,7 +300,7 @@ trait ReducableSnippets {
     ib.narr
   }
 
-  def filterCosParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(x => math.cos(x) > 0.0)
+  def filterCosParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.filter(x => math.cos(x) > 0.0)
 
   val other = List(2, 3)
 
@@ -316,15 +316,15 @@ trait ReducableSnippets {
     ib.narr
   }
 
-  def flatMapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = {
-    val pr = r.toPar
+  def flatMapParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
+    val pr = r
     for {
       x <- pr
       y <- other
     } yield {
       x * y
     }: @unchecked
-  }*/
+  }
 
   def mapSqrtSequential(r: Range) = {
     var i = r.head

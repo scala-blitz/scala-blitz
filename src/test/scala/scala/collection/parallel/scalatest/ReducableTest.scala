@@ -253,7 +253,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     }
   }
 
-  /*test("filter") {
+  test("filter") {
     testOperation(comparison = arrayComparison[Int]) {
       r => r.filter(_ % 3 == 0)
     } {
@@ -267,7 +267,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
     } {
       p => flatMapParallel(p)
     }
-  }*/
+  }
   test("mapReduce") {
     testOperation() {
       r => r.map(_ + 1).reduce(_ + _)

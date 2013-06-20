@@ -51,9 +51,10 @@ object Ranges {
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray[U]
     def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray2[U]
     def copyToArray[U >: Int](arr: Array[U])(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.RangesMacros.copyToArray3[U]
-    def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.flatMap[Int, S, That]
+    override def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.flatMap[Int, S, That]
     def filter(pred: Int => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.RangesMacros.filter
     def seq = range
+    def classTag = implicitly[ClassTag[Int]]
   }
 
   /* stealer implementation */
