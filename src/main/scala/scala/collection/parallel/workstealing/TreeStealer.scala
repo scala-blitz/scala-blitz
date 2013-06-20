@@ -14,14 +14,14 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
   val root: N
   val totalSize: Int
   val classTag: ClassTag[N]
-  val pathStack = new Array[Int](depthBound(totalSize) + 1)
-  val nodeStack = classTag.newArray(depthBound(totalSize) + 1)
+  val pathStack = new Array[Int](cacheAligned(depthBound(totalSize) + 1))
+  val nodeStack = classTag.newArray(cacheAligned(depthBound(totalSize) + 1))
   var depth: Int = 0
 
   def totalChildren(n: N): Int
   def child(n: N, idx: Int): N
   def isLeaf(n: N): Boolean
-  def estimateSubtree(depth: Int, totalSize: Int): Int
+  def estimateSubtree(n: N, depth: Int, totalSize: Int): Int
   def depthBound(totalSize: Int): Int
 
   private def checkBounds(idx: Int) = {
@@ -59,6 +59,12 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
+  final def encode(origin: Int, progress: Int): Int = {
+    SPECIAL_MASK |
+    ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+    ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
+  }
+
   final def completed(code: Int): Boolean = ((code & COMPLETED_MASK) >>> COMPLETED_SHIFT) != 0
 
   final def stolen(code: Int): Boolean = ((code & STOLEN_MASK) >>> STOLEN_SHIFT) != 0
@@ -68,6 +74,15 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
   final def progress(code: Int): Int = ((code & PROGRESS_MASK) >>> PROGRESS_SHIFT)
 
   final def special(code: Int): Boolean = (code & SPECIAL_MASK) != 0
+
+  final def decodeString(code: Int): String = if (special(code)) {
+    "([%s%s] %d, %d)".format(
+      if (completed(code)) "C" else " ",
+      if (stolen(code)) "!" else " ",
+      origin(code),
+      progress(code)
+    )
+  } else code.toString
 
   final def push(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth + 1, ov, nv)) {
     val cidx = origin(nv)
@@ -110,6 +125,8 @@ object TreeStealer {
   val SPECIAL_SHIFT = 31
   val SPECIAL_MASK = 0x80000000
 
+  def cacheAligned(sz: Int) = ((sz - 1) / 16 + 1) * 16
+
   abstract class ChunkIterator[@specialized(Int, Long, Float, Double) T] {
     def hasNext: Boolean
     def next(): T
@@ -120,7 +137,16 @@ object TreeStealer {
 
     def resetIterator(n: N): Unit
 
-    def elementAtLeaf(idx: Int): T
+    def elementAt(n: N, idx: Int): T
+
+    def rootInit() {
+      pathStack(0) = encode(1, 1)
+      nodeStack(0) = root
+    }
+
+    def hasNext = chunkIterator.hasNext
+
+    def next() = chunkIterator.next()
 
     final def state = {
       val code = READ_STACK(0)
@@ -139,33 +165,72 @@ object TreeStealer {
       val curr = peekcurr
       val prev = peekprev
 
-      if (special(prev) && stolen(prev) || stolen(curr)) {
+      if (completed(curr)) {
+        -1
+      } else if (special(prev) && stolen(prev) || stolen(curr)) {
         markStolen()
         -1
       } else {
-        val last = isLast(prev, curr)
-        val totalch = totalChildren(nodeStack(depth))
-        val p = progress(curr)
-        if (p < totalch) {
+        val currnode = nodeStack(depth)
+        val totalch = totalChildren(currnode)
+        val currprogress = progress(curr)
+        if (currprogress < totalch || totalch == 0) {
           if (next == 0) {
-            // decide to batch - pop to completed
-            // or not to batch - push
-            ???
-            advance(step)
+            val estimate = estimateSubtree(currnode, depth, totalSize)
+            if (isLeaf(currnode) || estimate < step) {
+              // decide to batch - pop to completed
+              val last = isLast(prev, curr)
+              val ncurr = if (last) {
+                if (depth > 0) 0 else encodeCompleted(origin(curr), 0)
+              } else encode(progress(prev), 0)
+              if (pop(curr, ncurr)) estimate
+              else advance(step)
+            } else {
+              // or not to batch - push
+              val nnext = encode(currprogress, 1)
+              push(next, nnext)
+              advance(step)
+            }
           } else {
-            // if next origin identical - switch
-            // if next origin different - push
-            ???
+            if (currprogress == origin(next)) {
+              // next origin identical - switch
+              val ncurr = encode(origin(curr), currprogress + 1)
+              switch(curr, ncurr)
+            } else {
+              // next origin different - push
+              val nnext = encode(currprogress, 1)
+              push(next, nnext)
+            }
+            advance(step)
           }
         } else {
           if (next == 0) {
-            // if last node - pop to 0
-            // if not last - pop to completed
-            ???
+            val last = isLast(prev, curr)
+            if (last) {
+              if (depth > 0) {
+                // last node below root - pop to 0
+                pop(curr, 0)
+              } else {
+                // at root mark stealer as completed
+                val ncurr = encodeCompleted(origin(curr), 0)
+                pop(curr, ncurr)
+              }
+            } else {
+              // not last - pop to completed
+              val ncurr = encode(origin(curr), 0)
+              pop(curr, ncurr)
+            }
+            advance(step)
           } else {
-            // if next origin identical - error!
-            // if next origin different - push
-            ???
+            if (currprogress == origin(next)) {
+              // next origin identical - error!
+              sys.error("error state!")
+            } else {
+              // next origin different - push
+              val nnext = encode(currprogress, 1)
+              push(next, nnext)
+            }
+            advance(step)
           }
         }
       }
@@ -188,6 +253,17 @@ object TreeStealer {
     def split: (Stealer[T], Stealer[T]) = ???
 
     def elementsRemainingEstimate: Int = ???
+
+    override def toString = "TreeStealer.External(\ndepth: %d\npath:  %s\nnodes: %s\n)".format(
+      depth,
+      pathStack.map(x => "%1$11s".format(decodeString(x))).mkString(", "),
+      nodeStack map {
+        case null => null
+        case x => x.getClass.getSimpleName.takeRight(4) + "@" + System.identityHashCode(x).toString.takeRight(4)
+      } map {
+        case s => "%1$11s".format(s)
+      } mkString(", ")
+    )
 
   }
 
