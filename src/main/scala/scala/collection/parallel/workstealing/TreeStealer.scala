@@ -127,7 +127,7 @@ object TreeStealer {
 
   def cacheAligned(sz: Int) = ((sz - 1) / 16 + 1) * 16
 
-  abstract class ChunkIterator[@specialized(Int, Long, Float, Double) T] {
+  trait ChunkIterator[@specialized(Int, Long, Float, Double) T] {
     def hasNext: Boolean
     def next(): T
   }
@@ -155,7 +155,7 @@ object TreeStealer {
       else Stealer.AvailableOrOwned
     }
 
-    @tailrec final def advance(step: Int): Int = {
+    @tailrec final def advance(step: Int): Int = if (depth < 0) -1 else {
       def isLast(prev: Int, curr: Int) = prev == 0 || {
         val prevnode = nodeStack(depth - 1)
         totalChildren(prevnode) == origin(curr)
@@ -183,8 +183,10 @@ object TreeStealer {
               val ncurr = if (last) {
                 if (depth > 0) 0 else encodeCompleted(origin(curr), 0)
               } else encode(progress(prev), 0)
-              if (pop(curr, ncurr)) estimate
-              else advance(step)
+              if (pop(curr, ncurr)) {
+                resetIterator(currnode)
+                estimate
+              } else advance(step)
             } else {
               // or not to batch - push
               val nnext = encode(currprogress, 1)

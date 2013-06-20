@@ -18,13 +18,13 @@ class TreeStealerTest extends FunSuite {
     hs
   }
 
-  test("TreeStealer.External.advance") {
+  test("HashTrieStealer.advance") {
     val hs = createHashSet(1)
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
-    println(stealer)
-    stealer.advance(1)
-    println(stealer)
+    assert(stealer.advance(1) == 1)
+    assert(stealer.next() == 0)
+    assert(stealer.advance(1) == -1)
   }
 
 }
