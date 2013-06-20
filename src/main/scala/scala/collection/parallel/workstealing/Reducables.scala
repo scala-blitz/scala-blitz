@@ -21,7 +21,7 @@ object Reducables {
 
   }
 
-  trait OpsLike[+T , +Repr] extends Any /*with ReducableOps[T, Repr, WorkstealingTreeScheduler]*/ {
+  trait OpsLike[+T, +Repr] extends Any /*with ReducableOps[T, Repr, WorkstealingTreeScheduler]*/ {
     def stealer: Stealer[T]
     def seq: Repr
 

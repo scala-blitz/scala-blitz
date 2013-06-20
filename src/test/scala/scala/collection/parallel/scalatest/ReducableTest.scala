@@ -36,7 +36,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
       method(i to 0 by -29)
       method(0 to i by 29)
     }
- 
+
     method(1 to 5 by 1000)
     method(1 to 1 by 1000)
     method(1000 to 1 by -100000)
@@ -45,7 +45,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
   def targetCollections(r: Range) = Seq(par2zippable(r.toPar), par2zippable(r.toArray.toPar))
 
   test("reduce") {
-    val rt = (r: Range) =>  r.iterator.sum
+    val rt = (r: Range) => r.iterator.sum
     val pt = (p: Reducable[Int]) => reduceParallel(p)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(pt)
@@ -243,9 +243,9 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
 
   test("mapCustomCanMergeFrom") {
     object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Reducable[Int], Int, Par[Conc[Int]]] {
-        def apply(from: Reducable[Int]) = new Conc.ConcMerger[Int]
-        def apply() = new Conc.ConcMerger[Int]
-      }
+      def apply(from: Reducable[Int]) = new Conc.ConcMerger[Int]
+      def apply() = new Conc.ConcMerger[Int]
+    }
     testOperation(comparison = concComparison[Int]) {
       r => r.map(_ + 1)
     } {

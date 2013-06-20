@@ -1,5 +1,7 @@
 package scala.collection.parallel.workstealing.methods
 
+
+
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
@@ -10,6 +12,8 @@ import scala.collection.parallel.Configuration
 import scala.collection.parallel.Merger
 import Optimizer._
 import scala.reflect.ClassTag
+
+
 
 object RangesMacros {
 

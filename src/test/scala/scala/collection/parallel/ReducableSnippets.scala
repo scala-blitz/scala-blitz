@@ -182,7 +182,7 @@ trait ReducableSnippets {
     val to = r.last
     var found = false
     var result = -1
-    while (i != to  && !found) {
+    while (i != to && !found) {
       if (2.0 == math.sin(i)) {
         found = true
         result = i
@@ -193,7 +193,6 @@ trait ReducableSnippets {
   }
 
   def findSinParallel(a: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = a.find(x => math.sin(x) == 2.0)
-
 
   def existsSequential(r: Range) = {
     var i = r.head
@@ -259,7 +258,7 @@ trait ReducableSnippets {
     dest
   }*/
 
-  def mapParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler):Par[Array[Int]] = r.map(_ + 1)
+  def mapParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler): Par[Array[Int]] = r.map(_ + 1)
   def mapParallel[Repr](r: Reducable[Int], customCmf: collection.parallel.generic.CanMergeFrom[Reducable[Int], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.map(_ + 1)(customCmf, s)
 
   def filterMod3Sequential(r: Range) = {
@@ -273,16 +272,16 @@ trait ReducableSnippets {
     }
     ib.narr
   }
-  
-  def foreachSequential(r:Range) = {
+
+  def foreachSequential(r: Range) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    r.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
+    r.foreach(x => if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
   def foreachParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    r.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
+    r.foreach(x => if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
@@ -339,5 +338,4 @@ trait ReducableSnippets {
 
   def mapSqrtParallel(r: Reducable[Int])(implicit s: WorkstealingTreeScheduler) = r.map(x => math.sqrt(x).toInt)
 
- 
 }
