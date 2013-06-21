@@ -29,7 +29,7 @@ class TreeStealerTest extends FunSuite {
     }
   }
 
-  test("HashTrieStealer.advance(1)") {
+  test("HashTrieStealer(1).advance(1)") {
     val hs = createHashSet(1)
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
@@ -40,7 +40,7 @@ class TreeStealerTest extends FunSuite {
     assert(stealer.advance(1) == -1)
   }
 
-  test("HashTrieStealer.advance(2)") {
+  test("HashTrieStealer(2).advance(1)") {
     val hs = createHashSet(2)
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
@@ -54,6 +54,50 @@ class TreeStealerTest extends FunSuite {
     assert(!stealer.hasNext)
     assert(stealer.advance(1) == -1)
   }
+
+  test("HashTrieStealer(5).advance(1)") {
+    import immutable.HashSet._
+    val hs = {
+      val h2a = new HashTrieSet(3, Array[immutable.HashSet[Int]](new HashSet1(0, 0), new HashSet1(1, 0)), 2)
+      val h2b = new HashSet1(2, 0)
+      val h2c = new HashTrieSet(3, Array[immutable.HashSet[Int]](new HashSet1(3, 0), new HashSet1(4, 0)), 2)
+      val h1 = new HashTrieSet(7, Array[immutable.HashSet[Int]](h2a, h2b, h2c), 5)
+      h1
+    }
+    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    stealer.rootInit()
+    assert(stealer.advance(1) == 1)
+    assert(stealer.hasNext)
+    assert(stealer.next() == 0)
+    assert(!stealer.hasNext)
+    assert(stealer.advance(1) == 1)
+    assert(stealer.hasNext)
+    assert(stealer.next() == 1)
+    assert(!stealer.hasNext)
+    assert(stealer.advance(1) == 1)
+    assert(stealer.hasNext)
+    assert(stealer.next() == 2)
+    assert(!stealer.hasNext)
+    assert(stealer.advance(1) == 1)
+    assert(stealer.hasNext)
+    assert(stealer.next() == 3)
+    assert(!stealer.hasNext)
+    assert(stealer.advance(1) == 1)
+    assert(stealer.hasNext)
+    assert(stealer.next() == 4)
+    assert(!stealer.hasNext)
+    assert(stealer.advance(1) == -1)
+  }
+
+  // test("HashTrieStealer.advance(64)") {
+  //   val hs = createHashSet(64)
+  //   val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+  //   stealer.rootInit()
+  //   printHashSet(hs)
+  //   println(stealer)
+  //   println(stealer.advance(1))
+  //   println(stealer)
+  // }
 
 }
 
