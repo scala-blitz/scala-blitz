@@ -3,8 +3,6 @@ import scala.reflect.ClassTag
 
 
 
-
-
 trait Reducable[@specialized T] {
 
   def iterator: Iterator[T]
@@ -13,4 +11,5 @@ trait Reducable[@specialized T] {
 
   def stealer: Stealer[T]
 
+  def newMerger: Merger[T, Reducable[T]]
 }

@@ -184,7 +184,7 @@ trait ParArraySnippets {
     ib.narr
   }
 
-  def filterMod3Parallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter{x :Int=>x % 3 == 0}
+  def filterMod3Parallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(_ % 3 == 0)
 
   def filterCosSequential(a: Array[Int]) = {
     var i = 0
@@ -198,7 +198,7 @@ trait ParArraySnippets {
     ib.narr
   }
 
-  def filterCosParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter{x:Int => math.cos(x) > 0.0}
+  def filterCosParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(x => math.cos(x) > 0.0)
 
   val other = List(2, 3)
 

@@ -24,7 +24,6 @@ object Reducables {
   trait OpsLike[+T, +Repr] extends Any /*with ReducableOps[T, Repr, WorkstealingTreeScheduler]*/ {
     def stealer: Stealer[T]
     def seq: Repr
-
     def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.reduce[T, U, Repr]
     def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.ReducablesMacros.mapReduce[T, T, R, Repr]
     def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ReducablesMacros.fold[T, U, Repr]
@@ -40,12 +39,13 @@ object Reducables {
     def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ReducablesMacros.forall[T, U, Repr]
     def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = macro methods.ReducablesMacros.map[T,S,That,Repr]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.flatMap[T, S, That, Repr]
-    def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler, ev:ClassTag[T]) = macro methods.ReducablesMacros.filter[T,Repr]
+
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]] {
     def stealer = r.stealer
     def seq = r
+    def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.filter[T,Reducable[T]]
   }
 
 

@@ -254,10 +254,11 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
   }
 
   test("filter") {
-    testOperation(comparison = arrayComparison[Int]) {
+    testOperation(comparison = seqComparison[Int]) {
       r => r.filter(_ % 3 == 0)
     } {
-      p => filterMod3Parallel(p)
+      p => val result = filterMod3Parallel(p)
+      result.iterator.toVector
     }
   }
 

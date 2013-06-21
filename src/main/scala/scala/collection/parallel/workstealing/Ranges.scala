@@ -22,11 +22,12 @@ object Ranges {
       def apply(from: Par[Range]) = new Arrays.ArrayMerger[Int](ctx)
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
-    implicit def rangeIsZippable = new IsZippable[Range, Int] {
+    implicit def rangeIsZippable(implicit ctx: WorkstealingTreeScheduler) = new IsZippable[Range, Int] {
       def apply(pr: Par[Range]) = new Zippable[Int]{
-      def iterator = ???
+      def iterator = pr.seq.iterator
       def splitter =  ???
       def stealer = new RangeStealer(pr.seq, 0, pr.seq.length)
+      def newMerger = new Arrays.ArrayMerger2ZippableMergerConvertor[Int](new Arrays.ArrayMerger[Int](ctx))
       }
     }
   }

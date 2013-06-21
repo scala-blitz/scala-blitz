@@ -20,20 +20,15 @@ object Arrays {
       def apply(from: Par[Array[_]]) = new ArrayMerger[T](ctx)
       def apply() = new ArrayMerger[T](ctx)
     }
-    implicit def arrayIsZippable[T] = new IsZippable[Array[T], T] {
-      def apply(pa: Par[Array[T]]) = new Zippable[T] {
-      def iterator = ???
-      def stealer = new ArrayStealer(pa.seq, 0, pa.seq.length)
-      def splitter = ???
-      }
-    }
+
+    implicit def arrayIsZippable[T](implicit ctx: WorkstealingTreeScheduler): IsZippable[Array[T], T] = new Array2ZippableConvertor[T]()
   }
 
   class Ops[T](val array: Par[Array[T]]) extends AnyVal with Zippables.OpsLike[T, Par[Array[T]]] {
     def stealer: PreciseStealer[T] = new ArrayStealer(array.seq, 0, array.seq.length)
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.aggregate[T, S]
     override def foreach[U >: T](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.ArraysMacros.foreach[T, U]
-    override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.ArraysMacros.mapReduce[T,T,R]
+    override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.ArraysMacros.mapReduce[T, T, R]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.fold[T, U]
     override def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.ArraysMacros.sum[T, U]
@@ -48,6 +43,16 @@ object Arrays {
     def filter(pred: T => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.filter[T]
     override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.ArraysMacros.flatMap[T, S, That]
     def seq = array
+  }
+
+  class Array2ZippableConvertor[T](implicit ctx: WorkstealingTreeScheduler) extends IsZippable[Array[T], T] {
+    def apply(pa: Par[Array[T]]) = new Zippable[T] {
+      def iterator = pa.seq.iterator
+      def stealer = new ArrayStealer(pa.seq, 0, pa.seq.length)
+      def splitter = ???
+      def newMerger = new ArrayMerger2ZippableMergerConvertor[T](Arrays.newArrayMerger(pa))
+    }
+
   }
 
   final class ArrayMerger[@specialized(Int, Long, Float, Double) T: ClassTag](
@@ -82,6 +87,20 @@ object Arrays {
       this += elem
     }
 
+  }
+
+  class ArrayMerger2ZippableMergerConvertor[T](val merger:ArrayMerger[T])(implicit ctx: WorkstealingTreeScheduler) extends Merger[T, Zippable[T]] {
+    def +=(elem: T) = { merger += (elem); this }
+    def result = Par.par2zippable(merger.result)(new Array2ZippableConvertor[T])
+    def clear() = merger.clear()
+    def merge(that: Merger[T, Zippable[T]]) = {
+      that match {
+        case x: ArrayMerger2ZippableMergerConvertor[T] => new ArrayMerger2ZippableMergerConvertor(merger.merge(x.merger))
+        case _ => 
+          that.result.iterator.foreach { merger += _ } //todo: unefficient
+          this
+      }
+    }
   }
 
   def newArrayMerger[T](pa: Par[Array[T]])(implicit ctx: WorkstealingTreeScheduler): ArrayMerger[T] = {

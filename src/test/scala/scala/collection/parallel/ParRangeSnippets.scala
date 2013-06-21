@@ -271,7 +271,7 @@ def mapReduceSequential(r: Range) = {
     ai.get
   }
 
-  def filterMod3Parallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter{x:Int=>x % 3 == 0}
+  def filterMod3Parallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(_ % 3 == 0)
 
   def filterCosSequential(r: Range) = {
     var i = r.head
@@ -285,7 +285,7 @@ def mapReduceSequential(r: Range) = {
     ib.narr
   }
 
-  def filterCosParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter{x:Int => math.cos(x) > 0.0}
+  def filterCosParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.filter(x => math.cos(x) > 0.0)
 
   val other = List(2, 3)
 

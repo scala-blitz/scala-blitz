@@ -47,7 +47,7 @@ trait ParHashMapSnippets {
     res
   }
 
-  def filterParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.filter { x: (Int, Int) => x._2 % 5 != 0 }
+  def filterParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.filter (_._2 % 5 != 0)
 
 }
 

@@ -7,6 +7,7 @@ import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.parallel.generic._
 import scala.collection.parallel.Par
+import scala.collection.parallel.Reducable
 import scala.collection.parallel.workstealing._
 import scala.collection.parallel.Configuration
 import scala.collection.parallel.Merger
@@ -413,13 +414,13 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler], ev: c.Expr[ClassTag[T]]): c.Expr[Par[Array[T]]] = {
+  def filter[T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Reducable[T]] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[T => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify { new Arrays.ArrayMerger[T](ctx.splice)(ev.splice) }
-    val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[T, Par[Array[T]]], elem: T) => if (p.splice(elem)) merger += elem })
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.Ops[T]](c.applyPrefix), "callee")
+    val mergerExpr = reify { callee.splice.r.newMerger }
+    val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[T, Reducable[T]], elem: T) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
       import scala.collection.parallel._
