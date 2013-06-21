@@ -22,10 +22,10 @@ class TreeStealerTest extends FunSuite {
     import immutable.HashSet._
     hs match {
       case t: HashTrieSet[_] =>
-        println("%sTrie\n".format(" " * indent))
+        println("%s%d)Trie\n".format(" " * indent, indent / 2))
         for (h <- t.elems) printHashSet(h, indent + 2)
       case t: HashSet1[_] =>
-        println("%s%s".format(" " * indent, t.iterator.next()))
+        println("%s%d)%s".format(" " * indent, indent / 2, t.iterator.next()))
     }
   }
 
@@ -92,12 +92,20 @@ class TreeStealerTest extends FunSuite {
   def testAdvance(sz: Int, step: Int => Int) {
     val seen = mutable.Set[Int]()
     val hs = createHashSet(sz)
+    val iterator = hs.iterator
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
-    var it = 0
-    while (stealer.advance(step(it)) != -1) {
-      while (stealer.hasNext) seen += stealer.next()
-      it += 1
+    var iter = 0
+    var i = 0
+    while (stealer.advance(step(iter)) != -1) {
+      while (stealer.hasNext) {
+        val expected = iterator.next()
+        val observed = stealer.next()
+        seen += observed
+        assert(expected == observed, "at " + i + ": " + expected + ", vs. observed: " + observed)
+        i += 1
+      }
+      iter += 1
     }
     assert(seen == hs, seen.size + ", " + hs.size)
   }
@@ -118,7 +126,19 @@ class TreeStealerTest extends FunSuite {
     testAdvance(64, x => 8)
   }
 
+  test("HashTrieStealer(128).advance(29)") {
+    testAdvance(128, x => 29)
+  }
+
+  test("HashTrieStealer(256).advance(11)") {
+    testAdvance(256, x => 37)
+  }
+
   test("HashTrieStealer(256).advance(16)") {
+    testAdvance(256, x => 16)
+  }
+
+  test("HashTrieStealer(256).advance(63)") {
     testAdvance(256, x => 16)
   }
 
@@ -129,6 +149,14 @@ class TreeStealerTest extends FunSuite {
   test("HashTrieStealer(4096).advance(512)") {
     testAdvance(4096, x => 512)
   }
+
+  test("HashTrieStealer(256).advance(1 << _)") {
+    testAdvance(256, 1 << _)
+  }
+
+  // test("HashTrieStealer(1024).advance(1 << _)") {
+  //   testAdvance(1024, 1 << _)
+  // }
 
 }
 

@@ -258,12 +258,12 @@ object TreeStealer {
 
     override def toString = "TreeStealer.External(\ndepth: %d\npath:  %s\nnodes: %s\n)".format(
       depth,
-      pathStack.map(x => "%1$11s".format(decodeString(x))).mkString(", "),
+      pathStack.map(x => "%1$12s".format(decodeString(x))).mkString(", "),
       nodeStack map {
         case null => null
         case x => x.getClass.getSimpleName.takeRight(4) + "@" + System.identityHashCode(x).toString.takeRight(4)
       } map {
-        case s => "%1$11s".format(s)
+        case s => "%1$12s".format(s)
       } mkString(", ")
     )
 

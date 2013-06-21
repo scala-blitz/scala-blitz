@@ -4,7 +4,7 @@ Reducable interface:
  ☐ fold
  ☐ reduce
  ☐ aggregate
- ☐ mapReduce -- should be easy to express in terms of aggregate
+ ☐ mapReduce
  ☐ max
  ☐ min
  ☐ sum
@@ -35,7 +35,7 @@ Parallel ranges:
  ✔ max @done (13-05-27 14:24)
  ✔ min @done (13-05-27 14:24)
  ✔ sum @done (13-05-27 14:24)
- ☐ mapReduce
+ ✔ mapReduce @done (13-06-21 16:36)
  ☐ foreach
  ✔ product @done (13-05-27 14:25)
  ☐ copyToArray
@@ -84,12 +84,12 @@ Parallel arrays:
 
 Parallel hash tables:
  ☐ reduce
- ☐ fold
- ☐ aggregate
+ ✔ fold @done (13-06-21 16:37)
+ ✔ aggregate @done (13-06-21 16:37)
  ☐ mapReduce
  ☐ foreach
  ☐ map
- ☐ filter
+ ✔ filter @done (13-06-21 16:37)
  ☐ unit tests
  ☐ microbenchmarks
 
