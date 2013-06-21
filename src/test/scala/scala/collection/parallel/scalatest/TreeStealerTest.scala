@@ -89,15 +89,46 @@ class TreeStealerTest extends FunSuite {
     assert(stealer.advance(1) == -1)
   }
 
-  // test("HashTrieStealer.advance(64)") {
-  //   val hs = createHashSet(64)
-  //   val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
-  //   stealer.rootInit()
-  //   printHashSet(hs)
-  //   println(stealer)
-  //   println(stealer.advance(1))
-  //   println(stealer)
-  // }
+  def testAdvance(sz: Int, step: Int => Int) {
+    val seen = mutable.Set[Int]()
+    val hs = createHashSet(sz)
+    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    stealer.rootInit()
+    var it = 0
+    while (stealer.advance(step(it)) != -1) {
+      while (stealer.hasNext) seen += stealer.next()
+      it += 1
+    }
+    assert(seen == hs, seen.size + ", " + hs.size)
+  }
+
+  test("HashTrieStealer(64).advance(1)") {
+    testAdvance(64, x => 1)
+  }
+
+  test("HashTrieStealer(64).advance(2)") {
+    testAdvance(64, x => 2)
+  }
+
+  test("HashTrieStealer(64).advance(4)") {
+    testAdvance(64, x => 4)
+  }
+
+  test("HashTrieStealer(64).advance(8)") {
+    testAdvance(64, x => 8)
+  }
+
+  test("HashTrieStealer(256).advance(16)") {
+    testAdvance(256, x => 16)
+  }
+
+  test("HashTrieStealer(1024).advance(64)") {
+    testAdvance(1024, x => 64)
+  }
+
+  test("HashTrieStealer(4096).advance(512)") {
+    testAdvance(4096, x => 512)
+  }
 
 }
 
