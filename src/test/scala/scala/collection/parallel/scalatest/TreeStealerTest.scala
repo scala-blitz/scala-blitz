@@ -150,13 +150,17 @@ class TreeStealerTest extends FunSuite {
     testAdvance(4096, x => 512)
   }
 
+  test("HashTrieStealer(1024).advance(8 << _)") {
+    testAdvance(2048, x => 1)
+  }
+
   test("HashTrieStealer(256).advance(1 << _)") {
     testAdvance(256, 1 << _)
   }
 
-  // test("HashTrieStealer(1024).advance(1 << _)") {
-  //   testAdvance(1024, 1 << _)
-  // }
+  test("HashTrieStealer(1024).advance(1 << _)") {
+    testAdvance(1024, 1 << _)
+  }
 
 }
 

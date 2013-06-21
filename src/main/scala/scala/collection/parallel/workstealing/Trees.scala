@@ -66,7 +66,7 @@ object Trees {
     var padding14: Int = 0
     var padding15: Int = 0
 
-    final def resetIterator(n: HashSet[T]) {
+    final def resetIterator(n: HashSet[T]): Unit = if (n.nonEmpty) {
       chunkIterator.setDepth(0)
       chunkIterator.setPosD(0)
       chunkIterator.clearArrayStack()
@@ -79,8 +79,16 @@ object Trees {
           leafArray(0) = n
           chunkIterator.setArrayD(leafArray)
       }
+    } else {
+      chunkIterator.clearSubIter()
+      chunkIterator.setDepth(-1)
     }
-    final def child(n: HashSet[T], idx: Int) = n.asInstanceOf[HashSet.HashTrieSet[T]].elems(idx - 1)
+    final def child(n: HashSet[T], idx: Int) = {
+      val trie = n.asInstanceOf[HashSet.HashTrieSet[T]]
+      if (trie.elems.length > 1 || idx == 1) trie.elems(idx - 1)
+      else if (idx == 2) HashSet.empty
+      else sys.error("error state")
+    }
     final def elementAt(n: HashSet[T], idx: Int): T = ???
     final def depthBound(totalSize: Int): Int = 6
     final def isLeaf(n: HashSet[T]) = n match {
@@ -89,8 +97,11 @@ object Trees {
     }
     final def estimateSubtree(n: HashSet[T], depth: Int, totalSize: Int) = n.size
     final def totalChildren(n: HashSet[T]) = n match {
-      case n: HashSet.HashTrieSet[_] => n.elems.length
-      case _ => 0
+      case n: HashSet.HashTrieSet[_] =>
+        val len = n.elems.length
+        if (len == 1) 2 else len
+      case _ =>
+        0
     }
   }
 
