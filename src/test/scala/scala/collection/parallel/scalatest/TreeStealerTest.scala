@@ -90,8 +90,12 @@ class TreeStealerTest extends FunSuite {
   }
 
   def testAdvance(sz: Int, step: Int => Int) {
-    val seen = mutable.Set[Int]()
     val hs = createHashSet(sz)
+    testAdvanceGeneric(hs, step)
+  }
+
+  def testAdvanceGeneric[T](hs: immutable.HashSet[T], step: Int => Int) {
+    val seen = mutable.Set[T]()
     val iterator = hs.iterator
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
@@ -151,7 +155,7 @@ class TreeStealerTest extends FunSuite {
   }
 
   test("HashTrieStealer(1024).advance(8 << _)") {
-    testAdvance(2048, x => 1)
+    testAdvance(2048, 8 << _)
   }
 
   test("HashTrieStealer(256).advance(1 << _)") {
@@ -160,6 +164,29 @@ class TreeStealerTest extends FunSuite {
 
   test("HashTrieStealer(1024).advance(1 << _)") {
     testAdvance(1024, 1 << _)
+  }
+
+  test("HashTrieStealer(...).advance(1 << ...)") {
+    val sizes = Seq(
+      1, 2, 5, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000,
+      200000, 500000
+    )
+    for {
+      sz <- sizes
+      step <- Seq(2, 4, 8, 16)
+    } {
+      testAdvance(sz, it => 1 << (step * it))
+    }
+  }
+
+  test("HashTrieStealer(collisions).advance(5)") {
+    class Dummy(val x: Int) {
+      override def hashCode = x % 10
+    }
+
+    val hs = for (i <- 0 until 100) yield new Dummy(i)
+    testAdvanceGeneric(hs.to[immutable.HashSet], x => 5)
   }
 
 }
