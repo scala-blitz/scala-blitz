@@ -189,6 +189,59 @@ class TreeStealerTest extends FunSuite {
     testAdvanceGeneric(hs.to[immutable.HashSet], x => 5)
   }
 
+  test("HashTrieStealer(1).markStolen()") {
+    val hs = createHashSet(1)
+    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    stealer.rootInit()
+    stealer.markStolen()
+    assert(stealer.advance(1) == -1)
+  }
+
+  def testAdvanceStealSplit(sz: Int, initialStep: Int, step: Int => Int) {
+    def addOnce(s: Stealer[Int], set: mutable.Set[Int]) {
+      if (s.advance(initialStep) != -1) {
+        while (s.hasNext) set += s.next()
+      }
+    }
+
+    def addAll(s: Stealer[Int], set: mutable.Set[Int]) {
+      var it = 0
+      while (s.advance(step(it)) != -1) {
+        while (s.hasNext) set += s.next()
+        it += 1
+      }
+    }
+
+    val hs = createHashSet(sz)
+    val seen = mutable.Set[Int]()
+    val lseen = mutable.Set[Int]()
+    val rseen = mutable.Set[Int]()
+
+    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    stealer.rootInit()
+    addOnce(stealer, seen)
+    stealer.markStolen()
+    val (l, r) = stealer.split
+    addAll(l, lseen)
+    addAll(r, rseen)
+    assert(lseen.size + rseen.size + seen.size == sz, ("for size: " + sz, seen, lseen, rseen))
+    assert(hs == (seen ++ lseen ++ rseen), ("for size: " + sz, seen, lseen, rseen))
+  }
+
+  test("HashTrieStealer(...).advance(...).markStolen().split") {
+    val sizes = Seq(
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000
+    )
+    for {
+      sz <- sizes
+      initialStep <- Seq(1, 2, 4, 8, 16, 32, 64, 128, 1024)
+      step <- Seq(2, 4, 8, 16)
+    } {
+      testAdvanceStealSplit(sz, initialStep, it => 1 << (step * it))
+    }
+  }
+
 }
 
 

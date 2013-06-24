@@ -66,6 +66,7 @@ object Trees {
     var padding14: Int = 0
     var padding15: Int = 0
 
+    final def newStealer = new HashTrieSetStealer(root)
     final def resetIterator(n: HashSet[T]): Unit = if (n.nonEmpty) {
       chunkIterator.setDepth(0)
       chunkIterator.setPosD(0)

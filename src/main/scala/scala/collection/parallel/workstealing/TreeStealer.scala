@@ -45,23 +45,30 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
     unsafe.compareAndSwapInt(pathStack, OFFSET(idx), ov, nv)
   }
 
-  final def encodeStolen(origin: Int, progress: Int): Int = {
+  final def encodeStolen(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
     STOLEN_MASK |
     ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
-  final def encodeCompleted(origin: Int, progress: Int): Int = {
+  final def toStolen(code: Int) = code | STOLEN_MASK
+
+  final def toUnstolen(code: Int) = code & ~STOLEN_MASK
+
+  final def encodeCompleted(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
     COMPLETED_MASK |
     ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
-  final def encode(origin: Int, progress: Int): Int = {
+  final def encode(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
     ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
     ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
@@ -71,18 +78,24 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
 
   final def origin(code: Int): Int = ((code & ORIGIN_MASK) >>> ORIGIN_SHIFT)
 
+  final def total(code: Int): Int =  ((code & TOTAL_MASK) >>> TOTAL_SHIFT)
+
   final def progress(code: Int): Int = ((code & PROGRESS_MASK) >>> PROGRESS_SHIFT)
 
   final def special(code: Int): Boolean = (code & SPECIAL_MASK) != 0
 
+  final def terminal(code: Int): Boolean = (code & TERM_MASK) != 0
+
   final def decodeString(code: Int): String = if (special(code)) {
-    "([%s%s] %d, %d)".format(
+    "([%s%s]%d,%d,%d)".format(
       if (completed(code)) "C" else " ",
       if (stolen(code)) "!" else " ",
       origin(code),
+      total(code),
       progress(code)
     )
-  } else code.toString
+  } else if (terminal(code)) "TERM"
+  else code.toString
 
   final def push(ov: Int, nv: Int): Boolean = if (CAS_STACK(depth + 1, ov, nv)) {
     val cidx = origin(nv)
@@ -115,13 +128,17 @@ object TreeStealer {
   val STACK_BASE_OFFSET = unsafe.arrayBaseOffset(classOf[Array[Int]])
   val STACK_INDEX_SCALE = unsafe.arrayIndexScale(classOf[Array[Int]])
   val PROGRESS_SHIFT = 0
-  val PROGRESS_MASK = 0x00000fff
-  val ORIGIN_SHIFT = 12
-  val ORIGIN_MASK = 0x00fff000
+  val PROGRESS_MASK = 0x000000ff
+  val ORIGIN_SHIFT = 8
+  val ORIGIN_MASK = 0x0000ff00
+  val TOTAL_SHIFT = 16
+  val TOTAL_MASK = 0x00ff0000
   val STOLEN_SHIFT = 24
   val STOLEN_MASK = 0x01000000
   val COMPLETED_SHIFT = 25
   val COMPLETED_MASK = 0x02000000
+  val TERM_SHIFT = 30
+  val TERM_MASK = 0x40000000
   val SPECIAL_SHIFT = 31
   val SPECIAL_MASK = 0x80000000
 
@@ -135,12 +152,14 @@ object TreeStealer {
   trait External[@specialized(Int, Long, Float, Double) T, N >: Null <: AnyRef] extends TreeStealer[T, N] {
     val chunkIterator: ChunkIterator[T]
 
+    def newStealer: TreeStealer.External[T, N]
+
     def resetIterator(n: N): Unit
 
     def elementAt(n: N, idx: Int): T
 
     def rootInit() {
-      pathStack(0) = encode(1, 1)
+      pathStack(0) = encode(1, totalChildren(root), 1)
       nodeStack(0) = root
     }
 
@@ -158,7 +177,7 @@ object TreeStealer {
     @tailrec final def advance(step: Int): Int = if (depth < 0) -1 else {
       def isLast(prev: Int, curr: Int) = prev == 0 || {
         val prevnode = nodeStack(depth - 1)
-        totalChildren(prevnode) == origin(curr)
+        total(prev) == origin(curr)
       }
 
       val next = peeknext
@@ -166,41 +185,45 @@ object TreeStealer {
       val prev = peekprev
 
       if (completed(curr)) {
+        markCompleted()
         -1
       } else if (special(prev) && stolen(prev) || stolen(curr)) {
         markStolen()
         -1
       } else {
-        val currnode = nodeStack(depth)
-        val totalch = totalChildren(currnode)
+        val totalch = total(curr)
         val currprogress = progress(curr)
         if (currprogress < totalch || totalch == 0) {
           if (next == 0) {
+            val currnode = nodeStack(depth)
             val estimate = estimateSubtree(currnode, depth, totalSize)
             if (isLeaf(currnode) || estimate < step) {
               // decide to batch - pop to completed
               val last = isLast(prev, curr)
               val ncurr = if (last) {
-                if (depth > 0) 0 else encodeCompleted(origin(curr), 0)
-              } else encode(progress(prev), 0)
+                if (depth > 0) 0 else encodeCompleted(origin(curr), totalch, 0)
+              } else encode(progress(prev), totalch, 0)
               if (pop(curr, ncurr)) {
                 resetIterator(currnode)
                 estimate
               } else advance(step)
             } else {
               // or not to batch - push
-              val nnext = encode(currprogress, 1)
+              val nextnode = child(currnode, currprogress)
+              val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
               advance(step)
             }
           } else {
             if (currprogress == origin(next)) {
               // next origin identical - switch
-              val ncurr = encode(origin(curr), currprogress + 1)
+              val ncurr = encode(origin(curr), totalch, currprogress + 1)
               switch(curr, ncurr)
             } else {
               // next origin different - push
-              val nnext = encode(currprogress, 1)
+              val currnode = nodeStack(depth)
+              val nextnode = child(currnode, currprogress)
+              val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
             }
             advance(step)
@@ -214,22 +237,24 @@ object TreeStealer {
                 pop(curr, 0)
               } else {
                 // at root mark stealer as completed
-                val ncurr = encodeCompleted(origin(curr), 0)
+                val ncurr = encodeCompleted(origin(curr), totalch, 0)
                 pop(curr, ncurr)
               }
             } else {
               // not last - pop to completed
-              val ncurr = encode(origin(curr), 0)
+              val ncurr = encode(origin(curr), totalch, 0)
               pop(curr, ncurr)
             }
             advance(step)
           } else {
             if (currprogress == origin(next)) {
               // next origin identical - error!
-              sys.error("error state!")
+              sys.error("error state: " + currprogress + ", " + origin(next))
             } else {
               // next origin different - push
-              val nnext = encode(currprogress, 1)
+              val currnode = nodeStack(depth)
+              val nextnode = child(currnode, currprogress)
+              val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
             }
             advance(step)
@@ -244,15 +269,105 @@ object TreeStealer {
         markStolen()
         false
       } else {
-        val ncode = encodeCompleted(origin(code), progress(code))
+        val ncode = encodeCompleted(origin(code), total(code), progress(code))
         if (CAS_STACK(0, code, ncode)) true
         else markCompleted()
       }
     }
 
-    final def markStolen(): Boolean = ???
+    @tailrec final def markStolen(): Boolean = {
+      @tailrec def stealAll(idx: Int) {
+        val code = READ_STACK(idx)
+        if (code == TERM_MASK) {
+          // do nothing -- stealing completed
+        } else if (code == 0) {
+          // replace with a terminator
+          if (!CAS_STACK(idx, 0, TERM_MASK)) stealAll(idx)
+        } else if (stolen(code)) {
+          // steal on the next level
+          stealAll(idx + 1)
+        } else {
+          // encode a theft
+          val ncode = toStolen(code)
+          if (CAS_STACK(idx, code, ncode)) stealAll(idx + 1)
+          else stealAll(idx)
+        }
+      }
 
-    def split: (Stealer[T], Stealer[T]) = ???
+      val code = READ_STACK(0)
+      if (completed(code)) false
+      else {
+        val ncode = encodeStolen(origin(code), total(code), progress(code))
+        if (CAS_STACK(0, code, ncode)) {
+          stealAll(1)
+          true
+        } else markStolen()
+      }
+    }
+
+    def split: (Stealer[T], Stealer[T]) = {
+      val left = newStealer
+      val right = newStealer
+
+      var d = 0
+      var currnode: N = root
+      var splitFound = false
+      while (d < pathStack.length && !splitFound) {
+        val code = READ_STACK(d)
+        val prog = progress(code)
+        val tot = total(code)
+        if (terminal(code)) {
+          val rcode = right.READ_STACK(d - 1)
+          val nrcode = if (depth > 0) 0 else encodeCompleted(origin(rcode), total(rcode), 0)
+          right.WRITE_STACK(d - 1, nrcode)
+          d = pathStack.length
+        } else if (prog != 0 && prog < tot) {
+          val offset = (tot - prog) / 2
+          val lcode = encode(origin(code), prog + offset, prog)
+          val rcode = encode(origin(code), tot, prog + offset + 1)
+          left.nodeStack(d) = currnode
+          left.depth = d
+          left.WRITE_STACK(d, lcode)
+          right.nodeStack(d) = currnode
+          right.depth = d
+          right.WRITE_STACK(d, rcode)
+          val rnext = encode(prog + offset, 0, 0)
+          right.WRITE_STACK(d + 1, rnext)
+          splitFound = true
+        } else {
+          left.nodeStack(d) = currnode
+          left.WRITE_STACK(d, toUnstolen(code))
+          right.nodeStack(d) = currnode
+          right.WRITE_STACK(d, toUnstolen(code))
+        }
+        if (prog != 0) currnode = child(currnode, prog)
+        else currnode = null
+        d += 1
+      }
+      while (d < pathStack.length) {
+        val code = READ_STACK(d)
+        val prog = progress(code)
+        if (terminal(code)) {
+          left.WRITE_STACK(d, 0)
+          d = pathStack.length
+        } else if (code == 0) {
+          // done
+          d = pathStack.length
+        } else {
+          var ncode = toUnstolen(code)
+          val prev = left.READ_STACK(d - 1)
+          if (progress(ncode) == 0 && total(prev) == origin(ncode)) ncode = 0
+          left.nodeStack(d) = currnode
+          if (ncode != 0 && progress(ncode) != 0) left.depth = d
+          left.WRITE_STACK(d, ncode)
+        }
+        if (prog != 0) currnode = child(currnode, prog)
+        else currnode = null
+        d += 1
+      }
+
+      (left, right)
+    }
 
     def elementsRemainingEstimate: Int = ???
 
