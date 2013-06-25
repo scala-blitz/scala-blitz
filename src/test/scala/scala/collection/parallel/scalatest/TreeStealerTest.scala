@@ -166,19 +166,19 @@ class TreeStealerTest extends FunSuite {
     testAdvance(1024, 1 << _)
   }
 
-  // test("HashTrieStealer(...).advance(1 << ...)") {
-  //   val sizes = Seq(
-  //     1, 2, 5, 10, 20, 50, 100, 200, 500, 1000,
-  //     2000, 5000, 10000, 20000, 50000, 100000,
-  //     200000, 500000
-  //   )
-  //   for {
-  //     sz <- sizes
-  //     step <- Seq(2, 4, 8, 16)
-  //   } {
-  //     testAdvance(sz, it => 1 << (step * it))
-  //   }
-  // }
+  test("HashTrieStealer(...).advance(1 << ...)") {
+    val sizes = Seq(
+      1, 2, 5, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000,
+      200000, 500000
+    )
+    for {
+      sz <- sizes
+      step <- Seq(2, 4, 8, 16)
+    } {
+      testAdvance(sz, it => 1 << (step * it))
+    }
+  }
 
   test("HashTrieStealer(collisions).advance(5)") {
     class Dummy(val x: Int) {
@@ -228,19 +228,19 @@ class TreeStealerTest extends FunSuite {
     assert(hs == (seen ++ lseen ++ rseen), ("for size: " + sz, seen, lseen, rseen))
   }
 
-  // test("HashTrieStealer(...).advance(...).markStolen().split") {
-  //   val sizes = Seq(
-  //     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
-  //     2000, 5000, 10000, 20000, 50000, 100000
-  //   )
-  //   for {
-  //     sz <- sizes
-  //     initialStep <- Seq(1, 2, 4, 8, 16, 32, 64, 128, 1024)
-  //     step <- Seq(2, 4, 8, 16)
-  //   } {
-  //     testAdvanceStealSplit(sz, initialStep, it => 1 << (step * it))
-  //   }
-  // }
+  test("HashTrieStealer(...).advance(...).markStolen().split") {
+    val sizes = Seq(
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000
+    )
+    for {
+      sz <- sizes
+      initialStep <- Seq(1, 2, 4, 8, 16, 32, 64, 128, 1024)
+      step <- Seq(2, 4, 8, 16)
+    } {
+      testAdvanceStealSplit(sz, initialStep, it => 1 << (step * it))
+    }
+  }
 
   def testConcurrentStealing(sz: Int, step: Int => Int) {
     val hs = createHashSet(sz)
@@ -285,9 +285,9 @@ class TreeStealerTest extends FunSuite {
 
   test("concurrent stealing") {
     val sizes = Seq(
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500//, 1000,
-      //2000, 5000, 10000, 20000, 50000, 100000
-    )
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000, 200000
+    ) ++ (0 until 50) ++ (50 until 500 by 20) ++ (500 until 5000 by 200)
     for {
       sz <- sizes
     } {
