@@ -332,7 +332,7 @@ object TreeStealer {
           left.nodeStack(d) = currnode
           left.depth = d
           left.WRITE_STACK(d, lcode)
-          if (prog == 1 && prog == ntot && READ_STACK(d + 1) == TERM_MASK) {
+          if (prog == 1 && prog == ntot && terminal(READ_STACK(d + 1))) {
             WRITE_STACK(d + 1, encodeStolen(prog, totalChildren(child(currnode, 1)), 1))
             WRITE_STACK(d + 2, TERM_MASK)
           }
