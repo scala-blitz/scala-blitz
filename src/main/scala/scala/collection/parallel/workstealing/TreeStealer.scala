@@ -21,7 +21,7 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
   def totalChildren(n: N): Int
   def child(n: N, idx: Int): N
   def isLeaf(n: N): Boolean
-  def estimateSubtree(n: N, depth: Int, totalSize: Int): Int
+  def estimateSubtree(n: N, depth: Int, ts: Int): Int
   def depthBound(totalSize: Int): Int
 
   private def checkBounds(idx: Int) = {
@@ -379,7 +379,30 @@ object TreeStealer {
       (left, right)
     }
 
-    def elementsRemainingEstimate: Int = ???
+    def elementsRemainingEstimate: Int = {
+      var num = 0
+      var d = 0
+      while (d < pathStack.length) {
+        val code = READ_STACK(d)
+        val currnode = nodeStack(d)
+        var offset = progress(code)
+        if (offset == 0 || currnode == null) d = pathStack.length
+        else {
+          if (total(code) == 0 && offset == 1) {
+            num += estimateSubtree(currnode, d, totalSize)
+          } else {
+            val to = math.min(totalChildren(currnode), total(code))
+            offset += 1
+            while (offset <= to) {
+              num += estimateSubtree(child(currnode, offset), d, totalSize)
+              offset += 1
+            }
+          }
+          d += 1
+        }
+      }
+      num
+    }
 
     override def toString = "TreeStealer.External(\ndepth: %d\npath:  %s\nnodes: %s\n)".format(
       depth,

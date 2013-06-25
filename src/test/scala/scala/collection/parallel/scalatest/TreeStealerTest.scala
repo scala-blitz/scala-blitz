@@ -220,6 +220,7 @@ class TreeStealerTest extends FunSuite {
     val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
     stealer.rootInit()
     addOnce(stealer, seen)
+    assert(hs.size == stealer.elementsRemainingEstimate + seen.size)
     stealer.markStolen()
     val (l, r) = stealer.split
     addAll(l, lseen)
@@ -287,7 +288,7 @@ class TreeStealerTest extends FunSuite {
     val sizes = Seq(
       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
       2000, 5000, 10000, 20000, 50000, 100000, 200000
-    ) ++ (0 until 50) ++ (50 until 500 by 10) ++ (500 until 5000 by 200)
+    ) ++ (0 until 50) ++ (50 until 500 by 5) ++ (500 until 5000 by 200)
     for {
       sz <- sizes
       step <- Seq(1, 2, 4, 8, 16, 32, 64)
