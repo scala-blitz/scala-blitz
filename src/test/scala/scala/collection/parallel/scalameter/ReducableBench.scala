@@ -16,9 +16,9 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
   /* config */
 
   def persistor = new SerializationPersistor
-  val tiny = 100000
-  val small = 1000000
-  val large = 10000000
+  val tiny  =  300000
+  val small = 3000000
+  val large = 30000000
 
   /* generators */
 
@@ -63,11 +63,20 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
     }
 
     measure method "aggregate" in {
-      using(ranges(small)) curve ("Sequential") in aggregateSequential
+      using(ranges(large)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(ranges(small))) curve ("Par") in { t =>         
         implicit val scheduler = t._2
         aggregateParallel(t._1)(t._2) }
     }
+
+    measure method "find" in {
+      using(ranges(large)) curve ("Sequential") in findNotExistingSequential
+      using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        implicit val scheduler = t._2
+        findNotExistingParallel(t._1)(t._2)
+      }
+    }
+
 
     measure method "find(sin)" in {
       using(ranges(tiny)) curve ("Sequential") in findSinSequential
@@ -106,7 +115,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     performance of "derivative" in {
       measure method "fold" in {
-        using(ranges(small)) curve ("Sequential") in foldSequential
+        using(ranges(large)) curve ("Sequential") in foldSequential
         using(withSchedulers(ranges(small))) curve("Par") in { t =>         
           implicit val scheduler = t._2
           foldParallel(t._1)(t._2) }
@@ -120,21 +129,21 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
       }
   
       measure method ("sum") in {
-        using(ranges(small)) curve ("Sequential") in sumSequential
+        using(ranges(large)) curve ("Sequential") in sumSequential
         using(withSchedulers(ranges(small))) curve("Par") in { t => 
           implicit val scheduler = t._2
           sumParallel(t._1)(t._2) }
       }
   
       measure method ("product") in {
-        using(ranges(small)) curve ("Sequential") in productSequential
+        using(ranges(large)) curve ("Sequential") in productSequential
         using(withSchedulers(ranges(small))) curve("Par") in { t => 
           implicit val scheduler = t._2
           productParallel(t._1)(t._2) }
       }
   
       measure method ("count(&1==0)") in {
-        using(ranges(small)) curve ("Sequential") in countSequential
+        using(ranges(large)) curve ("Sequential") in countSequential
         using(withSchedulers(ranges(small))) curve("Par") in { t => 
           implicit val scheduler = t._2
           countParallel(t._1)(t._2) }
