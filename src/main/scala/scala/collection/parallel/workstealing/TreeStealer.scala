@@ -249,7 +249,7 @@ object TreeStealer {
           } else {
             if (currprogress == origin(next)) {
               // next origin identical - error!
-              sys.error("error state: " + currprogress + ", " + origin(next))
+              sys.error("error state: " + this + ", " + currprogress + ", " + origin(next))
             } else {
               // next origin different - push
               val currnode = nodeStack(depth)
@@ -318,16 +318,25 @@ object TreeStealer {
         val tot = total(code)
         if (terminal(code)) {
           val rcode = right.READ_STACK(d - 1)
-          val nrcode = if (depth > 0) 0 else encodeCompleted(origin(rcode), total(rcode), 0)
+          val nrcode = 0
+          left.depth = d - 1
+          right.depth = d - 2
           right.WRITE_STACK(d - 1, nrcode)
           d = pathStack.length
         } else if (prog != 0 && prog < tot) {
           val offset = (tot - prog) / 2
-          val lcode = encode(origin(code), prog + offset, prog)
+          val ntot = prog + offset
+          val lcode = encode(origin(code), ntot, prog)
           val rcode = encode(origin(code), tot, prog + offset + 1)
+
           left.nodeStack(d) = currnode
           left.depth = d
           left.WRITE_STACK(d, lcode)
+          if (prog == 1 && prog == ntot && READ_STACK(d + 1) == TERM_MASK) {
+            WRITE_STACK(d + 1, encodeStolen(prog, totalChildren(child(currnode, 1)), 1))
+            WRITE_STACK(d + 2, TERM_MASK)
+          }
+
           right.nodeStack(d) = currnode
           right.depth = d
           right.WRITE_STACK(d, rcode)
@@ -340,13 +349,14 @@ object TreeStealer {
           right.nodeStack(d) = currnode
           right.WRITE_STACK(d, toUnstolen(code))
         }
-        if (prog != 0) currnode = child(currnode, prog)
+        if (prog != 0 && tot != 0) currnode = child(currnode, prog)
         else currnode = null
         d += 1
       }
       while (d < pathStack.length) {
         val code = READ_STACK(d)
         val prog = progress(code)
+        val tot = total(code)
         if (terminal(code)) {
           left.WRITE_STACK(d, 0)
           d = pathStack.length
@@ -361,7 +371,7 @@ object TreeStealer {
           if (ncode != 0 && progress(ncode) != 0) left.depth = d
           left.WRITE_STACK(d, ncode)
         }
-        if (prog != 0) currnode = child(currnode, prog)
+        if (prog != 0 && tot != 0) currnode = child(currnode, prog)
         else currnode = null
         d += 1
       }
