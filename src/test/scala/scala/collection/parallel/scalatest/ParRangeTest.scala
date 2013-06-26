@@ -211,7 +211,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
 
   test("forall") {
     testOperation() {
-      r => r.forall(_ < r.last)
+      r => r.forall(_ < Int.MaxValue)
     } {
       p => forallParallel(p)
     }
