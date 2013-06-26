@@ -593,13 +593,14 @@ object RangesMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter(c: Context)(pred: c.Expr[Int => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Par[Array[Int]]] = {
+  def filter[That:c.WeakTypeTag](c: Context)(pred: c.Expr[Int => Boolean])(cmf: c.Expr[CanMergeFrom[Par[Range], Int, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[Int => Boolean](pred)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Ranges.Ops](c.applyPrefix), "callee")
-    val mergerExpr = reify { Ranges.newMerger(callee.splice.range)(ctx.splice) }
-    val tkernel = transformerKernel[Int, Int, Par[Array[Int]]](c)(callee, mergerExpr, reify { (merger: Merger[Int, Par[Array[Int]]], elem: Int) => if (p.splice(elem)) merger += elem })
+    val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[Range], Int, That]](cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
+    val tkernel = transformerKernel[Int, Int, That](c)(callee, mergerExpr, reify { (merger: Merger[Int, That], elem: Int) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
       import scala.collection.parallel._
@@ -608,6 +609,7 @@ object RangesMacros {
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
       pv.splice
       cv.splice
+      cmfv.splice
       val stealer = callee.splice.stealer
       val kernel = tkernel.splice
       val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)

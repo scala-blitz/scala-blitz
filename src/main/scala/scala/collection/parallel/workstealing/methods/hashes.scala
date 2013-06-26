@@ -117,14 +117,17 @@ object HashMapMacros {
     }
   }
 
-  def filter[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(pred: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Par[HashMap[K, V]]] = {
+  def filter[K: c.WeakTypeTag, V: c.WeakTypeTag, That:c.WeakTypeTag](c: Context)(pred: c.Expr[((K, V)) => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._
+
 
     val (pv, p) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    //todo: use provided cmf
     val mergerExpr = c.Expr[Hashes.HashMapMerger[K, V]] {
       Apply(Select(Ident(newTermName("Hashes")), newTermName("newHashMapMerger")), List(Select(callee.tree, newTermName("hashmap"))))
     }
+
     val tkernel = transformerKernel[K, V, (K, V), Par[HashMap[K, V]]](c)(callee, mergerExpr, reify { (merger: Merger[(K, V), Par[HashMap[K, V]]], elem: (K, V)) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
@@ -137,7 +140,7 @@ object HashMapMacros {
       val stealer = callee.splice.stealer
       val kernel = tkernel.splice
       val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
-      cmb.result
+      cmb.result.asInstanceOf[That]
     }
 
     c.inlineAndReset(operation)

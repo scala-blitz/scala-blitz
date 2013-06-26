@@ -258,7 +258,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
       r => r.filter(_ % 3 == 0)
     } {
       p => val result = filterMod3Parallel(p)
-      result.iterator.toVector
+      result.seq.toSeq
     }
   }
 

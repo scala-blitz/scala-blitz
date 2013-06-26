@@ -10,6 +10,4 @@ trait Reducable[@specialized T] {
   def splitter: Splitter[T]
 
   def stealer: Stealer[T]
-
-  def newMerger: Merger[T, Reducable[T]]
 }
