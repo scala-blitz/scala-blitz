@@ -278,6 +278,8 @@ object ReducablesMacros {
     }
   }
 
+
+
   def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
     import c.universe._
 
@@ -345,6 +347,53 @@ object ReducablesMacros {
         }
       }
     }
+  }
+
+  def groupMapAggregate[T: c.WeakTypeTag, K:c.WeakTypeTag : ClassTag, M:c.WeakTypeTag : ClassTag, Repr:c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M,M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]) = {
+    import c.universe._
+
+    val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
+    val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
+    val (aggrv, aggrg) = c.nonFunctionToLocal[(M,M) => M](aggr)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val mergerExpr = reify {Hashes.newHashMapMerger[K,M](implicitly[ClassTag[K]], implicitly[ClassTag[M]], ctx.splice)}
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.parallel.workstealing.Hashes._
+      grv.splice
+      mpv.splice
+      aggrv.splice
+      cv.splice
+
+      new Reducables.ReducableKernel[T, HashMapMerger[K, M]] {
+        override def beforeWorkOn(tree: Ref[T, HashMapMerger[K, M]], node: Node[T, HashMapMerger[K, M]]) {
+          node.WRITE_INTERMEDIATE(mergerExpr.splice)
+        }
+        def zero = null
+        def combine(a: HashMapMerger[K, M], b: HashMapMerger[K, M]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a merge b
+        def apply(node: Node[T, HashMapMerger[K, M]], elementsCount: Int) = {
+          val merger = node.READ_INTERMEDIATE
+          val stealer = node.stealer
+          while (stealer.hasNext) {
+            val elem = stealer.next
+            val mappedElem = mpg.splice.apply(elem)
+            val elemKey = grg.splice.apply(elem)
+            merger.get(elemKey) match {
+              case Some((chunk, id)) =>  chunk.elems(id) = aggrg.splice.apply(chunk.elems(id), mappedElem)
+              case None =>merger += (elemKey,mappedElem)            
+            }
+          }
+          merger
+        }
+      }
+    }
+
   }
 
   def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {

@@ -112,6 +112,10 @@ object Hashes {
     new HashMapMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
   }
 
+  def newHashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V : ClassTag] (implicit ctx: WorkstealingTreeScheduler) = {
+    new HashMapMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+  }
+
   def newHashMapMerger[K, V](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler) = {
     new HashMapMerger[Object, Object](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx).asInstanceOf[HashMapMerger[K, V]]
   }
@@ -170,6 +174,16 @@ object Hashes {
       bkey += k
       bval += v
       this
+    }
+
+    def get(k:K ):Option[(Conc.Chunk[V],Int)] = {
+      val kz = keys
+      val vz = vals
+      val hc = improve(k.##, seed)
+      val idx = hc >>> HashBuckets.IRRELEVANT_BITS
+      var bkey = kz(idx)
+      val bval = vz(idx)
+      ???
     }
 
     def result = {
