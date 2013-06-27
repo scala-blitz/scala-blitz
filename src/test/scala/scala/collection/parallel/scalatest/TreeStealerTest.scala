@@ -31,7 +31,7 @@ class TreeStealerTest extends FunSuite {
 
   test("HashTrieStealer(1).advance(1)") {
     val hs = createHashSet(1)
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     assert(stealer.advance(1) == 1)
     assert(stealer.hasNext)
@@ -42,7 +42,7 @@ class TreeStealerTest extends FunSuite {
 
   test("HashTrieStealer(2).advance(1)") {
     val hs = createHashSet(2)
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     assert(stealer.advance(1) == 1)
     assert(stealer.hasNext)
@@ -64,7 +64,7 @@ class TreeStealerTest extends FunSuite {
       val h1 = new HashTrieSet(7, Array[immutable.HashSet[Int]](h2a, h2b, h2c), 5)
       h1
     }
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     assert(stealer.advance(1) == 1)
     assert(stealer.hasNext)
@@ -97,7 +97,7 @@ class TreeStealerTest extends FunSuite {
   def testAdvanceGeneric[T](hs: immutable.HashSet[T], step: Int => Int) {
     val seen = mutable.Set[T]()
     val iterator = hs.iterator
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     var iter = 0
     var i = 0
@@ -191,7 +191,7 @@ class TreeStealerTest extends FunSuite {
 
   test("HashTrieStealer(1).markStolen()") {
     val hs = createHashSet(1)
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     stealer.markStolen()
     assert(stealer.advance(1) == -1)
@@ -217,7 +217,7 @@ class TreeStealerTest extends FunSuite {
     val lseen = mutable.Set[Int]()
     val rseen = mutable.Set[Int]()
 
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     addOnce(stealer, seen)
     assert(hs.size == stealer.elementsRemainingEstimate + seen.size)
@@ -245,7 +245,7 @@ class TreeStealerTest extends FunSuite {
 
   def testConcurrentStealing(sz: Int, step: Int => Int) {
     val hs = createHashSet(sz)
-    val stealer = new workstealing.Trees.HashTrieSetStealer(hs)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     class Base extends Thread {
       val seen = mutable.Set[Int]()

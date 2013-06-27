@@ -169,6 +169,10 @@ object WorkstealingTreeScheduler {
     def validateResult[R](r: R): R
   }
 
+  class ThrowCause(e: Exception) extends TerminationCause {
+    def validateResult[R](r: R) = throw e
+  }
+
   trait Kernel[@specialized T, @specialized R] {
     /** Used for cancelling operations early (e.g. due to exceptions).
      *  Holds information on why the operation failed
@@ -250,21 +254,26 @@ object WorkstealingTreeScheduler {
       val ms = config.maximumStep
 
       // commit to processing chunks of the collection and process them until termination
-      var looping = true
-      while (looping && notTerminated) {
-        val currstep = node.READ_STEP
-        val currstate = stealer.state
+      try {
+        var looping = true
+        while (looping && notTerminated) {
+          val currstep = node.READ_STEP
+          val currstate = stealer.state
+    
+          if (currstate != Completed && currstate != StolenOrExpanded) {
+            // reserve some work
+            val chunk = stealer.advance(currstep)
   
-        if (currstate != Completed && currstate != StolenOrExpanded) {
-          // reserve some work
-          val chunk = stealer.advance(currstep)
-
-          if (chunk != -1) intermediate = combine(intermediate, apply(node, chunk))
-  
-          // update step
-          incCount = (incCount + 1) % incFreq
-          if (incCount == 0) node.WRITE_STEP(math.min(ms, currstep * incFact))
-        } else looping = false
+            if (chunk != -1) intermediate = combine(intermediate, apply(node, chunk))
+            else assert(stealer.state != AvailableOrOwned)
+    
+            // update step
+            incCount = (incCount + 1) % incFreq
+            if (incCount == 0) node.WRITE_STEP(math.min(ms, currstep * incFact))
+          } else looping = false
+        }
+      } catch {
+        case e: Exception => terminationCause = new ThrowCause(e)
       }
 
       completeIteration(node.stealer)
