@@ -16,10 +16,11 @@ import scala.collection.immutable.HashSet
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashSetSnippets {
 
   def testForSizes(method: Range => Unit) {
-    for (i <- 1 to 100) {
-      method(0 to i)
-      // method(i to 0 by -1)
-    }
+    // method(0 to 45)
+    // for (i <- 1 to 100) {
+    //   method(0 to i)
+    //   method(i to 0 by -1)
+    // }
     // for (i <- 1 to 100 by 10) {
     //   method(0 to i)
     //   method(i to 0 by -1)

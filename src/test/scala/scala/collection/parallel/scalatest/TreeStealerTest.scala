@@ -26,6 +26,8 @@ class TreeStealerTest extends FunSuite {
         for (h <- t.elems) printHashSet(h, indent + 2)
       case t: HashSet1[_] =>
         println("%s%d)%s".format(" " * indent, indent / 2, t.iterator.next()))
+      case _ =>
+        println("default: " + hs)
     }
   }
 
@@ -166,9 +168,100 @@ class TreeStealerTest extends FunSuite {
     testAdvance(1024, 1 << _)
   }
 
+  def testConcurrentStealing(sz: Int, step: Int => Int) {
+    val hs = createHashSet(sz)
+    val stealer = new workstealing.Trees.HashSetStealer(hs)
+    stealer.rootInit()
+    class Base extends Thread {
+      val seen = mutable.Set[Int]()
+      def consume(s: Stealer[Int]) {
+        var it = 0
+        while (s.advance(step(it)) != -1) {
+          while (s.hasNext) seen += s.next()
+          it += 1
+        }
+      }
+    }
+    class First extends Base {
+      override def run() {
+        consume(stealer)
+      }
+    }
+    val t1 = new First
+    var left: Stealer[Int] = null
+    var right: Stealer[Int] = null
+    var ls: String = null
+    var rs: String = null
+    class Second extends Base {
+      override def run() {
+        stealer.markStolen()
+        // println(stealer)
+        val (l, r) = stealer.split
+        left = l
+        right = r
+        ls = left.toString
+        rs = right.toString
+        // println(left)
+        // println(right)
+        consume(left)
+        consume(right)
+      }
+    }
+    val t2 = new Second
+    // printHashSet(hs)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    try {
+      assert(hs == (t1.seen ++ t2.seen), ("for size: " + sz, t1.seen, t2.seen, "diff: " + (hs diff (t1.seen ++ t2.seen))))
+      assert(hs.size == t1.seen.size + t2.seen.size, ("sizes: " + t1.seen.size + ", " + t2.seen.size, "for size: " + sz, t1.seen, t2.seen))
+    } catch {
+      case e: Exception =>
+        printHashSet(hs)
+        println(stealer)
+        println(ls)
+        println(rs)
+        println(left)
+        println(right)
+        throw e
+    }
+  }
+
+  test("concurrent stealing") {
+    val problematic = Seq(
+      125,
+      126,
+      128,
+      133,
+      134,
+      143,
+      155,
+      157,
+      162,
+      164,
+      168,
+      170,
+      212
+    ).flatMap(x => Seq.fill(20)(x))
+    val specific = Seq(
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
+      2000, 5000, 10000, 20000, 50000, 100000, 200000
+    )
+    val small = (0 until 200) ++ (200 until 100 by -1) ++ (200 until 300)
+    val big = (200 until 500 by 2) ++ (500 until 5000 by 200) ++ (5000 until 50000 by 2500)
+    val sizes = problematic ++ specific ++ small ++ big
+    for {
+      sz <- sizes
+      step <- Seq(1, 2, 4, 8, 16, 32, 64)
+    } {
+      testConcurrentStealing(sz, it => 1 << (it * step))
+    }
+  }
+
   test("HashTrieStealer(...).advance(1 << ...)") {
     val sizes = Seq(
-      1, 2, 5, 10, 20, 50, 100, 200, 500, 1000,
+      1, 2, 5, 10, 20, 50, 100, 155, 200, 500, 1000,
       2000, 5000, 10000, 20000, 50000, 100000,
       200000, 500000
     )
@@ -240,60 +333,6 @@ class TreeStealerTest extends FunSuite {
       step <- Seq(2, 4, 8, 16)
     } {
       testAdvanceStealSplit(sz, initialStep, it => 1 << (step * it))
-    }
-  }
-
-  def testConcurrentStealing(sz: Int, step: Int => Int) {
-    val hs = createHashSet(sz)
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    class Base extends Thread {
-      val seen = mutable.Set[Int]()
-      def consume(s: Stealer[Int]) {
-        var it = 0
-        while (s.advance(step(it)) != -1) {
-          while (s.hasNext) seen += s.next()
-          it += 1
-        }
-      }
-    }
-    class First extends Base {
-      override def run() {
-        consume(stealer)
-      }
-    }
-    val t1 = new First
-    class Second extends Base {
-      override def run() {
-        stealer.markStolen()
-        // println(stealer)
-        val (left, right) = stealer.split
-        // println(left)
-        // println(right)
-        consume(left)
-        consume(right)
-      }
-    }
-    val t2 = new Second
-    // printHashSet(hs)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-    assert(hs.size == t1.seen.size + t2.seen.size, ("for size: " + sz, t1.seen, t2.seen))
-    assert(hs == (t1.seen ++ t2.seen), ("for size: " + sz, t1.seen, t2.seen))
-  }
-
-  test("concurrent stealing") {
-    val sizes = Seq(
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
-      2000, 5000, 10000, 20000, 50000, 100000, 200000
-    ) ++ (0 until 50) ++ (50 until 500 by 5) ++ (500 until 5000 by 200)
-    for {
-      sz <- sizes
-      step <- Seq(1, 2, 4, 8, 16, 32, 64)
-    } {
-      testConcurrentStealing(sz, it => 1 << (it * step))
     }
   }
 

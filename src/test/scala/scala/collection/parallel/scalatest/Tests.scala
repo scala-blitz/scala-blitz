@@ -12,7 +12,9 @@ import scala.collection._
 
 trait Tests[Repr] extends Timeouts {
 
-  implicit val scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin()
+  implicit val scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin(
+    new workstealing.WorkstealingTreeScheduler.Config.Default(1)
+  )
 
   def testForSizes(method: Range => Unit): Unit
 

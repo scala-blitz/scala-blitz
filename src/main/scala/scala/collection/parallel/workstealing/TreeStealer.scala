@@ -174,7 +174,10 @@ object TreeStealer {
       else Stealer.AvailableOrOwned
     }
 
-    @tailrec final def advance(step: Int): Int = if (depth < 0) -1 else {
+    @tailrec final def advance(step: Int): Int = if (depth < 0) {
+      markCompleted()
+      -1
+    } else {
       def isLast(prev: Int, curr: Int) = prev == 0 || {
         val prevnode = nodeStack(depth - 1)
         total(prev) == origin(curr)
@@ -196,6 +199,7 @@ object TreeStealer {
         if (currprogress < totalch || totalch == 0) {
           if (next == 0) {
             val currnode = nodeStack(depth)
+            assert(currnode != null, this)
             val estimate = estimateSubtree(currnode, depth, totalSize)
             if (isLeaf(currnode) || estimate < step) {
               // decide to batch - pop to completed
@@ -311,70 +315,129 @@ object TreeStealer {
 
       var d = 0
       var currnode: N = root
-      var splitFound = false
-      while (d < pathStack.length && !splitFound) {
-        val code = READ_STACK(d)
-        val prog = progress(code)
-        val tot = total(code)
-        if (terminal(code)) {
-          val rcode = right.READ_STACK(d - 1)
-          val nrcode = 0
-          left.depth = d - 1
-          right.depth = d - 2
-          right.WRITE_STACK(d - 1, nrcode)
-          d = pathStack.length
-        } else if (prog != 0 && prog < tot) {
-          val offset = (tot - prog) / 2
-          val ntot = prog + offset
-          val lcode = encode(origin(code), ntot, prog)
-          val rcode = encode(origin(code), tot, prog + offset + 1)
-
-          left.nodeStack(d) = currnode
-          left.depth = d
-          left.WRITE_STACK(d, lcode)
-          if (prog == 1 && prog == ntot && terminal(READ_STACK(d + 1))) {
-            WRITE_STACK(d + 1, encodeStolen(prog, totalChildren(child(currnode, 1)), 1))
-            WRITE_STACK(d + 2, TERM_MASK)
-          }
-
-          right.nodeStack(d) = currnode
-          right.depth = d
-          right.WRITE_STACK(d, rcode)
-          val rnext = encode(prog + offset, 0, 0)
-          right.WRITE_STACK(d + 1, rnext)
-          splitFound = true
-        } else {
-          left.nodeStack(d) = currnode
-          left.WRITE_STACK(d, toUnstolen(code))
-          right.nodeStack(d) = currnode
-          right.WRITE_STACK(d, toUnstolen(code))
-        }
-        if (prog != 0 && tot != 0) currnode = child(currnode, prog)
-        else currnode = null
-        d += 1
-      }
+      var split = false
       while (d < pathStack.length) {
         val code = READ_STACK(d)
         val prog = progress(code)
         val tot = total(code)
         if (terminal(code)) {
-          left.WRITE_STACK(d, 0)
+          // terminator - done
           d = pathStack.length
-        } else if (code == 0) {
-          // done
-          d = pathStack.length
-        } else {
-          var ncode = toUnstolen(code)
-          val prev = left.READ_STACK(d - 1)
-          if (progress(ncode) == 0 && total(prev) == origin(ncode)) ncode = 0
+          currnode = null
+        } else if (prog != 0 && tot == 0) {
+          // child - done splitting
+          if (!split) {
+            if (d == 0) {
+              val ncode = encodeCompleted(1, 0, 0)
+              right.WRITE_STACK(d, ncode)
+            } else {
+              val prev = READ_STACK(d - 1)
+              val last = total(prev) == origin(code)
+              val ncode = if (last) 0 else encode(origin(code), 0, 0)
+              right.WRITE_STACK(d, ncode)
+            }
+          }
+
+          left.depth = d
           left.nodeStack(d) = currnode
-          if (ncode != 0 && progress(ncode) != 0) left.depth = d
-          left.WRITE_STACK(d, ncode)
+          left.WRITE_STACK(d, toUnstolen(code))
+
+          d += 1
+          currnode = null
+        } else if (prog != 0 && prog < tot && !split) {
+          // split an internal node
+          val offset = (tot - prog) / 2
+          val ntot = prog + offset
+          val lcode = encode(origin(code), ntot, prog)
+          val rcode = encode(origin(code), tot, ntot + 1)
+
+          split = true
+
+          right.depth = d
+          right.nodeStack(d) = currnode
+          right.WRITE_STACK(d, rcode)
+          if (ntot + 1 == tot) {
+            val c = child(currnode, ntot)
+            right.WRITE_STACK(d + 1, encode(ntot, totalChildren(c), 0))
+          }
+
+          left.depth = d
+          left.nodeStack(d) = currnode
+          left.WRITE_STACK(d, lcode)
+          val next = READ_STACK(d + 1)
+          if (prog == ntot && prog == 1 && terminal(next)) {
+            val c = child(currnode, 1)
+            left.depth = d + 1
+            left.nodeStack(d + 1) = c
+            left.WRITE_STACK(d + 1, encode(1, totalChildren(c), 1))
+
+            d = pathStack.length
+            currnode = null
+          } else if (prog == ntot && special(next) && progress(next) == 0 && origin(next) == prog) {
+            left.WRITE_STACK(d + 1, 0)
+
+            d = pathStack.length
+            currnode = null
+          } else {
+            d += 1
+            currnode = child(currnode, prog)
+          }
+        } else if (prog != 0 && prog < tot && split) {
+          // internal node, but already split - descend
+          left.depth = d
+          left.nodeStack(d) = currnode
+          left.WRITE_STACK(d, toUnstolen(code))
+
+          d += 1
+          currnode = child(currnode, prog)
+        } else if (prog != 0 && prog == tot) {
+          // end of the internal node - descend
+          if (!split) {
+            right.depth = d
+            right.nodeStack(d) = currnode
+            right.WRITE_STACK(d, toUnstolen(code))
+          }
+
+          left.depth = d
+          left.nodeStack(d) = currnode
+          left.WRITE_STACK(d, toUnstolen(code))
+
+          d += 1
+          currnode = child(currnode, prog)
+        } else if (prog == 0 && d > 0) {
+          // node completed - done
+          val prev = READ_STACK(d - 1)
+
+          if (!split) {
+            right.WRITE_STACK(d, toUnstolen(code))
+          }
+
+          if (total(prev) == origin(code)) {
+            left.WRITE_STACK(d, 0)
+          } else {
+            left.WRITE_STACK(d, toUnstolen(code))
+          }
+
+          d += 1
+          currnode = null
+        } else if (prog == 0 && d == 0) {
+          // completed root
+          assert(completed(code))
+          assert(!split)
+          left.depth = -1
+          left.WRITE_STACK(d, toUnstolen(code))
+          right.depth = -1
+          right.WRITE_STACK(d, toUnstolen(code))
+
+          d += 1
+          currnode = null
+        } else {
+          sys.error("unreachable state: " + this + ", depth: " + d + ", " + decodeString(d))
         }
-        if (prog != 0 && tot != 0) currnode = child(currnode, prog)
-        else currnode = null
-        d += 1
       }
+
+      assert(!(left.depth == 0 && left.READ_STACK(0) == 0), (this, left, right))
+      assert(!(right.depth == 0 && right.READ_STACK(0) == 0), (this, left, right))
 
       (left, right)
     }

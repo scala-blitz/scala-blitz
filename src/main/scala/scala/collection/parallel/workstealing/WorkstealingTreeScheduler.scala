@@ -265,7 +265,6 @@ object WorkstealingTreeScheduler {
             val chunk = stealer.advance(currstep)
   
             if (chunk != -1) intermediate = combine(intermediate, apply(node, chunk))
-            else assert(stealer.state != AvailableOrOwned)
     
             // update step
             incCount = (incCount + 1) % incFreq
