@@ -38,6 +38,8 @@ object Hashes {
     override def fold[U >: (K, V)](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.fold[K, V, U]
     override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashMapMacros.count[K, V, U]
     override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That], ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.filter[K, V, That]
+    override def mapReduce[R](mapper: ((K,V)) => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.HashMapMacros.mapReduce[K,V,R]
+    override def reduce[U >: (K, V)](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.HashMapMacros.reduce[K, V, U]
     def seq = hashmap
   }
 

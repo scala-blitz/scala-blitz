@@ -60,6 +60,105 @@ object HashMapMacros {
     c.inlineAndReset(result)
   }
 
+  def reduce[K: c.WeakTypeTag, V : c.WeakTypeTag, T >: (K, V) : c.WeakTypeTag](c: Context)(op: c.Expr[(T, T) => T])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    mapReduce[K,V,T](c)(reify { u: ((K,V)) => u })(op)(ctx)
+  }
+
+
+  def mapReduce[K: c.WeakTypeTag, V: c.WeakTypeTag,  R: c.WeakTypeTag](c: Context)(mapper: c.Expr[((K,V)) => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+    import c.universe._
+
+    val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
+    val (mv, mop) = c.nonFunctionToLocal[((K,V)) => R](mapper)
+    val calleeExpression = c.Expr[Hashes.HashMapOps[K,V]](c.applyPrefix)
+    val result = reify {
+      import collection.parallel
+      import parallel.workstealing._
+      import parallel.workstealing.ResultCell
+
+      lv.splice
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+
+        val kernel = new scala.collection.parallel.workstealing.Hashes.HashMapKernel[K, V, ResultCell[R]] {
+          override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[(K, V), ResultCell[R]], node: WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]]) {
+            node.WRITE_INTERMEDIATE(new ResultCell[R])
+          }
+          def zero = new ResultCell[R]
+          def combine(a: ResultCell[R], b: ResultCell[R]) = {
+            if (a eq b) a
+            else if (a.isEmpty) b
+            else if (b.isEmpty) a
+            else {
+              val r = new ResultCell[R]
+              r.result = op.splice(a.result, b.result)
+              r
+            }
+          }
+        def apply(node: WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]], from: Int, until: Int) = {
+          val rc = node.READ_INTERMEDIATE
+          if (from < until) {
+          val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashMapStealer[K, V]]
+          val table = stealer.table
+
+            import collection.mutable
+            import mutable.{DefaultEntry,HashEntry}
+            var i = from
+            var entries : HashEntry[K, DefaultEntry[K, V]] = null;
+            while (i < until && entries == null) {
+              entries = table(i)
+              i += 1
+            }
+            if(entries != null) {
+
+              val de = entries.asInstanceOf[DefaultEntry[K, V]]
+              val kv = (de.key, de.value)
+              var sum = mop.splice.apply(kv)
+              entries = entries.next
+              while (entries != null) {
+                val de = entries.asInstanceOf[DefaultEntry[K, V]]
+                val kv = (de.key, de.value)
+                sum = op.splice(sum, mop.splice.apply(kv))
+                entries = entries.next
+              }
+
+              while (i < until) {
+                entries = table(i)
+                while (entries != null) {
+                  val de = entries.asInstanceOf[DefaultEntry[K, V]]
+                  val kv = (de.key, de.value)
+                  sum = op.splice(sum, mop.splice.apply(kv))
+                  entries = entries.next
+                }
+                i += 1
+            }
+
+              if (rc.isEmpty) rc.result = sum
+              else rc.result = op.splice(rc.result, sum)
+            }
+          }
+          rc
+        }
+
+        }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      result
+    }
+
+    val operation = reify {
+      val res = result.splice
+      if (res.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      else res.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+
+
+
   def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
     aggregate[K, V, U](c)(z)(op)(op)(ctx)
   }

@@ -49,5 +49,17 @@ trait ParHashMapSnippets {
 
   def filterParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.filter (_._2 % 5 != 0)
 
+
+  def mapReduceSequential(hm: HashMap[Int, Int]) = {
+    val it = hm.iterator
+    var sum = 0
+    while (it.hasNext) {
+      val entry = it.next
+      sum += entry._1 + entry._2 + 1
+    }
+    sum
+  }
+
+  def mapReduceParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.mapReduce(x=>x._1+x._2+1)(_+_)
 }
 

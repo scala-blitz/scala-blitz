@@ -48,7 +48,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     hm
   }
 
-  test("aggregate") {
+  /*test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
     val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
     testOperation()(rt)(ht)
@@ -71,6 +71,15 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     val rt = (r: Range) => HashMap(r zip r: _*).filter(_._1 % 5 != 0)
     val ht = (h: collection.mutable.HashMap[Int, Int]) => filterParallel(h)
     testOperation(comparison = hashMapComparison[Int, Int])(rt)(ht)
+  }*/
+  
+  test("mapReduce") {
+    val rt = (r: Range) => mapReduceSequential(HashMap(r zip r: _*));
+    val ht = (h: collection.mutable.HashMap[Int, Int]) =>  mapReduceParallel(h) 
+    intercept[UnsupportedOperationException] {
+      mapReduceParallel(collection.mutable.HashMap.empty[Int, Int])
+    }
+    testOperation(testEmpty = false)(rt)(ht)
   }
 
 }
