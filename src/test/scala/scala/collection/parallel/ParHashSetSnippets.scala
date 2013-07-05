@@ -25,6 +25,8 @@ trait ParHashSetSnippets {
 
   def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(0)(_ + _)(_ + _)
 
+  def aggregateParallelUnion(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(new HashSet[Int])(_ ++ _)(_ + _)
+
 }
 
 

@@ -409,7 +409,11 @@ object TreeStealer {
           val prev = READ_STACK(d - 1)
 
           if (!split) {
-            right.WRITE_STACK(d, toUnstolen(code))
+            if (total(prev) == origin(code) + 1) {
+              right.WRITE_STACK(d, 0)
+            } else {
+              right.WRITE_STACK(d, toUnstolen(code))
+            }
           }
 
           if (total(prev) == origin(code)) {
@@ -438,6 +442,8 @@ object TreeStealer {
 
       assert(!(left.depth == 0 && left.READ_STACK(0) == 0), (this, left, right))
       assert(!(right.depth == 0 && right.READ_STACK(0) == 0), (this, left, right))
+
+      //debug((this.toString, left.toString, right.toString))
 
       (left, right)
     }
@@ -478,6 +484,20 @@ object TreeStealer {
       } mkString(", ")
     )
 
+  }
+
+  object debug {
+    val log = new java.util.concurrent.ConcurrentLinkedQueue[AnyRef]
+
+    def apply(x: AnyRef) = log.add(x)
+
+    def clear() {
+      log.clear()
+    }
+
+    def print() {
+      println(log.toArray.mkString("\n"))
+    }
   }
 
 }
