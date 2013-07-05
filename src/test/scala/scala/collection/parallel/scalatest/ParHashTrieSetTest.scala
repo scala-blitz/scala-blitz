@@ -29,7 +29,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       method(0 to i)
       method(i to 0 by -1)
     }
-    for (i <- 1 to 100 by 10) {
+    for (i <- 1 to 1000 by 2) {
       method(0 to i)
       method(i to 0 by -1)
     }
