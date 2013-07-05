@@ -19,6 +19,12 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     for (i <- 1 to 100) {
       method(0 to 45)
     }
+    for (i <- 1 to 10000) {
+      method(0 to 56)
+    }
+    for (i <- 1 to 10000) {
+      method(0 to 212)
+    }
     for (i <- 1 to 100) {
       method(0 to i)
       method(i to 0 by -1)
@@ -54,12 +60,6 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     for (i <- r) hm += i
     hm
   }
-
-  // test("aggregate-union") {
-  //   val rt = (r: Range) => r.aggregate(new HashSet[Int])(_ + _, _ ++ _)
-  //   val ht = (h: HashSet[Int]) => aggregateParallelUnion(h)
-  //   testOperation()(rt)(ht)
-  // }
 
   test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)

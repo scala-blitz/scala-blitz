@@ -356,10 +356,8 @@ object TreeStealer {
           right.depth = d
           right.nodeStack(d) = currnode
           right.WRITE_STACK(d, rcode)
-          if (ntot + 1 == tot) {
-            val c = child(currnode, ntot)
-            right.WRITE_STACK(d + 1, encode(ntot, totalChildren(c), 0))
-          }
+          val c = child(currnode, ntot)
+          right.WRITE_STACK(d + 1, encode(ntot, totalChildren(c), 0))
 
           left.depth = d
           left.nodeStack(d) = currnode
