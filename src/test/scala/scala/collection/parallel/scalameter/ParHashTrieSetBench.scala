@@ -17,7 +17,7 @@ class ParHashTrieSetBench extends PerformanceTest.Regression with Serializable w
 
   def persistor = new SerializationPersistor
 
-  val small = 50000
+  val small = 25000
   val normal = 150000
 
   val opts = Seq(
@@ -38,6 +38,11 @@ class ParHashTrieSetBench extends PerformanceTest.Regression with Serializable w
     measure method "aggregate" in {
       using(hashTrieSets(normal)) curve("Sequential") in aggregateSequential
       using(withSchedulers(hashTrieSets(normal))) curve("Par") in { t => aggregateParallel(t._1)(t._2) }
+    }
+
+    measure method "map" in {
+      using(hashTrieSets(small)) curve("Sequential") in mapSequential
+      using(withSchedulers(hashTrieSets(small))) curve("Par") in { t => mapParallel(t._1)(t._2) }
     }
 
   }

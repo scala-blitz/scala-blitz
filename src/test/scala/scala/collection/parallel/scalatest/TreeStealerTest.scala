@@ -155,6 +155,41 @@ class TreeStealerTest extends FunSuite with Helpers {
     testAdvance(1024, 1 << _)
   }
 
+  def testRecursiveStealing(sz: Int, step: Int) {
+    for (i <- 1 until sz) {
+      val hs = createHashSet(sz)
+      val stealer = new workstealing.Trees.HashSetStealer(hs)
+      val seen = mutable.HashSet[Int]()
+      stealer.rootInit()
+
+      def advanceSteal(s: Stealer[Int], level: Int): Unit = {
+        var left = i
+        var added = false
+        while (left > 0 && s.advance(step) != -1) {
+          while (s.hasNext) {
+            seen += s.next()
+            added = true
+          }
+          left -= 1
+        }
+
+        s.markStolen()
+        val (l, r) = s.split
+
+        if (added) advanceSteal(l, level + 1)
+        if (added) advanceSteal(r, level + 1)
+      }
+
+      advanceSteal(stealer, 0)
+
+      assert(seen == hs, (seen, hs))
+    }
+  }
+
+  test("recursive stealing") {
+    for (i <- 1 until 128; step <- Seq(1, 4, 8, 16, 32)) testRecursiveStealing(i, step)
+  }
+
   def testConcurrentStealing(sz: Int, step: Int => Int) {
     val hs = createHashSet(sz)
     val stealer = new workstealing.Trees.HashSetStealer(hs)

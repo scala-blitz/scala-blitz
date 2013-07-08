@@ -62,7 +62,7 @@ object Trees {
     implicit def hashTrieSetOps[T](a: Par[HashSet[T]]) = new Trees.HashSetOps(a)
     implicit def canMergeHashTrieSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](ctx)
-      def apply() = ???
+      def apply() = new HashSetMerger[T](ctx)
     }
     implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
       def apply(pa: Par[HashSet[T]]) = ???
