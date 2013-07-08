@@ -13,14 +13,19 @@ import scala.collection.immutable.HashSet
 
 
 
-class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashSetSnippets {
+class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
   def testForSizes(method: Range => Unit) {
-    for (i <- 1 to 100) {
+    for (i <- 1 to 20000) {
       method(0 to 45)
     }
-    for (i <- 1 to 10000) {
-      method(0 to 56)
+    for (i <- 1 to 20000) {
+      method(0 to 56)  
+    }
+    for (i <- 1 to 1000) {
+      for (sz <- 40 until 90) {
+        method(0 to sz)
+      }
     }
     for (i <- 1 to 10000) {
       method(0 to 212)
@@ -77,6 +82,12 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
         collection.parallel.workstealing.TreeStealer.debug.print()
         throw t
     }
+  }
+
+  test("map") {
+    val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
+    val ht = (hs: HashSet[Int]) => mapParallel(hs)
+    testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
   }
 
 }

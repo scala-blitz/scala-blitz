@@ -60,4 +60,67 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Trees.HashSetKernel[T, Merger[S, That]]] = {
+    import c.universe._
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      new Trees.HashSetKernel[T, Merger[S, That]] {
+        override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
+          node.WRITE_INTERMEDIATE(mergerExpr.splice)
+        }
+        def zero = null
+        def combine(a: Merger[S, That], b: Merger[S, That]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a merge b
+        def apply(node: Node[T, Merger[S, That]], ci: Trees.TrieChunkIterator[T, HashSet[T]]): Merger[S, That] = {
+          def apply(node: HashSet[T], cmb: Merger[S, That]): Unit = node match {
+            case hs1: HashSet.HashSet1[_] =>
+              applyer.splice(cmb, Trees.key(hs1))
+            case hst: HashSet.HashTrieSet[_] =>
+              var i = 0
+              val elems = hst.elems
+              while (i < elems.length) {
+                apply(elems(i), cmb)
+                i += 1
+              }
+            case hsc: HashSet[T] =>
+              for (e <- hsc) applyer.splice(cmb, e)
+          }
+
+          if (ci.hasNext) apply(ci.root, node.READ_INTERMEDIATE)
+          node.READ_INTERMEDIATE
+        }
+      }
+    }
+  }
+
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (fv, f) = c.nonFunctionToLocal[T => S](func)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val mergerExpr = reify {
+      cmf.splice(callee.splice.hashset)
+    }
+    val tkernel = transformerKernel[T, S, That](c)(callee, mergerExpr, reify { (merger: Merger[S, That], elem: T) => merger += f.splice(elem) })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Trees
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      fv.splice
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
 }

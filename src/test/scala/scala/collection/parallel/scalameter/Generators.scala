@@ -31,6 +31,11 @@ trait Generators {
     for (i <- 0 until size) hm += ((i, i))
     hm
   }
+  def hashTrieSets(from: Int) = for (size <- sizes(from)) yield {
+    var hs = immutable.HashSet[Int]()
+    for (i <- 0 until size) hs += i
+    hs
+  }
 
   def withArrays[Repr <% TraversableOnce[_]](gen: Gen[Repr]) = for (coll <- gen) yield (coll, new Array[Int](coll.size))
 

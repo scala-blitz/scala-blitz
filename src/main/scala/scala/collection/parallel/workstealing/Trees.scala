@@ -60,8 +60,8 @@ object Trees {
 
   trait Scope {
     implicit def hashTrieSetOps[T](a: Par[HashSet[T]]) = new Trees.HashSetOps(a)
-    implicit def canMergeHashTrieSet[T](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
-      def apply(from: Par[HashSet[_]]) = ???
+    implicit def canMergeHashTrieSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
+      def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](ctx)
       def apply() = ???
     }
     implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
@@ -76,6 +76,7 @@ object Trees {
       s
     }
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.aggregate[T, S]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.map[T, S, That]
   }
 
   class HashSetStealer[T](val root: HashSet[T]) extends {
@@ -129,6 +130,126 @@ object Trees {
         if (len == 1) 2 else len
       case _ =>
         0
+    }
+  }
+
+  trait HashUtils {
+    protected final def improve(hcode: Int) = {
+      var h: Int = hcode + ~(hcode << 9)
+      h = h ^ (h >>> 14)
+      h = h + (h << 4)
+      h ^ (h >>> 10)
+    }
+  }
+
+  class HashSetMerger[@specialized(Int, Long) T: ClassTag](
+    val ctx: WorkstealingTreeScheduler
+  ) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with HashUtils {
+    val emptyTrie = HashSet.empty[T]
+    val elems = new Array[Conc.Buffer[T]](1 << width)
+
+    def newHashBucket = new HashSetMerger[T](ctx)
+
+    def width = 5
+
+    def clearBucket(idx: Int) {
+      elems(idx) = null
+    }
+
+    def mergeBucket(idx: Int, that: HashSetMerger[T], res: HashSetMerger[T]) {
+      val thise = this.elems(idx)
+      val thate = that.elems(idx)
+      if (thise == null) {
+        res.elems(idx) = thate
+      } else if (thate == null) {
+        res.elems(idx) = thise
+      } else {
+        thise.prepareForMerge()
+        thate.prepareForMerge()
+        res.elems(idx) = thise merge thate
+      }
+    }
+
+    def +=(elem: T): HashSetMerger[T] = {
+      val es = elems
+      val hc = improve(elem.##)
+      val idx = hc & 0x1f
+      var bucket = es(idx)
+      if (bucket eq null) {
+        es(idx) = new Conc.Buffer[T]
+        bucket = es(idx)
+      }
+      bucket += elem
+      this
+    }
+
+    def result = {
+      import Par._
+      import Ops._
+      val stealer = (0 until elems.length).toPar.stealer
+      val root = new Array[HashSet[T]](1 << 5)
+      val kernel = new HashSetMergerResultKernel(elems, root)
+      
+      ctx.invokeParallelOperation(stealer, kernel)
+
+      val fulltries = root.filter(_ != null)
+      var bitmap = 0
+      var sz = 0
+      var i = 0
+      while (i < root.length) {
+        if (root(i) ne null) {
+          sz += root(i).size
+          bitmap |= 1 << i
+        }
+        i += 1
+      }
+
+      val hs = if (sz == 0) HashSet.empty[T]
+        else if (sz == 1) root(0)
+        else new HashSet.HashTrieSet(bitmap, fulltries, sz)
+
+      hs.toPar
+    }
+  }
+
+  class HashSetMergerResultKernel[@specialized(Int, Long) T](
+    val elems: Array[Conc.Buffer[T]],
+    val root: Array[HashSet[T]]
+  ) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
+    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    def zero = ()
+    def combine(a: Unit, b: Unit) = a
+    def apply(node: Node[Int, Unit], chunkSize: Int) {
+      val stealer = node.stealer.asInstanceOf[Ranges.RangeStealer]
+      var i = stealer.nextProgress
+      val until = stealer.nextUntil
+      while (i < until) {
+        storeBucket(i)
+        i += 1
+      }
+    }
+    private def storeBucket(i: Int) {
+      def traverse(es: Conc[T], res: HashSet[T]): HashSet[T] = es match {
+        case knode: Conc.<>[T] =>
+          val lres = traverse(knode.left, res)
+          traverse(knode.right, lres)
+        case kchunk: Conc.Chunk[T] =>
+          var cres = res
+          val kchunkarr = kchunk.elems
+          var i = 0
+          val until = kchunk.size
+          while (i < until) {
+            val k = kchunkarr(i)
+            val hc = improve(k.##)
+            cres = cres.updated0(k, hc, 5)
+            i += 1
+          }
+          cres
+        case _ =>
+          sys.error("unreachable: " + es)
+      }
+
+      root(i) = if (elems(i) ne null) traverse(elems(i).result.normalized, HashSet.empty[T]) else null
     }
   }
 

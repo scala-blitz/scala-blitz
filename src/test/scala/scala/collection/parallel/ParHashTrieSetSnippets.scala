@@ -11,7 +11,7 @@ import collection.immutable.HashSet
 
 
 
-trait ParHashSetSnippets {
+trait ParHashTrieSetSnippets {
 
   def aggregateSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -26,6 +26,18 @@ trait ParHashSetSnippets {
   def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(0)(_ + _)(_ + _)
 
   def aggregateParallelUnion(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(new HashSet[Int])(_ ++ _)(_ + _)
+
+  def mapSequential(hm: HashSet[Int]) = {
+    val it = hm.iterator
+    var res = HashSet.empty[Int]
+    while (it.hasNext) {
+      val k = it.next()
+      res += k * 2
+    }
+    res
+  }
+
+  def mapParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.map(_ * 2)
 
 }
 
