@@ -53,4 +53,6 @@ trait Tests[Repr] extends Timeouts with Helpers {
 
   def hashTrieSetComparison[T](range: Range, hs: immutable.Set[T], phs: Par[immutable.HashSet[T]]) = hs == phs.seq
 
+  def hashTrieMapComparison[K, V](range: Range, hm: immutable.Map[K, V], phm: Par[immutable.HashMap[K, V]]) = hm == phm.seq
+
 }
