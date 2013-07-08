@@ -309,7 +309,14 @@ object TreeStealer {
       }
     }
 
+    private def check(cond: Boolean, msg: AnyRef) {
+      if (!cond) sys.error("Error state: ")
+    }
+
     def split: (Stealer[T], Stealer[T]) = {
+      assert(state == Stealer.StolenOrExpanded)
+      markStolen()
+
       val left = newStealer
       val right = newStealer
 
@@ -333,7 +340,8 @@ object TreeStealer {
             } else {
               val prev = READ_STACK(d - 1)
               val last = total(prev) == origin(code)
-              val ncode = if (last) 0 else encode(origin(code), 0, 0)
+              check(last, this)
+              val ncode = 0
               right.WRITE_STACK(d, ncode)
             }
           }
@@ -424,8 +432,8 @@ object TreeStealer {
           currnode = null
         } else if (prog == 0 && d == 0) {
           // completed root
-          assert(completed(code))
-          assert(!split)
+          check(completed(code), (this, d))
+          check(!split, (this, d))
           left.depth = -1
           left.WRITE_STACK(d, toUnstolen(code))
           right.depth = -1
@@ -438,8 +446,8 @@ object TreeStealer {
         }
       }
 
-      assert(!(left.depth == 0 && left.READ_STACK(0) == 0), (this, left, right))
-      assert(!(right.depth == 0 && right.READ_STACK(0) == 0), (this, left, right))
+      check(!(left.depth == 0 && left.READ_STACK(0) == 0), (this, left, right))
+      check(!(right.depth == 0 && right.READ_STACK(0) == 0), (this, left, right))
 
       //debug((this.toString, left.toString, right.toString))
 
