@@ -13,13 +13,13 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
   def persistor = new SerializationPersistor
 
-  val tiny  =  300000
+  val tiny = 300000
   val small = 3000000
   val large = 30000000
 
   val opts = Seq(
-    exec.minWarmupRuns -> 35,
-    exec.maxWarmupRuns -> 90,
+    exec.minWarmupRuns -> 50,
+    exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
     exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",

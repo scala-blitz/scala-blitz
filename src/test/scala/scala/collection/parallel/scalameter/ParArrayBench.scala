@@ -20,8 +20,8 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
   /* generators */
 
   val opts = Seq(
-    exec.minWarmupRuns -> 25,
-    exec.maxWarmupRuns -> 50,
+    exec.minWarmupRuns -> 50,
+    exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
     exec.independentSamples -> 6,
     exec.outliers.suspectPercent -> 40,
