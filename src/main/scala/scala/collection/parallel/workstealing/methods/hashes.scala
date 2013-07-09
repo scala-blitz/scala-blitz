@@ -156,6 +156,29 @@ object HashMapMacros {
     c.inlineAndReset(operation)
   }
 
+  def min[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
+    val op = reify { (x: T, y: T) => if (ordg.splice.compare(x, y) < 0) x else y }
+    reify {
+      ordv.splice
+      reduce[K, V, T](c)(op)(ctx).splice
+    }
+  }
+
+
+
+def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
+    val op = reify { (x: T, y: T) => if (ordg.splice.compare(x, y) > 0) x else y }
+    reify {
+      ordv.splice
+      reduce[K, V, T](c)(op)(ctx).splice
+    }
+  }
 
 
 
