@@ -14,7 +14,13 @@ object Reducables {
 
   trait Scope {
     implicit def reducableOps[T](r: Reducable[T]) = new collection.parallel.workstealing.Reducables.Ops[T](r)
-    implicit def canMergeReducable[T:ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Reducable[_], T, Par[Array[T]]] = new CanMergeFrom[Reducable[_], T, Par[Array[T]]] {
+    implicit def canMergeReducableInt(implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Reducable[_], Int, Par[Array[Int]]] = new CanMergeFrom[Reducable[_], Int, Par[Array[Int]]] {
+      def apply(from: Reducable[_]) = new Arrays.ArrayMerger[Int](ctx)
+      def apply() = new Arrays.ArrayMerger[Int](ctx)
+    }
+
+
+    implicit def canMergeReducable[@specialized(Int, Long, Float, Double) T:ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Reducable[_], T, Par[Array[T]]] = new CanMergeFrom[Reducable[_], T, Par[Array[T]]] {
       def apply(from: Reducable[_]) = new Arrays.ArrayMerger[T](ctx)
       def apply() = new Arrays.ArrayMerger[T](ctx)
     }

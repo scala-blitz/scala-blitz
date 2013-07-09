@@ -16,7 +16,8 @@ object Arrays {
 
   trait Scope {
     implicit def arrayOps[T](a: Par[Array[T]]) = new Arrays.Ops(a)
-    implicit def canMergeArray[T: ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] = new CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] {
+
+    implicit def canMergeArray[@specialized(Int, Long, Float, Double) T: ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] = new CanMergeFrom[Par[Array[_]], T, Par[Array[T]]] {
       def apply(from: Par[Array[_]]) = new ArrayMerger[T](ctx)
       def apply() = new ArrayMerger[T](ctx)
     }
