@@ -9,6 +9,8 @@ import scala.reflect.ClassTag
 import scala.collection.parallel.generic._
 import scala.collection.mutable.HashTable
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.FlatHashTable
+import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashEntry
 import scala.collection.mutable.DefaultEntry
 
@@ -27,6 +29,18 @@ object Hashes {
     implicit def hashMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
       def apply(pa: Par[HashMap[K, V]]) = ???
     }
+    implicit def hashSetOps[T](a: Par[HashSet[T]]) = new Hashes.HashSetOps(a)
+    implicit def canMergeHashSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
+      def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+      def apply() = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+    }
+    implicit def canMergeIntHashSet(implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], Int, Par[HashSet[Int]]] {
+      def apply(from: Par[HashSet[_]]) = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+      def apply() = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+    }
+    implicit def hashSetIsReducable[T] = new IsReducable[HashSet[T], T] {
+      def apply(pa: Par[HashSet[T]]) = ???
+    }
   }
 
   class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducables.OpsLike[(K, V), Par[HashMap[K, V]]] {
@@ -38,6 +52,15 @@ object Hashes {
     override def fold[U >: (K, V)](z: =>U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.fold[K, V, U]
     def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashMapMacros.count[K, V, U]
     def filter(pred: ((K, V)) => Boolean)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.filter[K, V]
+  }
+
+  class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[HashSet[T]]] {
+    def stealer: Stealer[T] = {
+      val contents = hashset.seq.hashTableContents
+      new HashSetStealer(contents, 0, contents.table.length)
+    }
+    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.aggregate[T, S]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashSetMacros.map[T, S, That]
   }
 
   abstract class HashStealer[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
@@ -101,6 +124,41 @@ object Hashes {
       val curr = entry.asInstanceOf[DefaultEntry[K, V]]
       entry = entry.next
       (curr.key, curr.value)
+    } else {
+      moveForward()
+      nextAt
+    }
+  }
+
+  final class HashSetStealer[T](val contents: FlatHashTable.Contents[T], si: Int, ei: Int) extends HashStealer[T](si, ei) {
+    type StealerType = HashSetStealer[T]
+
+    val table: Array[AnyRef] = contents.table
+    var current: T = _
+
+    var padding9: Int = _
+    var padding10: Int = _
+    var padding11: Int = _
+    var padding12: Int = _
+    var padding13: Int = _
+    var padding14: Int = _
+    var padding15: Int = _
+
+    def newStealer(si: Int, ei: Int) = new HashSetStealer(contents, si, ei)
+
+    protected def loadFactor: Int = contents.loadFactor
+
+    protected def positionAt(idx: Int): Boolean = if (table(idx) == null) false else {
+      current = table(idx).asInstanceOf[T]
+      true
+    }
+
+    protected def hasNextAt = current != null
+
+    @annotation.tailrec final def nextAt = if (current != null) {
+      val curr = current
+      current = null.asInstanceOf[T]
+      curr
     } else {
       moveForward()
       nextAt
@@ -240,6 +298,128 @@ object Hashes {
       apply(node, stealer.nextProgress, stealer.nextUntil)
     }
     def apply(node: Node[(K, V), R], from: Int, until: Int): R
+  }
+
+  def newHashSetMerger[@specialized(Int, Long) T <: AnyVal: ClassTag](callee: Par[HashSet[T]])(implicit ctx: WorkstealingTreeScheduler) = {
+    new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
+  }
+
+  def newHashSetMerger[T](callee: Par[HashSet[T]])(implicit ctx: WorkstealingTreeScheduler) = {
+    new HashSetMerger[Object](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx).asInstanceOf[HashSetMerger[T]]
+  }
+
+  class HashSetMerger[@specialized(Int, Long) T: ClassTag](
+    val width: Int,
+    val loadFactor: Int,
+    val seed: Int,
+    val ctx: WorkstealingTreeScheduler
+  ) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with FlatHashTable.HashUtils[T] {
+    val keys = new Array[Conc.Buffer[T]](1 << width)
+
+    def newHashBucket = new HashSetMerger(width, loadFactor, seed, ctx)
+
+    def clearBucket(idx: Int) {
+      keys(idx) = null
+    }
+
+    def mergeBucket(idx: Int, that: HashSetMerger[T], res: HashSetMerger[T]) {
+      val thisk = this.keys(idx)
+      val thatk = that.keys(idx)
+      if (thisk == null) {
+        res.keys(idx) = thatk
+      } else if (thatk == null) {
+        res.keys(idx) = thisk
+      } else {
+        thisk.prepareForMerge()
+        thatk.prepareForMerge()
+        res.keys(idx) = thisk merge thatk
+      }
+    }
+
+    def +=(k: T): HashSetMerger[T] = {
+      val kz = keys
+      val hc = improve(k.##, seed)
+      val idx = hc >>> HashBuckets.IRRELEVANT_BITS
+      var bkey = kz(idx)
+      if (bkey eq null) {
+        kz(idx) = new Conc.Buffer
+        bkey = kz(idx)
+      }
+      bkey += k
+      this
+    }
+
+    def result = {
+      import Par._
+      import Ops._
+      val expectedSize = keys.foldLeft(0) { (acc, x) =>
+        if (x ne null) acc + x.size else acc
+      }
+      val table = new HashBuckets.FlatEntries[T](width, expectedSize, loadFactor, seed)
+      val stealer = (0 until keys.length).toPar.stealer
+      val kernel = new HashSetMergerResultKernel(width, keys, table)
+      val size = ctx.invokeParallelOperation(stealer, kernel)
+      table.setSize(size)
+      val hs = new HashSet(table.hashTableContents)
+      for (elem <- table.spills) hs += elem
+      hs.toPar
+    }
+
+    override def toString = "HashSetMerger(%s)".format(keys.mkString(", "))
+  }
+
+  class HashSetMergerResultKernel[@specialized(Int, Long) T](
+    val width: Int,
+    val keys: Array[Conc.Buffer[T]],
+    val table: HashBuckets.FlatEntries[T]
+  ) extends IndexedStealer.IndexedKernel[Int, Int] {
+    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    def zero = 0
+    def combine(a: Int, b: Int) = a + b
+    def apply(node: Node[Int, Int], chunkSize: Int): Int = {
+      val stealer = node.stealer.asInstanceOf[Ranges.RangeStealer]
+      var i = stealer.nextProgress
+      val until = stealer.nextUntil
+      var sum = 0
+      while (i < until) {
+        sum += storeBucket(i)
+        i += 1
+      }
+      sum
+    }
+    private val blocksize = table.tableLength >> HashBuckets.DISCRIMINANT_BITS
+    private def blockStart(block: Int) = block * blocksize
+    private def storeBucket(i: Int): Int = {
+      val nextBlockStart = blockStart(i + 1)
+
+      def traverse(ks: Conc[T]): Int = ks match {
+        case knode: Conc.<>[T] =>
+          traverse(knode.left) + traverse(knode.right)
+        case kchunk: Conc.Chunk[T] =>
+          val kchunkarr = kchunk.elems
+          var i = 0
+          var total = 0
+          val until = kchunk.size
+          while (i < until) {
+            val k = kchunkarr(i)
+            total += table.tryInsertEntry(-1, nextBlockStart, k)
+            i += 1
+          }
+          total
+        case _ =>
+          sys.error("unreachable: " + ks)
+      }
+
+      if (keys(i) ne null) traverse(keys(i).result.normalized) else 0
+    }
+  }
+
+  abstract class HashSetKernel[T, R] extends IndexedStealer.IndexedKernel[T, R] {
+    def apply(node: Node[T, R], chunkSize: Int): R = {
+      val stealer = node.stealer.asInstanceOf[HashSetStealer[T]]
+      apply(node, stealer.nextProgress, stealer.nextUntil)
+    }
+    def apply(node: Node[T, R], from: Int, until: Int): R
   }
 
 }

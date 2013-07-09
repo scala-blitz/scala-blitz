@@ -6,6 +6,7 @@ import scala.reflect.ClassTag
 import scala.collection.mutable.HashTable
 import scala.collection.mutable.HashEntry
 import scala.collection.mutable.DefaultEntry
+import scala.collection.mutable.FlatHashTable
 
 
 
@@ -85,6 +86,43 @@ object HashBuckets {
     }
     
     protected def createNewEntry[X](key: K, x: X) = ???
+  }
+
+  class FlatEntries[@specialized(Int, Long) T](val width: Int, numelems: Int, lf: Int, _seedvalue: Int) extends FlatHashTable[T] {
+    import FlatHashTable._
+
+    val spills = new collection.mutable.ArrayBuffer[T]
+
+    {
+      _loadFactor = lf
+      table = new Array[AnyRef](capacity(sizeForThreshold(numelems, _loadFactor)))
+      tableSize = 0
+      threshold = newThreshold(_loadFactor, table.length)
+      seedvalue = _seedvalue
+      sizeMapInit(table.length)
+    }
+
+    def setSize(sz: Int) = tableSize = sz
+
+    def tableLength = table.length
+
+    def tryInsertEntry(insertAt: Int, comesBefore: Int, elem: T): Int = {
+      var h = insertAt
+      if (h == -1) h = index(elemHashCode(elem))
+      var entry = table(h)
+      while (null != entry) {
+        if (entry == elem) return 0
+        h = h + 1 // we *do not* do `(h + 1) % table.length` here, because we'll never overflow!
+        if (h >= comesBefore) spills.synchronized {
+          spills += elem
+          return 0
+        }
+        entry = table(h)
+      }
+      table(h) = elem.asInstanceOf[AnyRef]
+
+      1
+    }    
   }
 
 }
