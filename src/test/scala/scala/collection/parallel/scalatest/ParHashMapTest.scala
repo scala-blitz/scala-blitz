@@ -70,7 +70,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   test("filter") {
     val rt = (r: Range) => HashMap(r zip r: _*).filter(_._1 % 5 != 0)
     val ht = (h: collection.mutable.HashMap[Int, Int]) => filterParallel(h)
-    testOperation(comparison = hashMapComparison[Int, Int])(rt)(ht)
+    testOperation(comparison = hashMapComparison[Int, Int], numSec = 12)(rt)(ht)
   }
 
 }
