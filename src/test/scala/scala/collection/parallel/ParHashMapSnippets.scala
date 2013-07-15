@@ -61,5 +61,17 @@ trait ParHashMapSnippets {
   }
 
   def mapReduceParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.mapReduce(x=>x._1+x._2+1)(_+_)
+
+  def foreachSequential(r:Range) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    HashMap(r zip r: _*).foreach(x=>  if ((x._1+x._2) % 500 == 0) ai.incrementAndGet())
+    ai.get
+  }
+
+  def foreachParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = {
+    val ai = new java.util.concurrent.atomic.AtomicLong(0)
+    hm.toPar.foreach(x=> if ((x._1+x._2) % 500 == 0) ai.incrementAndGet())
+    ai.get
+  }
 }
 

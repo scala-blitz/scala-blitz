@@ -48,7 +48,8 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     hm
   }
 
-  /*test("aggregate") {
+
+  test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
     val ht = (h: HashMap[Int, Int]) => aggregateParallel(h)
     testOperation()(rt)(ht)
@@ -71,7 +72,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     val rt = (r: Range) => HashMap(r zip r: _*).filter(_._1 % 5 != 0)
     val ht = (h: collection.mutable.HashMap[Int, Int]) => filterParallel(h)
     testOperation(comparison = hashMapComparison[Int, Int])(rt)(ht)
-  }*/
+  }
   
   test("mapReduce") {
     val rt = (r: Range) => mapReduceSequential(HashMap(r zip r: _*));
@@ -81,6 +82,82 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     }
     testOperation(testEmpty = false)(rt)(ht)
   }
+ 
+
+  test("foreach") {
+    val rt = (r: Range) => foreachSequential(r)
+    val ht = (h: HashMap[Int, Int]) => foreachParallel(h)
+    testOperation()(rt)(ht)
+  }
+
+  test("min") {
+      object MyOrd extends Ordering[(Int,Int)] {
+      def compare(x: (Int,Int), y: (Int,Int)) = if(Ordering.Int.compare(x._1,y._1)!=0 ) Ordering.Int.compare(x._1,y._1) else Ordering.Int.compare(x._2,y._2)
+      }
+    val rt = (r: Range) => {val m = r.min; (m,m)}
+    val ht = (h: HashMap[Int, Int]) => h.min
+
+    intercept[UnsupportedOperationException] {
+      collection.mutable.HashMap.empty[Int, Int].toPar.min
+    }
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
+  test("max") {
+      class MyOrd extends Ordering[(Int,Int)] {
+      def compare(x: (Int,Int), y: (Int,Int)) = if(Ordering.Int.compare(x._1,y._1)!=0 ) Ordering.Int.compare(x._1,y._1) else Ordering.Int.compare(x._2,y._2)
+      }
+    val rt = (r: Range) => {val m = r.max; (m,m)}
+    val ht = (h: HashMap[Int, Int]) => h.max
+
+    intercept[UnsupportedOperationException] {
+      collection.mutable.HashMap.empty[Int, Int].toPar.max
+    }
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
+  test("sum") {
+    implicit object customNum extends Numeric[(Int,Int)] {
+      def fromInt(x: Int): (Int,Int) = ???
+      def minus(x: (Int,Int), y: (Int,Int)): (Int,Int) = ???
+      def negate(x: (Int, Int)): (Int, Int) = ???
+      def plus(x: (Int,Int), y: (Int,Int)) : (Int,Int) = (x._1+y._1,x._2+y._2)
+      def times(x: (Int,Int), y: (Int,Int)) = ???
+      def toDouble(x: (Int,Int)): Double = ???
+      def toFloat(x: (Int,Int)): Float = ???
+      def toInt(x: (Int,Int)): Int = ???
+      def toLong(x: (Int,Int)): Long = ???
+      override def zero = (0,0)
+      override def one = ???
+      def compare(x: (Int, Int),y: (Int, Int)): Int = ???
+    }
+    val rt = (r: Range) => { val s = r.sum; (s,s)}
+    val ht = (h: HashMap[Int, Int]) => h.sum
+
+    testOperation()(rt)(ht)
+  }
+
+  test("product") {
+    implicit object customNum extends Numeric[(Int,Int)] {
+      def fromInt(x: Int): (Int,Int) = ???
+      def minus(x: (Int,Int), y: (Int,Int)): (Int,Int) = ???
+      def negate(x: (Int, Int)): (Int, Int) = ???
+      def plus(x: (Int,Int), y: (Int,Int)) : (Int,Int) = ???
+      def times(x: (Int,Int), y: (Int,Int)) = (x._1+y._1,x._2+y._2)
+      def toDouble(x: (Int,Int)): Double = ???
+      def toFloat(x: (Int,Int)): Float = ???
+      def toInt(x: (Int,Int)): Int = ???
+      def toLong(x: (Int,Int)): Long = ???
+      override def zero = ???
+      override def one = (0,0)
+      def compare(x: (Int, Int),y: (Int, Int)): Int = ???
+    }
+    val rt = (r: Range) => { val s = r.sum; (s,s)}
+    val ht = (h: HashMap[Int, Int]) => h.product
+
+    testOperation()(rt)(ht)
+  }
+
 
 }
 

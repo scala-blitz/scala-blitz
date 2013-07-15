@@ -169,7 +169,7 @@ object HashMapMacros {
 
 
 
-def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+  def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
@@ -177,6 +177,30 @@ def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Con
     reify {
       ordv.splice
       reduce[K, V, T](c)(op)(ctx).splice
+    }
+  }
+
+  def product[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+    val op = reify { (x: T, y: T) => numg.splice.times(x,y) }
+    val one = reify{numg.splice.one}
+    reify {
+      numg.splice
+      aggregate[K,V,T](c)(one)(op)(op)(ctx).splice
+    }
+  }
+
+  def sum[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+    val op = reify { (x: T, y: T) => numg.splice.plus(x,y) }
+    val zero = reify{numg.splice.zero}
+    reify {
+      numg.splice
+      aggregate[K,V,T](c)(zero)(op)(op)(ctx).splice
     }
   }
 
@@ -199,6 +223,21 @@ def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Con
       aggregate[K, V, Int](c)(z)(combop)(seqop)(ctx).splice
     }
   }
+
+  def foreach[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
+    val combop = reify { (x: Unit, y: Unit) => x }
+    val seqop = reify { (cnt: Unit, x: U) => actg.splice.apply(x)}
+    val z = reify { () }
+
+    reify {
+      actv.splice
+      aggregate[K, V, Unit](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
 
   def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Hashes.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
@@ -245,24 +284,24 @@ def max[K: c.WeakTypeTag, V: c.WeakTypeTag,  T >: (K, V) : c.WeakTypeTag](c: Con
 
     val (pv, p) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
-    //todo: use provided cmf
-    val mergerExpr = c.Expr[Hashes.HashMapMerger[K, V]] {
-      Apply(Select(Ident(newTermName("Hashes")), newTermName("newHashMapMerger")), List(Select(callee.tree, newTermName("hashmap"))))
-    }
+    val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]](cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
 
-    val tkernel = transformerKernel[K, V, (K, V), Par[HashMap[K, V]]](c)(callee, mergerExpr, reify { (merger: Merger[(K, V), Par[HashMap[K, V]]], elem: (K, V)) => if (p.splice(elem)) merger += elem })
+    val tkernel = transformerKernel[K, V, (K, V), That](c)(callee, mergerExpr, reify { (merger: Merger[(K, V), That], elem: (K, V)) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
+      import scala.reflect.ClassTag
       import scala.collection.parallel._
       import scala.collection.parallel.workstealing.Hashes
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
       pv.splice
       cv.splice
+      cmfv.splice
       val stealer = callee.splice.stealer
       val kernel = tkernel.splice
       val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
-      cmb.result.asInstanceOf[That]
+      cmb.result
     }
 
     c.inlineAndReset(operation)
