@@ -187,7 +187,7 @@ object HashMapMacros {
     val op = reify { (x: T, y: T) => numg.splice.times(x,y) }
     val one = reify{numg.splice.one}
     reify {
-      numg.splice
+      numv.splice
       aggregate[K,V,T](c)(one)(op)(op)(ctx).splice
     }
   }
@@ -199,7 +199,7 @@ object HashMapMacros {
     val op = reify { (x: T, y: T) => numg.splice.plus(x,y) }
     val zero = reify{numg.splice.zero}
     reify {
-      numg.splice
+      numv.splice
       aggregate[K,V,T](c)(zero)(op)(op)(ctx).splice
     }
   }

@@ -91,11 +91,8 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("min") {
-      object MyOrd extends Ordering[(Int,Int)] {
-      def compare(x: (Int,Int), y: (Int,Int)) = if(Ordering.Int.compare(x._1,y._1)!=0 ) Ordering.Int.compare(x._1,y._1) else Ordering.Int.compare(x._2,y._2)
-      }
-    val rt = (r: Range) => {val m = r.min; (m,m)}
-    val ht = (h: HashMap[Int, Int]) => h.min
+    val rt = (r: Range) => minSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => minParallel(h)
 
     intercept[UnsupportedOperationException] {
       collection.mutable.HashMap.empty[Int, Int].toPar.min
@@ -104,11 +101,9 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("max") {
-      class MyOrd extends Ordering[(Int,Int)] {
-      def compare(x: (Int,Int), y: (Int,Int)) = if(Ordering.Int.compare(x._1,y._1)!=0 ) Ordering.Int.compare(x._1,y._1) else Ordering.Int.compare(x._2,y._2)
-      }
-    val rt = (r: Range) => {val m = r.max; (m,m)}
-    val ht = (h: HashMap[Int, Int]) => h.max
+    
+    val rt = (r: Range) => maxSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => maxParallel(h)
 
     intercept[UnsupportedOperationException] {
       collection.mutable.HashMap.empty[Int, Int].toPar.max
@@ -117,43 +112,16 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("sum") {
-    implicit object customNum extends Numeric[(Int,Int)] {
-      def fromInt(x: Int): (Int,Int) = ???
-      def minus(x: (Int,Int), y: (Int,Int)): (Int,Int) = ???
-      def negate(x: (Int, Int)): (Int, Int) = ???
-      def plus(x: (Int,Int), y: (Int,Int)) : (Int,Int) = (x._1+y._1,x._2+y._2)
-      def times(x: (Int,Int), y: (Int,Int)) = ???
-      def toDouble(x: (Int,Int)): Double = ???
-      def toFloat(x: (Int,Int)): Float = ???
-      def toInt(x: (Int,Int)): Int = ???
-      def toLong(x: (Int,Int)): Long = ???
-      override def zero = (0,0)
-      override def one = ???
-      def compare(x: (Int, Int),y: (Int, Int)): Int = ???
-    }
-    val rt = (r: Range) => { val s = r.sum; (s,s)}
-    val ht = (h: HashMap[Int, Int]) => h.sum
+    
+    val rt = (r: Range) => sumSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => sumParallel(h)
 
     testOperation()(rt)(ht)
   }
 
   test("product") {
-    implicit object customNum extends Numeric[(Int,Int)] {
-      def fromInt(x: Int): (Int,Int) = ???
-      def minus(x: (Int,Int), y: (Int,Int)): (Int,Int) = ???
-      def negate(x: (Int, Int)): (Int, Int) = ???
-      def plus(x: (Int,Int), y: (Int,Int)) : (Int,Int) = ???
-      def times(x: (Int,Int), y: (Int,Int)) = (x._1+y._1,x._2+y._2)
-      def toDouble(x: (Int,Int)): Double = ???
-      def toFloat(x: (Int,Int)): Float = ???
-      def toInt(x: (Int,Int)): Int = ???
-      def toLong(x: (Int,Int)): Long = ???
-      override def zero = ???
-      override def one = (0,0)
-      def compare(x: (Int, Int),y: (Int, Int)): Int = ???
-    }
-    val rt = (r: Range) => { val s = r.sum; (s,s)}
-    val ht = (h: HashMap[Int, Int]) => h.product
+    val rt = (r: Range) => productSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => productParallel(h)
 
     testOperation()(rt)(ht)
   }

@@ -45,11 +45,43 @@ class ParHashMapBench extends PerformanceTest.Regression with Serializable with 
       using(withSchedulers(hashMaps(small))) curve("Par") in { t => filterParallel(t._1)(t._2) }
     }
 
+    measure method "mapReduce" in {
+      using(hashMaps(normal)) curve("Sequential") in mapReduceSequential
+      using(withSchedulers(hashMaps(normal))) curve("Par") in { t => mapReduceParallel(t._1)(t._2) }
+    }
+
+
     performance of "derivative" in {
       measure method "count" in {
         using(hashMaps(normal)) curve("Sequential") in countSequential
         using(withSchedulers(hashMaps(normal))) curve("Par") in { t => countParallel(t._1)(t._2) }
       }
+
+      measure method "foreach" in {
+        using(hashMaps(normal)) curve("Sequential") in foreachSequential
+        using(withSchedulers(hashMaps(normal))) curve("Par") in { t => foreachParallel(t._1)(t._2) }
+      }
+      
+      measure method "sum" in {
+        using(hashMaps(normal)) curve("Sequential") in sumSequential
+        using(withSchedulers(hashMaps(normal))) curve("Par") in { t => sumParallel(t._1)(t._2) }
+      }
+
+      measure method "product" in {
+        using(hashMaps(normal)) curve("Sequential") in productSequential
+        using(withSchedulers(hashMaps(normal))) curve("Par") in { t => productParallel(t._1)(t._2) }
+      }
+
+      measure method "min" in {
+        using(hashMaps(normal)) curve("Sequential") in minSequential
+        using(withSchedulers(hashMaps(normal))) curve("Par") in { t => minParallel(t._1)(t._2) }
+      }
+
+      measure method "max" in {
+        using(hashMaps(normal)) curve("Sequential") in maxSequential
+        using(withSchedulers(hashMaps(normal))) curve("Par") in { t => maxParallel(t._1)(t._2) }
+      }
+
     }
 
   }
