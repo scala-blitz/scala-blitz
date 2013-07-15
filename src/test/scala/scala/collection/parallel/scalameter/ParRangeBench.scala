@@ -13,7 +13,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
   def persistor = new SerializationPersistor
 
-  val tiny  =  300000
+  val tiny = 300000
   val small = 3000000
   val large = 30000000
 
@@ -23,20 +23,18 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
     exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
-    reports.regression.noiseMagnitude -> 0.15
-  )
+    reports.regression.noiseMagnitude -> 0.15)
 
   val pcopts = Seq(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
     exec.independentSamples -> 1,
-    reports.regression.noiseMagnitude -> 0.75
-  )
+    reports.regression.noiseMagnitude -> 0.75)
 
   /* benchmarks */
 
-  performance of "Par[Range]" config(opts: _*) in {
+  performance of "Par[Range]" config (opts: _*) in {
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
@@ -75,30 +73,29 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(ranges(small))) curve ("Par") in { t => mapSqrtParallel(t._1)(t._2) }
     }
 
-    measure method "filter(mod3)" config (
-      exec.minWarmupRuns -> 80,
-      exec.maxWarmupRuns -> 160
-    ) in {
-      using(ranges(small)) curve ("Sequential") in filterMod3Sequential
-      using(withSchedulers(ranges(small))) curve("Par") in { t => filterMod3Parallel(t._1)(t._2) }
-      }
-     
-    measure method "filter(cos)" in {
-      using(ranges(tiny)) curve ("Sequential") in filterCosSequential
-      using(withSchedulers(ranges(tiny))) curve("Par") in { t => filterCosParallel(t._1)(t._2) }
-    }
-
     measure method "flatMap" in {
       using(ranges(small)) curve ("Sequential") in flatMapSequential
-      using(withSchedulers(ranges(small))) curve("Par") in { t => flatMapParallel(t._1)(t._2) }
-      }
-  
+      using(withSchedulers(ranges(small))) curve ("Par") in { t => flatMapParallel(t._1)(t._2) }
+    }
+
     performance of "derivative" in {
       measure method "fold" in {
         using(ranges(large)) curve ("Sequential") in foldSequential
         using(withSchedulers(ranges(large))) curve ("Par") in { t => foldParallel(t._1)(t._2) }
       }
-      
+
+      measure method "filter(mod3)" config (
+        exec.minWarmupRuns -> 80,
+        exec.maxWarmupRuns -> 160) in {
+          using(ranges(small)) curve ("Sequential") in filterMod3Sequential
+          using(withSchedulers(ranges(small))) curve ("Par") in { t => filterMod3Parallel(t._1)(t._2) }
+        }
+
+      measure method "filter(cos)" in {
+        using(ranges(tiny)) curve ("Sequential") in filterCosSequential
+        using(withSchedulers(ranges(tiny))) curve ("Par") in { t => filterCosParallel(t._1)(t._2) }
+      }
+
       measure method "foreach" in {
         using(ranges(small)) curve ("Sequential") in foreachSequential
         using(withSchedulers(ranges(small))) curve ("Par") in { t => foreachParallel(t._1)(t._2) }
@@ -134,7 +131,6 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         using(withSchedulers(ranges(large))) curve ("Par") in { t => existsParallel(t._1)(t._2) }
       }
     }
-   }
-
+  }
 
 }
