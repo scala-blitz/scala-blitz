@@ -1,6 +1,8 @@
 package scala.collection.parallel
 package workstealing
 
+
+
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.collection.parallel.generic._
@@ -9,6 +11,8 @@ import scala.collection.parallel.generic._
 import scala.collection.parallel.Par
 import scala.collection.parallel.workstealing._
 import scala.reflect.ClassTag
+
+
 
 object Reducables {
 
@@ -19,8 +23,7 @@ object Reducables {
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
 
-
-    implicit def canMergeReducable[@specialized(Int, Long, Float, Double) T:ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Reducable[_], T, Par[Array[T]]] = new CanMergeFrom[Reducable[_], T, Par[Array[T]]] {
+    implicit def canMergeReducable[@specialized(Int, Long, Float, Double) T: ClassTag](implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Reducable[_], T, Par[Array[T]]] = new CanMergeFrom[Reducable[_], T, Par[Array[T]]] {
       def apply(from: Reducable[_]) = new Arrays.ArrayMerger[T](ctx)
       def apply() = new Arrays.ArrayMerger[T](ctx)
     }
@@ -43,16 +46,15 @@ object Reducables {
     def find[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro methods.ReducablesMacros.find[T, U, Repr]
     def exists[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ReducablesMacros.exists[T, U, Repr]
     def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.ReducablesMacros.forall[T, U, Repr]
-    def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = macro methods.ReducablesMacros.map[T,S,That,Repr]
+    def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = macro methods.ReducablesMacros.map[T, S, That, Repr]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.flatMap[T, S, That, Repr]
-    def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.filter[T,That,Repr]
+    def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.filter[T, That, Repr]
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]] {
     def stealer = r.stealer
     def seq = r
   }
-
 
   import WorkstealingTreeScheduler._
 

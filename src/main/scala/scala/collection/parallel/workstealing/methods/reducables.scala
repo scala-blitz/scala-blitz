@@ -278,8 +278,6 @@ object ReducablesMacros {
     }
   }
 
-
-
   def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
     import c.universe._
 
@@ -349,14 +347,14 @@ object ReducablesMacros {
     }
   }
 
-  def groupMapAggregate[T: c.WeakTypeTag, K:c.WeakTypeTag : ClassTag, M:c.WeakTypeTag : ClassTag, Repr:c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M,M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]) = {
+  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag: ClassTag, M: c.WeakTypeTag: ClassTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
-    val (aggrv, aggrg) = c.nonFunctionToLocal[(M,M) => M](aggr)
+    val (aggrv, aggrg) = c.nonFunctionToLocal[(M, M) => M](aggr)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify {Hashes.newHashMapMerger[K,M](implicitly[ClassTag[K]], implicitly[ClassTag[M]], ctx.splice)}
+    val mergerExpr = reify { Hashes.newHashMapMerger[K, M](implicitly[ClassTag[K]], implicitly[ClassTag[M]], ctx.splice) }
 
     reify {
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
@@ -385,8 +383,8 @@ object ReducablesMacros {
             val mappedElem = mpg.splice.apply(elem)
             val elemKey = grg.splice.apply(elem)
             merger.get(elemKey) match {
-              case Some((chunk, id)) =>  chunk.elems(id) = aggrg.splice.apply(chunk.elems(id), mappedElem)
-              case None =>merger += (elemKey,mappedElem)            
+              case Some((chunk, id)) => chunk.elems(id) = aggrg.splice.apply(chunk.elems(id), mappedElem)
+              case None => merger += (elemKey, mappedElem)
             }
           }
           merger

@@ -39,15 +39,13 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   def targetCollections(r: Range) = Seq(
-    createHashMap(r)
-  )
+    createHashMap(r))
 
   def createHashMap(r: Range): HashMap[Int, Int] = {
     val hm = HashMap[Int, Int]()
     for (i <- r) hm += ((i, i))
     hm
   }
-
 
   test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
@@ -63,7 +61,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
 
   test("simple filter") {
     val hm = HashMap(0 -> 0, 1 -> 2, 2 -> 4, 3 -> 6, 4 -> 8, 5 -> 10, 6 -> 12)
-    val res = hm.toPar.filter{x:(Int,Int)=>x._1 % 2 == 0}
+    val res = hm.toPar.filter { x: (Int, Int) => x._1 % 2 == 0 }
     val expected = HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12)
     assert(res.seq == HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12), (hm, res))
   }
@@ -73,16 +71,15 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     val ht = (h: collection.mutable.HashMap[Int, Int]) => filterParallel(h)
     testOperation(comparison = hashMapComparison[Int, Int])(rt)(ht)
   }
-  
+
   test("mapReduce") {
     val rt = (r: Range) => mapReduceSequential(HashMap(r zip r: _*));
-    val ht = (h: collection.mutable.HashMap[Int, Int]) =>  mapReduceParallel(h) 
+    val ht = (h: collection.mutable.HashMap[Int, Int]) => mapReduceParallel(h)
     intercept[UnsupportedOperationException] {
       mapReduceParallel(collection.mutable.HashMap.empty[Int, Int])
     }
     testOperation(testEmpty = false)(rt)(ht)
   }
- 
 
   test("foreach") {
     val rt = (r: Range) => foreachSequential(r)
@@ -101,7 +98,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("max") {
-    
+
     val rt = (r: Range) => maxSequential(HashMap(r zip r: _*))
     val ht = (h: HashMap[Int, Int]) => maxParallel(h)
 
@@ -112,7 +109,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("sum") {
-    
+
     val rt = (r: Range) => sumSequential(HashMap(r zip r: _*))
     val ht = (h: HashMap[Int, Int]) => sumParallel(h)
 
@@ -126,22 +123,5 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     testOperation()(rt)(ht)
   }
 
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

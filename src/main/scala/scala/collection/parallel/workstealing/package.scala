@@ -33,7 +33,7 @@ package object workstealing {
       empty = false
     }
     def isEmpty = empty
-    override def toString = if(empty) "ResultCell(empty)" else "ResultCell(" + r + ")"
+    override def toString = if (empty) "ResultCell(empty)" else "ResultCell(" + r + ")"
   }
 
   final case class ProgressStatus(val start: Int, var progress: Int)
@@ -43,11 +43,4 @@ package object workstealing {
   }
 
 }
-
-
-
-
-
-
-
 
