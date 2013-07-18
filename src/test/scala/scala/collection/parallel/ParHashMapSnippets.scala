@@ -136,5 +136,22 @@ trait ParHashMapSnippets {
   }
 
   def productParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.product(CustomNumTimes, s)
+
+  def findSinSequential(hm: HashMap[Int, Int]) = {
+    hm.find(x => math.sin(x._1 + x._2) == 2)
+  }
+
+  def findSinParallel(hm: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.find(x => math.sin(x._1 + x._2) == 2)
+
+  def findSequential(hm: HashMap[Int, Int], elem: Int) = {
+    hm.find(x => x == (elem, elem))
+  }
+
+  def findParallel(hm: HashMap[Int, Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hm.toPar.find(x => x == (elem, elem))
+
+  def existsParallel(hm: HashMap[Int, Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hm.toPar.exists(_ == (elem, elem))
+
+  def forallSmallerParallel(hm: HashMap[Int, Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hm.toPar.forall(x => x._1 < elem && x._2 < elem)
+
 }
 

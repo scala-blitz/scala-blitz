@@ -15,6 +15,7 @@ import Optimizer.c2opt
 
 
 
+
 object HashMapMacros {
 
   def aggregate[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
@@ -300,7 +301,7 @@ object HashMapMacros {
     c.inlineAndReset(operation)
   }
 
-  def find[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
+  def find[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[((K, V)) => Boolean](p)
@@ -338,22 +339,22 @@ object HashMapMacros {
     }
   }
 
-  def forall[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def forall[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
       (x: (K, V)) => !p.splice(x)
     }
-    val found = find[K, V](c)(np)(ctx)
+    val found = find[K, V, (K, V)](c)(np)(ctx)
     reify {
       found.splice.isEmpty
     }
   }
 
-  def exists[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def exists[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
     import c.universe._
 
-    val found = find[K, V](c)(p)(ctx)
+    val found = find[K, V, T](c)(p)(ctx)
     reify {
       found.splice.nonEmpty
     }

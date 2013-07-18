@@ -17,6 +17,7 @@ class ParHashMapBench extends PerformanceTest.Regression with Serializable with 
 
   def persistor = new SerializationPersistor
 
+  val tiny = 10000
   val small = 100000
   val normal = 300000
 
@@ -47,6 +48,16 @@ class ParHashMapBench extends PerformanceTest.Regression with Serializable with 
     measure method "mapReduce" in {
       using(hashMaps(normal)) curve ("Sequential") in mapReduceSequential
       using(withSchedulers(hashMaps(normal))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
+    }
+
+    measure method "find(sin)" in {
+      using(hashMaps(tiny)) curve ("Sequential") in findSinSequential
+      using(withSchedulers(hashMaps(tiny))) curve ("Par") in { t => findSinParallel(t._1)(t._2) }
+    }
+
+    measure method "find" in {
+      using(hashMaps(tiny)) curve ("Sequential") in (x => findSequential(x, -1))
+      using(withSchedulers(hashMaps(tiny))) curve ("Par") in { t => findParallel(t._1, -1)(t._2) }
     }
 
     performance of "derivative" in {

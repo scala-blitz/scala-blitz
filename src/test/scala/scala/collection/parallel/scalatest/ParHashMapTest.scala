@@ -123,5 +123,46 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     testOperation()(rt)(ht)
   }
 
+  test("find") {
+    testOperation() {
+      r => r.find(_ == Int.MaxValue)
+    } {
+      a => findParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r =>
+        val e = r.find(_ == 0);
+        e.map(x => (x, x))
+    } {
+      a => findParallel(a, 0)
+    }
+  }
+
+  test("exists") {
+    testOperation() {
+      r => r.exists(_ == Int.MaxValue)
+    } {
+      a => existsParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.exists(_ == r.last)
+    } {
+      a => existsParallel(a, a.last._1)
+    }
+  }
+
+  test("forall") {
+    testOperation() {
+      r => r.forall(_ < Int.MaxValue)
+    } {
+      a => forallSmallerParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.forall(_ < r.last)
+    } {
+      a => forallSmallerParallel(a, a.last._1)
+    }
+  }
+
 }
 

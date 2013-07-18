@@ -45,9 +45,9 @@ object Hashes {
     override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.HashMapMacros.foreach[K, V, U]
     override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashMapMacros.sum[K, V, U]
     override def product[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashMapMacros.product[K, V, U]
-    override def find(p: ((K, V)) => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro methods.HashMapMacros.find[K, V]
-    override def exists(p: ((K, V)) => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.exists[K, V]
-    override def forall(p: ((K, V)) => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.forall[K, V]
+    override def find[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro methods.HashMapMacros.find[K, V, U]
+    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.exists[K, V, U]
+    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.forall[K, V, U]
 
     def seq = hashmap
   }
