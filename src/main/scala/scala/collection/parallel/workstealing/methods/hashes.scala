@@ -300,4 +300,63 @@ object HashMapMacros {
     c.inlineAndReset(operation)
   }
 
+  def find[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
+    import c.universe._
+
+    val (lv, pred) = c.nonFunctionToLocal[((K, V)) => Boolean](p)
+
+    val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      val kernel = new Hashes.HashMapKernel[K, V, Option[(K, V)]] {
+        def zero = None
+        def combine(a: Option[(K, V)], b: Option[(K, V)]) = if (a.isDefined) a else b
+        def apply(node: Node[(K, V), Option[(K, V)]], from: Int, until: Int) = {
+          val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashMapStealer[K, V]]
+          val table = stealer.table
+          var i = from
+          var result: (K, V) = null
+          while (i < until && result == null) {
+            var entries = table(i)
+            while (entries != null && result == null) {
+              import collection.mutable
+              import mutable.DefaultEntry
+              val de = entries.asInstanceOf[DefaultEntry[K, V]]
+              val kv = (de.key, de.value)
+              if (pred.splice(kv)) result = kv
+              entries = entries.next
+            }
+            i += 1
+          }
+          if (result == null) None else Some(result)
+        }
+      }
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      ctx.splice.invokeParallelOperation(stealer, kernel)
+    }
+  }
+
+  def forall[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val np = reify {
+      (x: (K, V)) => !p.splice(x)
+    }
+    val found = find[K, V](c)(np)(ctx)
+    reify {
+      found.splice.isEmpty
+    }
+  }
+
+  def exists[K: c.WeakTypeTag, V: c.WeakTypeTag](c: Context)(p: c.Expr[((K, V)) => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val found = find[K, V](c)(p)(ctx)
+    reify {
+      found.splice.nonEmpty
+    }
+  }
+
 }
