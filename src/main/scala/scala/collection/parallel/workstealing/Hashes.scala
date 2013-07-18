@@ -48,6 +48,8 @@ object Hashes {
     override def find[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro methods.HashMapMacros.find[K, V, U]
     override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.exists[K, V, U]
     override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashMapMacros.forall[K, V, U]
+    override def map[T, That](mp: ((K, V)) => T)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashMapMacros.map[K, V, T, That]
+    override def flatMap[T, That](mp:  ((K, V))=> TraversableOnce[T])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: WorkstealingTreeScheduler) = macro methods.HashMapMacros.flatMap[K, V, T, That]
 
     def seq = hashmap
   }

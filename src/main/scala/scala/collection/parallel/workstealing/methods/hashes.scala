@@ -301,6 +301,63 @@ object HashMapMacros {
     c.inlineAndReset(operation)
   }
 
+  def map[K: c.WeakTypeTag, V: c.WeakTypeTag, T: c.WeakTypeTag , That: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => T])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => T](mp)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], T, That]](cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
+
+    val tkernel = transformerKernel[K, V, T, That](c)(callee, mergerExpr, reify { (merger: Merger[T, That], elem: (K, V)) => merger += mpg.splice.apply(elem) })
+
+    val operation = reify {
+      import scala.reflect.ClassTag
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Hashes
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      mpv.splice
+      cv.splice
+      cmfv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+  def flatMap[K: c.WeakTypeTag, V: c.WeakTypeTag, T: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => TraversableOnce[T]])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] =   {  
+import c.universe._
+
+    val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => TraversableOnce[T]](mp)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], T, That]](cmf, "cmf")
+    val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
+
+    val tkernel = transformerKernel[K, V, T, That](c)(callee, mergerExpr, reify { (merger: Merger[T, That], elem: (K, V)) => mpg.splice.apply(elem).foreach{merger += _} })
+
+    val operation = reify {
+      import scala.reflect.ClassTag
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Hashes
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      mpv.splice
+      cv.splice
+      cmfv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+
   def find[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
     import c.universe._
 
