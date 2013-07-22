@@ -41,7 +41,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
   /* benchmarks */
 
-  performance of "Reduable[Range]" config (opts: _*) in {
+  performance of "Reducable[Range]" config (opts: _*) in {
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
