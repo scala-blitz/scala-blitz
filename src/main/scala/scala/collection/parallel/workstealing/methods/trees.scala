@@ -61,6 +61,69 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
+
+  def mapReduce[T: c.WeakTypeTag, S >: T : c.WeakTypeTag,  M: c.WeakTypeTag](c: Context)(mp: c.Expr[S => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[M] = {
+    import c.universe._
+
+    val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
+    val (comblv, comboper) = c.nonFunctionToLocal[(M, M) => M](combop)
+
+    val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
+    val result = reify {
+      import scala._
+      import collection.parallel
+      import parallel._
+      import workstealing._
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      mpv.splice
+      comblv.splice
+      val kernel = new scala.collection.parallel.workstealing.Trees.HashSetKernel[T, ResultCell[M]] {
+        def zero = new ResultCell[M]()
+        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[M]], node: WorkstealingTreeScheduler.Node[T, ResultCell[M]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[M])
+        }
+        def combine(a: ResultCell[M], b: ResultCell[M]) = {
+          if(a.isEmpty) b else if (b.isEmpty) a else {
+            val r = new ResultCell[M]
+            r.result= comboper.splice.apply(a.result, b.result)
+            r
+        }
+        }
+        def apply(node: Node[T, ResultCell[M]], ci: Trees.TrieChunkIterator[T, HashSet[T]]): ResultCell[M] = {
+          def combineRC(acc:ResultCell[M], v:T) =  {
+            if(acc.isEmpty) acc.result = mpg.splice(v)
+            else acc.result = comboper.splice(acc.result, mpg.splice(v))
+            acc
+          }
+        
+          def apply(node: HashSet[T], acc: ResultCell[M]): ResultCell[M] = node match {
+            case hs1: HashSet.HashSet1[_] =>
+              combineRC(acc,Trees.key(hs1))
+            case hst: HashSet.HashTrieSet[_] =>
+              var i = 0
+              var sum = acc
+              val elems = hst.elems
+              while (i < elems.length) {
+                sum = apply(elems(i), sum)
+                i += 1
+              }
+              sum
+            case hsc: HashSet[T] =>
+              hsc.foldLeft(acc){(a:ResultCell[M],b:T) => combineRC(a,b)}
+          }
+          val cur = node.READ_INTERMEDIATE
+          if (ci.hasNext) apply(ci.root, cur) else cur
+        }
+      }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      if(result.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      else result.result
+    }
+
+     c.inlineAndReset(result)
+  }
+
   def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Trees.HashSetKernel[T, Merger[S, That]]] = {
     import c.universe._
 
