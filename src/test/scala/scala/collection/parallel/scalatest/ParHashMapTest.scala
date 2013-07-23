@@ -39,8 +39,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   def targetCollections(r: Range) = Seq(
-    createHashMap(r)
-  )
+    createHashMap(r))
 
   def createHashMap(r: Range): HashMap[Int, Int] = {
     val hm = HashMap[Int, Int]()
@@ -62,7 +61,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
 
   test("simple filter") {
     val hm = HashMap(0 -> 0, 1 -> 2, 2 -> 4, 3 -> 6, 4 -> 8, 5 -> 10, 6 -> 12)
-    val res = hm.toPar.filter(_._1 % 2 == 0)
+    val res = hm.toPar.filter { x: (Int, Int) => x._1 % 2 == 0 }
     val expected = HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12)
     assert(res.seq == HashMap(0 -> 0, 2 -> 4, 4 -> 8, 6 -> 12), (hm, res))
   }
@@ -73,21 +72,97 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     testOperation(comparison = hashMapComparison[Int, Int], numSec = 12)(rt)(ht)
   }
 
+  test("mapReduce") {
+    val rt = (r: Range) => mapReduceSequential(HashMap(r zip r: _*));
+    val ht = (h: collection.mutable.HashMap[Int, Int]) => mapReduceParallel(h)
+    intercept[UnsupportedOperationException] {
+      mapReduceParallel(collection.mutable.HashMap.empty[Int, Int])
+    }
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
+  test("foreach") {
+    val rt = (r: Range) => foreachSequential(r)
+    val ht = (h: HashMap[Int, Int]) => foreachParallel(h)
+    testOperation()(rt)(ht)
+  }
+
+  test("min") {
+    val rt = (r: Range) => minSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => minParallel(h)
+
+    intercept[UnsupportedOperationException] {
+      collection.mutable.HashMap.empty[Int, Int].toPar.min
+    }
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
+  test("max") {
+
+    val rt = (r: Range) => maxSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => maxParallel(h)
+
+    intercept[UnsupportedOperationException] {
+      collection.mutable.HashMap.empty[Int, Int].toPar.max
+    }
+    testOperation(testEmpty = false)(rt)(ht)
+  }
+
+  test("sum") {
+
+    val rt = (r: Range) => sumSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => sumParallel(h)
+
+    testOperation()(rt)(ht)
+  }
+
+  test("product") {
+    val rt = (r: Range) => productSequential(HashMap(r zip r: _*))
+    val ht = (h: HashMap[Int, Int]) => productParallel(h)
+
+    testOperation()(rt)(ht)
+  }
+
+  test("find") {
+    testOperation() {
+      r => r.find(_ == Int.MaxValue)
+    } {
+      a => findParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r =>
+        val e = r.find(_ == 0);
+        e.map(x => (x, x))
+    } {
+      a => findParallel(a, 0)
+    }
+  }
+
+  test("exists") {
+    testOperation() {
+      r => r.exists(_ == Int.MaxValue)
+    } {
+      a => existsParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.exists(_ == r.last)
+    } {
+      a => existsParallel(a, a.last._1)
+    }
+  }
+
+  test("forall") {
+    testOperation() {
+      r => r.forall(_ < Int.MaxValue)
+    } {
+      a => forallSmallerParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.forall(_ < r.last)
+    } {
+      a => forallSmallerParallel(a, a.last._1)
+    }
+  }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

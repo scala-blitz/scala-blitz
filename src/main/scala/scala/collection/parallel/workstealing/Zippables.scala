@@ -21,6 +21,7 @@ object Zippables {
 
   class Ops[T](val z: Zippable[T]) extends AnyVal with OpsLike[T, Zippable[T]] {
     def stealer = z.stealer
+    def seq = z
   }
 
 }

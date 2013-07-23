@@ -15,6 +15,7 @@ trait Generators {
   def sizes(from: Int) = Gen.enumeration("size")(from, from * 3, from * 5)
   def ranges(from: Int) = for (size <- sizes(from)) yield 0 until size
   def arrays(from: Int) = for (size <- sizes(from)) yield (0 until size).toArray
+
   def concs(from: Int) = for (size <- sizes(from)) yield {
     var conc: Conc[Int] = Conc.Zero
     for (i <- 0 until size) conc = conc <> i

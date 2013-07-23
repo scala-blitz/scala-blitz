@@ -25,6 +25,7 @@ object Concs {
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.ConcsMacros.reduce[T, U]
     override def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.ConcsMacros.copyToArray[T, U]
     def genericCopyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = methods.ConcsMethods.copyToArray[T, U](c, arr, start, len)(ctx)
+    def seq = c
   }
   
   /* stealer implementation */
