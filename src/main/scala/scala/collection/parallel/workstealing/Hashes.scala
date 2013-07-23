@@ -73,8 +73,9 @@ object Hashes {
       val contents = hashset.seq.hashTableContents
       new HashSetStealer(contents, 0, contents.table.length)
     }
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.aggregate[T, S]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.aggregate[T, S]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashSetMacros.map[T, S, That]
+    def seq = hashset
   }
 
   abstract class HashStealer[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) {
