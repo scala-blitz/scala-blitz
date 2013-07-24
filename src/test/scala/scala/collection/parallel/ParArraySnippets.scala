@@ -82,17 +82,7 @@ trait ParArraySnippets {
 
   def sumParallel(a: Array[Int], customNum: Numeric[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.sum(customNum, s)
 
-  def productSequential(a: Array[Int]) = {
-    var i = 0
-    val until = a.length
-    var sum = 1
-    while (i < until) {
-      sum *= a(i)
-      i += 1
-    }
-    if (sum == 1) ???
-    sum
-  }
+  def productSequential(a: Array[Int]) = foldProductSequential(a)
 
   def productParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.product
 
