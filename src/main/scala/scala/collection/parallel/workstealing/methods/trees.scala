@@ -165,8 +165,7 @@ object HashTrieSetMacros {
           node.WRITE_INTERMEDIATE(new ResultCell[M])
         }
         def combine(a: ResultCell[M], b: ResultCell[M]) = {
-          if ( a eq b) a else 
-          if (a.isEmpty) b else if (b.isEmpty) a else {
+          if (a eq b) a else if (a.isEmpty) b else if (b.isEmpty) a else {
             val r = new ResultCell[M]
             r.result = comboper.splice.apply(a.result, b.result)
             r
@@ -317,6 +316,68 @@ object HashTrieMapMacros {
     c.inlineAndReset(result)
   }
 
+  def mapReduce[K: c.WeakTypeTag, V: c.WeakTypeTag, M: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[M] = {
+    import c.universe._
+
+    val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => M](mp)
+    val (comblv, comboper) = c.nonFunctionToLocal[(M, M) => M](combop)
+
+    val calleeExpression = c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix)
+    val result = reify {
+      import collection.parallel
+      import parallel.workstealing._
+      import parallel.workstealing.ResultCell
+
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      mpv.splice
+      comblv.splice
+      val kernel = new scala.collection.parallel.workstealing.Trees.HashMapKernel[K, V, ResultCell[M]] {
+        def zero = new ResultCell[M]()
+        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[(K, V), ResultCell[M]], node: WorkstealingTreeScheduler.Node[(K, V), ResultCell[M]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[M])
+        }
+        def combine(a: ResultCell[M], b: ResultCell[M]) = {
+          if (a eq b) a else if (a.isEmpty) b else if (b.isEmpty) a else {
+            val r = new ResultCell[M]
+            r.result = comboper.splice.apply(a.result, b.result)
+            r
+          }
+        }
+        def apply(node: Node[(K, V), ResultCell[M]], ci: Trees.TrieChunkIterator[(K, V), HashMap[K, V]]): ResultCell[M] = {
+          def combineRC(acc: ResultCell[M], v: (K, V)) = {
+            if (acc.isEmpty) acc.result = mpg.splice(v)
+            else acc.result = comboper.splice(acc.result, mpg.splice(v))
+            acc
+          }
+
+          def apply(node: HashMap[K, V], acc: ResultCell[M]): ResultCell[M] = node match {
+            case hm1: HashMap.HashMap1[_, _] =>
+              combineRC(acc, Trees.kv(hm1))
+            case hmt: HashMap.HashTrieMap[_, _] =>
+              var i = 0
+              var sum = acc
+              val elems = hmt.elems
+              while (i < elems.length) {
+                sum = apply(elems(i), sum)
+                i += 1
+              }
+              sum
+            case hmc: HashMap[K, V] =>
+              hmc.foldLeft(acc) { (a: ResultCell[M], b: (K, V)) => combineRC(a, b) }
+          }
+          val cur = node.READ_INTERMEDIATE
+          if (ci.hasNext) apply(ci.root, cur) else cur
+        }
+      }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      if (result.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      else result.result
+    }
+
+    c.inlineAndReset(result)
+  }
+
   def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[Trees.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
 
@@ -382,6 +443,87 @@ object HashTrieMapMacros {
     }
 
     c.inlineAndReset(operation)
+  }
+
+  def product[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+
+    val op = reify { (x: T, y: T) => numg.splice.times(x, y) }
+    val one = reify { numg.splice.one }
+    reify {
+      numv.splice
+      aggregate[K, V, T](c)(one)(op)(op)(ctx).splice
+    }
+  }
+
+  def sum[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+    val op = reify { (x: T, y: T) => numg.splice.plus(x, y) }
+    val zero = reify { numg.splice.zero }
+    reify {
+      numv.splice
+      aggregate[K, V, T](c)(zero)(op)(op)(ctx).splice
+    }
+  }
+
+  def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+    aggregate[K, V, U](c)(z)(op)(op)(ctx)
+  }
+
+  def count[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+    import c.universe._
+
+    val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
+    val combop = reify { (x: Int, y: Int) => x + y }
+    val seqop = reify { (cnt: Int, x: (K, V)) => if (pred.splice(x)) cnt + 1 else cnt }
+    val z = reify { 0 }
+
+    reify {
+      pv.splice
+      aggregate[K, V, Int](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
+  def foreach[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
+    val combop = reify { (x: Unit, y: Unit) => x }
+    val seqop = reify { (cnt: Unit, x: U) => actg.splice.apply(x) }
+    val z = reify { () }
+
+    reify {
+      actv.splice
+      aggregate[K, V, Unit](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
+  def reduce[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[K, V, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+
+  def min[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[(K, V)] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
+    val op = reify { (x: (K, V), y: (K, V)) => if (ordg.splice.compare(x, y) < 0) x else y }
+    reify {
+      ordv.splice
+      reduce[K, V, (K, V)](c)(op)(ctx).splice
+    }
+  }
+
+  def max[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[(K, V)] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
+    val op = reify { (x: (K, V), y: (K, V)) => if (ordg.splice.compare(x, y) > 0) x else y }
+    reify {
+      ordv.splice
+      reduce[K, V, (K, V)](c)(op)(ctx).splice
+    }
   }
 
 }

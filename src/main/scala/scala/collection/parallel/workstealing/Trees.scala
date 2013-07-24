@@ -57,12 +57,12 @@ object Trees {
       }
     }
     final def clearPosStack() {
-     val posStack = unsafe.getObject(this, OFFSET_POS_STACK).asInstanceOf[Array[Int]]
-     var i = 0
-     while (i < 6) {
-       posStack(i) = 0
-       i += 1
-     }
+      val posStack = unsafe.getObject(this, OFFSET_POS_STACK).asInstanceOf[Array[Int]]
+      var i = 0
+      while (i < 6) {
+        posStack(i) = 0
+        i += 1
+      }
     }
     final def clearSubIter() = unsafe.putObject(this, OFFSET_SUBITER, null)
     final def root = getArrayD(0).asInstanceOf[Repr]
@@ -94,7 +94,7 @@ object Trees {
       s
     }
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.aggregate[T, S]
-    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.mapReduce[T,T,M]
+    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.mapReduce[T, T, M]
     override def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieSetMacros.min[T, U]
     override def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieSetMacros.max[T, U]
     override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.reduce[T, U]
@@ -115,6 +115,16 @@ object Trees {
       s
     }
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieMapMacros.aggregate[K, V, S]
+    override def mapReduce[M](mp: ((K, V)) => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieMapMacros.mapReduce[K, V, M]
+    override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.min[K, V, U]
+    override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.max[K, V, U]
+    override def reduce[U >: (K, V)](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieMapMacros.reduce[K, V, U]
+    override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.HashTrieMapMacros.foreach[K, V, U]
+    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.fold[K, V, U]
+    override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.sum[K, V, U]
+    override def product[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.product[K, V, U]
+    override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashTrieMapMacros.count[K, V, U]
+
     override def map[S, That](func: ((K, V)) => S)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieMapMacros.map[K, V, S, That]
     def seq = hashmap
   }
@@ -183,8 +193,7 @@ object Trees {
   }
 
   class HashSetMerger[@specialized(Int, Long) T: ClassTag](
-    val ctx: WorkstealingTreeScheduler
-  ) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with HashUtils {
+    val ctx: WorkstealingTreeScheduler) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with HashUtils {
     val elems = new Array[Conc.Buffer[T]](1 << width)
 
     def newHashBucket = new HashSetMerger[T](ctx)
@@ -228,7 +237,7 @@ object Trees {
       val stealer = (0 until elems.length).toPar.stealer
       val root = new Array[HashSet[T]](1 << 5)
       val kernel = new HashSetMergerResultKernel(elems, root)
-      
+
       ctx.invokeParallelOperation(stealer, kernel)
 
       val fulltries = root.filter(_ != null)
@@ -244,8 +253,8 @@ object Trees {
       }
 
       val hs = if (sz == 0) HashSet.empty[T]
-        else if (sz == 1) root(0)
-        else new HashSet.HashTrieSet(bitmap, fulltries, sz)
+      else if (sz == 1) root(0)
+      else new HashSet.HashTrieSet(bitmap, fulltries, sz)
 
       hs.toPar
     }
@@ -253,8 +262,7 @@ object Trees {
 
   class HashSetMergerResultKernel[@specialized(Int, Long) T](
     val elems: Array[Conc.Buffer[T]],
-    val root: Array[HashSet[T]]
-  ) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
+    val root: Array[HashSet[T]]) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
     override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
     def zero = ()
     def combine(a: Unit, b: Unit) = a
@@ -355,8 +363,7 @@ object Trees {
   }
 
   class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long) V: ClassTag](
-    val ctx: WorkstealingTreeScheduler
-  ) extends HashBuckets[K, (K, V), HashMapMerger[K, V], Par[HashMap[K, V]]] with HashUtils {
+    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapMerger[K, V], Par[HashMap[K, V]]] with HashUtils {
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
 
@@ -413,7 +420,7 @@ object Trees {
       val stealer = (0 until keys.length).toPar.stealer
       val root = new Array[HashMap[K, V]](1 << 5)
       val kernel = new HashMapMergerResultKernel(keys, vals, root)
-      
+
       ctx.invokeParallelOperation(stealer, kernel)
 
       val fulltries = root.filter(_ != null)
@@ -429,8 +436,8 @@ object Trees {
       }
 
       val hm = if (sz == 0) HashMap.empty[K, V]
-        else if (sz == 1) root(0)
-        else new HashMap.HashTrieMap(bitmap, fulltries, sz)
+      else if (sz == 1) root(0)
+      else new HashMap.HashTrieMap(bitmap, fulltries, sz)
 
       hm.toPar
     }
@@ -439,8 +446,7 @@ object Trees {
   class HashMapMergerResultKernel[@specialized(Int, Long) K, @specialized(Int, Long) V](
     val keys: Array[Conc.Buffer[K]],
     val vals: Array[Conc.Buffer[V]],
-    val root: Array[HashMap[K, V]]
-  ) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
+    val root: Array[HashMap[K, V]]) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
     override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
     def zero = ()
     def combine(a: Unit, b: Unit) = a
