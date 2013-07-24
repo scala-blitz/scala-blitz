@@ -16,6 +16,7 @@ import Optimizer.c2opt
 
 
 
+
 object HashTrieSetMacros {
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
@@ -61,8 +62,88 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
+  def product[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
 
-  def mapReduce[T: c.WeakTypeTag, S >: T : c.WeakTypeTag,  M: c.WeakTypeTag](c: Context)(mp: c.Expr[S => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[M] = {
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+
+    val op = reify { (x: T, y: T) => numg.splice.times(x, y) }
+    val one = reify { numg.splice.one }
+    reify {
+      numv.splice
+      aggregate[T, T](c)(one)(op)(op)(ctx).splice
+    }
+  }
+
+  def sum[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
+    val op = reify { (x: T, y: T) => numg.splice.plus(x, y) }
+    val zero = reify { numg.splice.zero }
+    reify {
+      numv.splice
+      aggregate[T, T](c)(zero)(op)(op)(ctx).splice
+    }
+  }
+
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+    aggregate[T, U](c)(z)(op)(op)(ctx)
+  }
+
+  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+    import c.universe._
+
+    val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
+    val combop = reify { (x: Int, y: Int) => x + y }
+    val seqop = reify { (cnt: Int, x: U) => if (pred.splice(x)) cnt + 1 else cnt }
+    val z = reify { 0 }
+
+    reify {
+      pv.splice
+      aggregate[T, Int](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
+  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+    import c.universe._
+
+    val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
+    val combop = reify { (x: Unit, y: Unit) => x }
+    val seqop = reify { (cnt: Unit, x: U) => actg.splice.apply(x) }
+    val z = reify { () }
+
+    reify {
+      actv.splice
+      aggregate[T, Unit](c)(z)(combop)(seqop)(ctx).splice
+    }
+  }
+
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = mapReduce[T, U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+
+  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
+    val op = reify { (x: T, y: T) => if (ordg.splice.compare(x, y) < 0) x else y }
+    reify {
+      ordv.splice
+      reduce[T, T](c)(op)(ctx).splice
+    }
+  }
+
+  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    import c.universe._
+
+    val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
+    val op = reify { (x: T, y: T) => if (ordg.splice.compare(x, y) > 0) x else y }
+    reify {
+      ordv.splice
+      reduce[T, T](c)(op)(ctx).splice
+    }
+  }
+
+  def mapReduce[T: c.WeakTypeTag, S >: T: c.WeakTypeTag, M: c.WeakTypeTag](c: Context)(mp: c.Expr[S => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[M] = {
     import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
@@ -84,22 +165,22 @@ object HashTrieSetMacros {
           node.WRITE_INTERMEDIATE(new ResultCell[M])
         }
         def combine(a: ResultCell[M], b: ResultCell[M]) = {
-          if(a.isEmpty) b else if (b.isEmpty) a else {
+          if (a.isEmpty) b else if (b.isEmpty) a else {
             val r = new ResultCell[M]
-            r.result= comboper.splice.apply(a.result, b.result)
+            r.result = comboper.splice.apply(a.result, b.result)
             r
-        }
+          }
         }
         def apply(node: Node[T, ResultCell[M]], ci: Trees.TrieChunkIterator[T, HashSet[T]]): ResultCell[M] = {
-          def combineRC(acc:ResultCell[M], v:T) =  {
-            if(acc.isEmpty) acc.result = mpg.splice(v)
+          def combineRC(acc: ResultCell[M], v: T) = {
+            if (acc.isEmpty) acc.result = mpg.splice(v)
             else acc.result = comboper.splice(acc.result, mpg.splice(v))
             acc
           }
-        
+
           def apply(node: HashSet[T], acc: ResultCell[M]): ResultCell[M] = node match {
             case hs1: HashSet.HashSet1[_] =>
-              combineRC(acc,Trees.key(hs1))
+              combineRC(acc, Trees.key(hs1))
             case hst: HashSet.HashTrieSet[_] =>
               var i = 0
               var sum = acc
@@ -110,18 +191,18 @@ object HashTrieSetMacros {
               }
               sum
             case hsc: HashSet[T] =>
-              hsc.foldLeft(acc){(a:ResultCell[M],b:T) => combineRC(a,b)}
+              hsc.foldLeft(acc) { (a: ResultCell[M], b: T) => combineRC(a, b) }
           }
           val cur = node.READ_INTERMEDIATE
           if (ci.hasNext) apply(ci.root, cur) else cur
         }
       }
       val result = ctx.splice.invokeParallelOperation(stealer, kernel)
-      if(result.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      if (result.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
       else result.result
     }
 
-     c.inlineAndReset(result)
+    c.inlineAndReset(result)
   }
 
   def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Trees.HashSetKernel[T, Merger[S, That]]] = {
@@ -187,9 +268,8 @@ object HashTrieSetMacros {
 
     c.inlineAndReset(operation)
   }
-  
-}
 
+}
 
 object HashTrieMapMacros {
 

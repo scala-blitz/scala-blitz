@@ -25,6 +25,18 @@ trait ParHashTrieSetSnippets {
 
   def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(0)(_ + _)(_ + _)
 
+  def mapReduceParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.mapReduce(_ + 1)(_ + _)
+
+  def mapReduceSequential(hm: HashSet[Int]) = {
+    val it = hm.iterator
+    var sum = 0
+    while (it.hasNext) {
+      val k = it.next() + 1
+      sum += k
+    }
+    sum
+  }
+
   def aggregateParallelUnion(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(new HashSet[Int])(_ ++ _)(_ + _)
 
   def mapSequential(hm: HashSet[Int]) = {
