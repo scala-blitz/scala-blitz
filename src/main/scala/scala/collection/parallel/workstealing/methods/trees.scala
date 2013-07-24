@@ -151,10 +151,10 @@ object HashTrieSetMacros {
 
     val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
     val result = reify {
-      import scala._
       import collection.parallel
-      import parallel._
-      import workstealing._
+      import parallel.workstealing._
+      import parallel.workstealing.ResultCell
+
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       mpv.splice
@@ -165,6 +165,7 @@ object HashTrieSetMacros {
           node.WRITE_INTERMEDIATE(new ResultCell[M])
         }
         def combine(a: ResultCell[M], b: ResultCell[M]) = {
+          if ( a eq b) a else 
           if (a.isEmpty) b else if (b.isEmpty) a else {
             val r = new ResultCell[M]
             r.result = comboper.splice.apply(a.result, b.result)
