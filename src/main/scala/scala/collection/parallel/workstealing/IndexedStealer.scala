@@ -6,7 +6,10 @@ package workstealing
 import scala.annotation.tailrec
 
 
-
+/**
+  * Base class for all stealers operating on index-based collections.
+  * can be not-precise in sence that can return different amount of elements for different indeces.
+  */
 abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 
@@ -81,7 +84,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
   override def toString = {
     val p = READ_PROGRESS
     val dp = decode(p)
-    "IndexedStealer(%d, %d, %d)".format(startIndex, p, dp, untilIndex)
+    "IndexedStealer(%d, %d, %d, %d)".format(startIndex, p, dp, untilIndex) 
   }
 
 }
@@ -92,6 +95,7 @@ object IndexedStealer {
 
   val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[IndexedStealer[_]].getDeclaredField("progress"))
 
+  /** base class for IndexedStealers that have single element for every index*/
   abstract class Flat[T](si: Int, ei: Int) extends IndexedStealer[T](si, ei) with PreciseStealer[T] {
     type StealerType <: Flat[T]
 
@@ -105,7 +109,9 @@ object IndexedStealer {
 
     def psplit(leftsize: Int): (StealerType, StealerType) = splitAtIndex(leftsize)
   
-    def split: (StealerType, StealerType) = psplit(elementsRemainingEstimate / 2)
+    def split: (StealerType, StealerType) = psplit(elementsRemaining / 2)
+
+    def nextOffset = nextProgress
 
   }
 

@@ -187,6 +187,7 @@ object HashTrieSetMacros {
 
     c.inlineAndReset(operation)
   }
+  
 }
 
 

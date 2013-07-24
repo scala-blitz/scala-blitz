@@ -20,13 +20,13 @@ trait Tests[Repr] extends Timeouts with Helpers {
 
   def targetCollections(r: Range): Seq[Repr]
 
-  def testOperation[T, S](numSec: Int = 6, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
+  def testOperation[T, S](numSec: Int = 10, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
     testForSizes { r =>
       testOperationForSize(r, numSec, testEmpty, comparison)(rop)(collop)
     }
   }
 
-  def testOperationForSize[T, S](r: Range, numSec: Int = 6, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
+  def testOperationForSize[T, S](r: Range, numSec: Int = 10, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
     import Par._
     val colls = targetCollections(r)
 
@@ -50,6 +50,8 @@ trait Tests[Repr] extends Timeouts with Helpers {
   def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
   def hashMapComparison[K, V](range: Range, hm: mutable.HashMap[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
+
+  def hashSetComparison[T](range: Range, hs: mutable.Set[T], phs: Par[mutable.HashSet[T]]) = hs == phs.seq
 
   def hashTrieSetComparison[T](range: Range, hs: immutable.Set[T], phs: Par[immutable.HashSet[T]]) = hs == phs.seq
 

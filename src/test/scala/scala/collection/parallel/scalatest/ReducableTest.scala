@@ -11,7 +11,7 @@ import workstealing.Ops._
 
 
 
-class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRangeSnippets {
+class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] with ReducableSnippets {
 
   def testForSizes(method: Range => Unit) {
     for (i <- 1 to 1000) {
@@ -36,17 +36,17 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
       method(i to 0 by -29)
       method(0 to i by 29)
     }
- 
+
     method(1 to 5 by 1000)
     method(1 to 1 by 1000)
     method(1000 to 1 by -100000)
   }
 
-  def targetCollections(r: Range) = Seq(r)
+  def targetCollections(r: Range) = Seq(par2zippable(r.toPar), par2zippable(r.toArray.toPar))
 
   test("reduce") {
-    val rt = (r: Range) => r.reduce(_ + _)
-    val pt = (p: Range) => reduceParallel(p)
+    val rt = (r: Range) => r.iterator.sum
+    val pt = (p: Reducable[Int]) => reduceParallel(p)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(pt)
     }
@@ -188,9 +188,9 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
   test("find") {
     //should be found
     testOperation() {
-      r => r.find(_ == r.last)
+      r => r.find(_ == 0)
     } {
-      p => findLastParallel(p)
+      p => findFirstParallel(p)
     }
     //should not be found
     testOperation() {
@@ -203,7 +203,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
 
   test("exists") {
     testOperation() {
-      r => r.exists(_ == (r.last + 1))
+      r => r.exists(_ == 0)
     } {
       p => existsParallel(p)
     }
@@ -217,7 +217,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     }
   }
 
-  test("copyAllToArray") {
+  /*test("copyAllToArray") {
     testOperation(comparison = seqComparison[Int]) {
       r => copyAllToArraySequential((r,new Array[Int](r.length)))
     } {
@@ -231,7 +231,7 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     } {
       p => copyPartToArrayParallel(p)
     }
-  }
+  }*/
 
   test("map") {
     testOperation(comparison = arrayComparison[Int]) {
@@ -242,10 +242,10 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
   }
 
   test("mapCustomCanMergeFrom") {
-    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Conc[Int]]] {
-        def apply(from: Par[Range]) = new Conc.ConcMerger[Int]
-        def apply() = new Conc.ConcMerger[Int]
-      }
+    object customCmf extends scala.collection.parallel.generic.CanMergeFrom[Reducable[Int], Int, Par[Conc[Int]]] {
+      def apply(from: Reducable[Int]) = new Conc.ConcMerger[Int]
+      def apply() = new Conc.ConcMerger[Int]
+    }
     testOperation(comparison = concComparison[Int]) {
       r => r.map(_ + 1)
     } {
@@ -254,10 +254,12 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
   }
 
   test("filter") {
-    testOperation(comparison = arrayComparison[Int]) {
+    testOperation(comparison = seqComparison[Int]) {
       r => r.filter(_ % 3 == 0)
     } {
-      p => filterMod3Parallel(p)
+      p =>
+        val result = filterMod3Parallel(p)
+        result.seq.toSeq
     }
   }
 

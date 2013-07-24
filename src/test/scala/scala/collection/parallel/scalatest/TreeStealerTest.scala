@@ -173,11 +173,12 @@ class TreeStealerTest extends FunSuite with Helpers {
           left -= 1
         }
 
-        s.markStolen()
-        val (l, r) = s.split
-
-        if (added) advanceSteal(l, level + 1)
-        if (added) advanceSteal(r, level + 1)
+        if (s.markStolen()) {
+          val (l, r) = s.split
+  
+          if (added) advanceSteal(l, level + 1)
+          if (added) advanceSteal(r, level + 1)
+        }
       }
 
       advanceSteal(stealer, 0)
@@ -216,17 +217,18 @@ class TreeStealerTest extends FunSuite with Helpers {
     var rs: String = null
     class Second extends Base {
       override def run() {
-        stealer.markStolen()
-        // println(stealer)
-        val (l, r) = stealer.split
-        left = l
-        right = r
-        ls = left.toString
-        rs = right.toString
-        // println(left)
-        // println(right)
-        consume(left)
-        consume(right)
+        if (stealer.markStolen()) {
+          // println(stealer)
+          val (l, r) = stealer.split
+          left = l
+          right = r
+          ls = left.toString
+          rs = right.toString
+          // println(left)
+          // println(right)
+          consume(left)
+          consume(right)
+        }
       }
     }
     val t2 = new Second
@@ -336,12 +338,13 @@ class TreeStealerTest extends FunSuite with Helpers {
     stealer.rootInit()
     addOnce(stealer, seen)
     assert(hs.size == stealer.elementsRemainingEstimate + seen.size)
-    stealer.markStolen()
-    val (l, r) = stealer.split
-    addAll(l, lseen)
-    addAll(r, rseen)
-    assert(lseen.size + rseen.size + seen.size == sz, ("for size: " + sz, seen, lseen, rseen))
-    assert(hs == (seen ++ lseen ++ rseen), ("for size: " + sz, seen, lseen, rseen))
+    if (stealer.markStolen()) {
+      val (l, r) = stealer.split
+      addAll(l, lseen)
+      addAll(r, rseen)
+      assert(lseen.size + rseen.size + seen.size == sz, ("for size: " + sz, seen, lseen, rseen))
+      assert(hs == (seen ++ lseen ++ rseen), ("for size: " + sz, seen, lseen, rseen))
+    }
   }
 
   test("HashTrieStealer(...).advance(...).markStolen().split") {

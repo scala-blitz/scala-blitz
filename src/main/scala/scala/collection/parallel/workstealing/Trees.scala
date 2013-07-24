@@ -93,9 +93,10 @@ object Trees {
       s.rootInit()
       s
     }
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.aggregate[T, S]
-    def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.mapReduce[T,T,M]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.aggregate[T, S]
+    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieSetMacros.mapReduce[T,T,M]
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.map[T, S, That]
+    def seq = hashset
   }
 
   class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducables.OpsLike[(K, V), Par[HashMap[K, V]]] {
@@ -104,8 +105,9 @@ object Trees {
       s.rootInit()
       s
     }
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieMapMacros.aggregate[K, V, S]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashTrieMapMacros.aggregate[K, V, S]
     override def map[S, That](func: ((K, V)) => S)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieMapMacros.map[K, V, S, That]
+    def seq = hashmap
   }
 
   class HashSetStealer[T](val root: HashSet[T]) extends {
