@@ -30,7 +30,7 @@ trait ParArraySnippets {
   def reduceSequential(a: Array[Int]) = {
     var i = 0
     val until = a.length
-    var sum = 1
+    var sum = 0
     while (i < until) {
       sum += a(i)
       i += 1
@@ -43,7 +43,7 @@ trait ParArraySnippets {
   def mapReduceSequential(a: Array[Int]) = {
     var i = 0
     val until = a.length
-    var sum = 1
+    var sum = 0
     while (i < until) {
       sum += a(i) + 1
       i += 1
