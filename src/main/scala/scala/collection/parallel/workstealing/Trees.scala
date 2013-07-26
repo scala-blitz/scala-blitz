@@ -105,6 +105,8 @@ object Trees {
     override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashTrieSetMacros.count[T, U]
 
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.map[T, S, That]
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.flatMap[T, S, That]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.filter[T, That]
     def seq = hashset
   }
 

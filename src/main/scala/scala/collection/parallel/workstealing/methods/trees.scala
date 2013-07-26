@@ -269,6 +269,58 @@ object HashTrieSetMacros {
     c.inlineAndReset(operation)
   }
 
+  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (fv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val mergerExpr = reify {
+      cmf.splice(callee.splice.hashset)
+    }
+    val tkernel = transformerKernel[T, S, That](c)(callee, mergerExpr, reify { (merger: Merger[S, That], elem: T) => f.splice(elem).foreach(el=>merger += el) })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Trees
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      fv.splice
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+    import c.universe._
+
+    val (fv, f) = c.nonFunctionToLocal[T => Boolean](pred)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val mergerExpr = reify {
+      cmf.splice(callee.splice.hashset)
+    }
+    val tkernel = transformerKernel[T, T, That](c)(callee, mergerExpr, reify { (merger: Merger[T, That], elem: T) => if(f.splice(elem)) merger += elem })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Trees
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      fv.splice
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val cmb = ctx.splice.invokeParallelOperation(stealer, kernel)
+      cmb.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
 }
 
 object HashTrieMapMacros {
