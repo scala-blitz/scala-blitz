@@ -333,6 +333,7 @@ object HashTrieMapMacros {
     val (zv, zg) = c.nonFunctionToLocal[S](z)
     val calleeExpression = c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
+
       import scala._
       import collection.parallel
       import parallel._
@@ -340,6 +341,8 @@ object HashTrieMapMacros {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Trees.HashMapKernel[K, V, S] {
+        seqlv.splice
+        comblv.splice
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
         def apply(node: Node[(K, V), S], ci: Trees.TrieChunkIterator[(K, V), HashMap[K, V]]): S = {
