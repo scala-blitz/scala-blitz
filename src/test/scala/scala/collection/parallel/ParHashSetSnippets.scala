@@ -25,8 +25,6 @@ trait ParHashSetSnippets {
 
   def aggregateParallel(hs: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hs.toPar.aggregate(0)(_ + _)(_ + _)
 
-  def foldParallel(hs:HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hs.toPar.fold(0)(_ + _)
-  def foldSequentical(hs: HashSet[Int]) = aggregateSequential(hs)
 
   def mapSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -40,6 +38,8 @@ trait ParHashSetSnippets {
 
   def mapParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.map(_ * 2)
 
+  def foldParallel(hs:HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hs.toPar.fold(0)(_ + _)
+  def foldSequentical(hs: HashSet[Int]) = aggregateSequential(hs)
   
   def reduceSequential(hs: HashSet[Int]) = aggregateSequential(hs)
 
@@ -81,7 +81,7 @@ trait ParHashSetSnippets {
     val it = hs.iterator
     while (it.hasNext) {
       val el = it.next
-      if ((el*el) % 3 == 1) { count += 1 }
+      if ((el*el) % 3 == 0) { count += 1 }
     }
     count
   }
