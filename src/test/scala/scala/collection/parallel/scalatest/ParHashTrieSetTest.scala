@@ -16,7 +16,7 @@ import scala.collection.immutable.HashSet
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
   def testForSizes(method: Range => Unit) {
-    for (i <- 1 to 20000) {
+    /*for (i <- 1 to 20000) {
       method(0 to 45)
     }
     for (i <- 1 to 20000) {
@@ -35,7 +35,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
     for (i <- 1 to 10000) {
       method(0 to 212)
-    }
+    }*/
     for (i <- 1 to 100) {
       method(0 to i)
       method(i to 0 by -1)
@@ -52,10 +52,11 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       method(0 to i)
       method(i to 0 by -1)
     }
-    for (i <- 100000 to 1000000 by 200000) {
+/*    for (i <- 100000 to 1000000 by 200000) {
       method(0 to i)
       method(i to 0 by -1)
     }
+ */
     for (i <- 1000 to 1 by -1) {
       method(0 to i)
       method(i to 0 by -1)
@@ -229,6 +230,44 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
  
+  test("find") {
+    testOperation() {
+      r => createHashSet(r).find(x => x == Int.MaxValue)
+    } {
+      a => findParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.find(x => x == 1)
+    } {
+      a => findParallel(a, 1)
+    }
+  }
+
+  test("exists") {
+    testOperation() {
+      r => createHashSet(r).exists(x => x == Int.MaxValue)
+    } {
+      a => existsParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => createHashSet(r).exists(x => x == 1)
+    } {
+      a => existsParallel(a, 1)
+    }
+  }
+
+  test("forall") {
+    testOperation() {
+      r => r.forall(_ < Int.MaxValue)
+    } {
+      a => forallSmallerParallel(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.forall(_ < r.last)
+    } {
+      a => forallSmallerParallel(a, a.last)
+    }
+  }
 
 
 }

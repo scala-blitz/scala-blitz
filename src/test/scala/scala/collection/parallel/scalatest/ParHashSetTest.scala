@@ -150,9 +150,9 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
 
   test("count") {
     testOperation() {
-      r => r.count(_ % 2 == 0)
+      r => countSquareMod3Sequential(createHashSet(r))
     } {
-      a => countParallel(a)
+      a => countSquareMod3Parallel(a)
     }
   }
 
@@ -214,9 +214,9 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
       a => existsParallel(a, Int.MaxValue)
     }
     testOperation() {
-      r => r.exists(_ == r.last)
+      r => r.exists(_ == 1)
     } {
-      a => existsParallel(a, a.last)
+      a => existsParallel(a, 1)
     }
   }
 
@@ -257,7 +257,6 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
       a => mapReduceParallel(a)
     }
   }
-
 
 }
 

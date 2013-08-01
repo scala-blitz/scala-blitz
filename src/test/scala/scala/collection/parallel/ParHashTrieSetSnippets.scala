@@ -118,12 +118,18 @@ trait ParHashTrieSetSnippets {
     a.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
+
   def foreachParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
     a.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
+  def findParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.find(x => x == elem)
+
+  def existsParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.exists(x => x == elem)
+
+  def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.forall(x => x < elem)
 
 }
 
