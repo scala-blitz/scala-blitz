@@ -103,6 +103,10 @@ object Trees {
     override def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieSetMacros.sum[T, U]
     override def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieSetMacros.product[T, U]
     override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashTrieSetMacros.count[T, U]
+    override def find[U >: T](pred: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro methods.HashTrieSetMacros.find[T, U]
+    override def exists[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashTrieSetMacros.exists[T, U]
+    override def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashTrieSetMacros.forall[T, U]
+
 
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.map[T, S, That]
     override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieSetMacros.flatMap[T, S, That]
@@ -126,6 +130,11 @@ object Trees {
     override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.sum[K, V, U]
     override def product[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashTrieMapMacros.product[K, V, U]
     override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashTrieMapMacros.count[K, V, U]
+    override def find[U >: (K, V)](pred: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro methods.HashTrieMapMacros.find[K, V, U]
+    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashTrieMapMacros.exists[K, V, U]
+
+    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro methods.HashTrieMapMacros.forall[K, V, U]
+
 
     override def map[S, That](func: ((K, V)) => S)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieMapMacros.map[K, V, S, That]
     override def flatMap[S, That](func: ((K, V)) => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashTrieMapMacros.flatMap[K, V, S, That]
