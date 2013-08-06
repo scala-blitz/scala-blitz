@@ -16,7 +16,12 @@ import scala.collection.immutable.HashSet
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
   def testForSizes(method: Range => Unit) {
-    /*for (i <- 1 to 20000) {
+
+    for (i <- 1 to 20000) {
+      method(0 to 357)
+    }
+/*
+    for (i <- 1 to 20000) {
       method(0 to 45)
     }
     for (i <- 1 to 20000) {
@@ -35,7 +40,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
     for (i <- 1 to 10000) {
       method(0 to 212)
-    }*/
+    }
     for (i <- 1 to 100) {
       method(0 to i)
       method(i to 0 by -1)
@@ -52,15 +57,16 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       method(0 to i)
       method(i to 0 by -1)
     }
-/*    for (i <- 100000 to 1000000 by 200000) {
+    for (i <- 100000 to 1000000 by 200000) {
       method(0 to i)
       method(i to 0 by -1)
     }
- */
+ 
     for (i <- 1000 to 1 by -1) {
       method(0 to i)
       method(i to 0 by -1)
     }
+ */
   }
 
   def targetCollections(r: Range) = Seq(
@@ -72,7 +78,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     for (i <- r) hm += i
     hm
   }
-
+/*
   test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
     val ht = (h: HashSet[Int]) => {
@@ -242,7 +248,31 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => findParallel(a, 1)
     }
   }
+ */
 
+  test("Reducable.find") {
+/*    testOperation() {
+      r => None
+    } {
+      a => findReducable(a, Int.MaxValue)
+    }*/
+    testOperation() {
+      r => Some(1)
+    } {
+      a => 
+//      printHashSet(a)
+      collection.parallel.workstealing.TreeStealer.debug.clear()
+      val r = findReducable(a, 1)
+      if(r.isEmpty) {
+        printHashSet(a)
+        collection.parallel.workstealing.TreeStealer.debug.print()
+      }
+//      println("-------------------------------")
+      r
+    }
+  }
+
+/*
   test("exists") {
     testOperation() {
       r => createHashSet(r).exists(x => x == Int.MaxValue)
@@ -255,6 +285,20 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => existsParallel(a, 1)
     }
   }
+ 
+  test("Reducable.exists") {
+    testOperation() {
+      r => createHashSet(r).exists(x => x == Int.MaxValue)
+    } {
+      a => existsReducable(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => createHashSet(r).exists(x => x == 1)
+    } {
+      a => existsReducable(a, 1)
+    }
+  }
+
 
   test("forall") {
     testOperation() {
@@ -269,6 +313,19 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
+  test("Reducable.forall") {
+    testOperation() {
+      r => r.forall(_ < Int.MaxValue)
+    } {
+      a => forallSmallerReducable(a, Int.MaxValue)
+    }
+    testOperation() {
+      r => r.forall(_ < r.last)
+    } {
+      a => forallSmallerReducable(a, a.last)
+    }
+  }
+ */
 
 }
 

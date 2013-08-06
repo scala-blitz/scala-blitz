@@ -127,9 +127,15 @@ trait ParHashTrieSetSnippets {
 
   def findParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.find(x => x == elem)
 
+  def findReducable(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).find(x => x == elem)
+
   def existsParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.exists(x => x == elem)
 
+  def existsReducable(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).exists(x => x == elem)
+
   def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.forall(x => x < elem)
+
+  def forallSmallerReducable(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).forall(x => x < elem)
 
 }
 

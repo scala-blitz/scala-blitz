@@ -74,17 +74,26 @@ object Trees {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](ctx)
       def apply() = new HashSetMerger[T](ctx)
     }
-    implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
-      def apply(pa: Par[HashSet[T]]) = ???
-    }
     implicit def hashTrieMapOps[K, V](a: Par[HashMap[K, V]]) = new Trees.HashMapOps(a)
     implicit def canMergeHashTrieMap[K: ClassTag, V: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
       def apply(from: Par[HashMap[_, _]]) = new HashMapMerger[K, V](ctx)
       def apply() = new HashMapMerger[K, V](ctx)
     }
     implicit def hashTrieMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
-      def apply(pa: Par[HashMap[K, V]]) = ???
+      def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)]{
+        def iterator = pa.seq.iterator
+        def splitter = ???
+        def stealer = pa.stealer
+      }
     }
+    implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
+      def apply(pa: Par[HashSet[T]]) = new Reducable[T]{
+        def iterator = pa.seq.iterator
+        def splitter = ???
+        def stealer = pa.stealer
+      }
+    }
+
   }
 
   class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[HashSet[T]]] {
