@@ -74,6 +74,18 @@ object Hashes {
       new HashSetStealer(contents, 0, contents.table.length)
     }
     override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.aggregate[T, S]
+    override def foreach[U >: T](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro methods.HashSetMacros.foreach[T, U]
+    override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro methods.HashSetMacros.mapReduce[T, R]
+    override def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.reduce[T, U]
+    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro methods.HashSetMacros.fold[T, U]
+    override def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashSetMacros.sum[T, U]
+    override def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashSetMacros.product[T, U]
+    override def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashSetMacros.min[T, U]
+    override def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro methods.HashSetMacros.max[T, U]
+    override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro methods.HashSetMacros.count[T, U]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.filter[T, That] 
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler) = macro methods.HashSetMacros.flatMap[T, S, That]
+
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro methods.HashSetMacros.map[T, S, That]
     def seq = hashset
   }
