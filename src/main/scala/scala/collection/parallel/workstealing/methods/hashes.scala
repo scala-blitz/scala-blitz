@@ -35,7 +35,10 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Hashes.HashMapKernel[K, V, S] {
-        def zero = z.splice
+        seqlv.splice
+        comblv.splice
+        zv.splice
+        def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
         def apply(node: WorkstealingTreeScheduler.Node[(K, V), S], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashMapStealer[K, V]]
@@ -83,6 +86,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
       import parallel.workstealing.ResultCell
 
       lv.splice
+      mv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
 
@@ -390,6 +394,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
       val kernel = new Hashes.HashMapKernel[K, V, Option[(K, V)]] {
+        lv.splice
         def zero = None
         def combine(a: Option[(K, V)], b: Option[(K, V)]) = if (a.isDefined) a else b
         def apply(node: Node[(K, V), Option[(K, V)]], from: Int, until: Int) = {
@@ -462,7 +467,10 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.parallel.workstealing.Hashes.HashSetKernel[T, S] {
-        def zero = z.splice
+        seqlv.splice
+        comblv.splice
+        zv.splice
+        def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
         def apply(node: WorkstealingTreeScheduler.Node[T, S], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashSetStealer[T]]
@@ -482,6 +490,62 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
 
     c.inlineAndReset(result)
   }
+
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(pred: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[T]] = {
+    import c.universe._
+
+    val (predv, predg) = c.nonFunctionToLocal[T => Boolean](pred)
+    val calleeExpression = c.Expr[Hashes.HashSetOps[T]](c.applyPrefix)
+    val result = reify {
+      import scala._
+      import collection.parallel
+      import parallel._
+      import workstealing._
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+      val kernel = new scala.collection.parallel.workstealing.Hashes.HashSetKernel[T, Option[T]] {
+        predv.splice
+        def zero = None
+        def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
+        def apply(node: WorkstealingTreeScheduler.Node[T, Option[T]], from: Int, until: Int) = {
+          val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashSetStealer[T]]
+          val table = stealer.table
+          var i = from
+          while (i < until && (table(i) == null|| !predg.splice(table(i).asInstanceOf[T]))) {
+            i += 1
+          }
+          if(i < until) Some(table(i).asInstanceOf[T])
+          else None
+        }
+      }
+      ctx.splice.invokeParallelOperation(stealer, kernel)
+    }
+
+    c.inlineAndReset(result)
+  }
+
+
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val np = reify {
+      (x: T) => !p.splice(x)
+    }
+    val found = find[T, T](c)(np)(ctx)
+    reify {
+      found.splice.isEmpty
+    }
+  }
+
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+    import c.universe._
+
+    val found = find[T, U](c)(p)(ctx)
+    reify {
+      found.splice.nonEmpty
+    }
+  }
+
 
   def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: 
 c.Expr[Hashes.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): 
@@ -616,6 +680,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
       import parallel.workstealing.ResultCell
 
       lv.splice
+      mv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
 
