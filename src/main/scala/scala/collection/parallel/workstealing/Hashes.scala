@@ -27,7 +27,13 @@ object Hashes {
       def apply() = new HashMapMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
     implicit def hashMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
-      def apply(pa: Par[HashMap[K, V]]) = ???
+      def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K,V)] {
+      def iterator: Iterator[(K, V)] = pa.seq.iterator
+
+      def splitter: Splitter[(K, V)] = ???
+
+      def stealer: Stealer[(K,V)] = pa.stealer
+      }
     }
     implicit def hashSetOps[T](a: Par[HashSet[T]]) = new Hashes.HashSetOps(a)
     implicit def canMergeHashSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
@@ -39,7 +45,13 @@ object Hashes {
       def apply() = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
     implicit def hashSetIsReducable[T] = new IsReducable[HashSet[T], T] {
-      def apply(pa: Par[HashSet[T]]) = ???
+      def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
+      def iterator: Iterator[T] = pa.seq.iterator
+
+      def splitter: Splitter[T] = ???
+
+      def stealer: Stealer[T] = pa.stealer
+      }
     }
   }
 
