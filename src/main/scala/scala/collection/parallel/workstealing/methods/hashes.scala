@@ -707,8 +707,9 @@ WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
            var i = from
            if(cmb.isEmpty) {
              while(i < until && table(i) == null)  i += 1
-             if(i < until) cmb.result = mop.splice(table(i).asInstanceOf[T])
+             if(i < until) { cmb.result = mop.splice(table(i).asInstanceOf[T]); i = i + 1;}
             }
+
            while (i < until) {
              var current = table(i)
              if (current != null) cmb.result = op.splice(cmb.result, mop.splice(table(i).asInstanceOf[T]))
