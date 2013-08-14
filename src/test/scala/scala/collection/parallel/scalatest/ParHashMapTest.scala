@@ -98,7 +98,6 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
   }
 
   test("max") {
-
     val rt = (r: Range) => maxSequential(HashMap(r zip r: _*))
     val ht = (h: HashMap[Int, Int]) => maxParallel(h)
 
@@ -163,6 +162,31 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
       a => forallSmallerParallel(a, a.last._1)
     }
   }
+
+  test("filter") {
+    testOperation(comparison = hashMapComparison[Int, Int]) {
+      r => filterCosSequential(createHashMap(r))
+    } {
+      a => filterCosParallel(a)
+    }
+  }
+
+  test("flatMap") {
+    testOperation(comparison = hashMapComparison[Int, Int]) {
+      r =>  flatMapSequential(createHashMap(r))
+    } {
+      a => flatMapParallel(a)
+    }
+  }
+
+  test("mapReduce") {
+    testOperation() {
+      r => mapReduceSequential(createHashMap(r))
+    } {
+      a => mapReduceParallel(a)
+    }
+  }
+
 
 }
 

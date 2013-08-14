@@ -15,12 +15,14 @@ import scala.collection.immutable.HashSet
 
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
+  val TEST_AS_REDUCABLE = false
+
   def testForSizes(method: Range => Unit) {
 
     for (i <- 1 to 20000) {
       method(0 to 357)
     }
-/*
+
     for (i <- 1 to 20000) {
       method(0 to 45)
     }
@@ -66,7 +68,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       method(0 to i)
       method(i to 0 by -1)
     }
- */
+ 
   }
 
   def targetCollections(r: Range) = Seq(
@@ -78,7 +80,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     for (i <- r) hm += i
     hm
   }
-/*
+
   test("aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
     val ht = (h: HashSet[Int]) => {
@@ -97,15 +99,67 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
+  if(TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
+    val rt = (r: Range) => r.toSeq
+    val ht = (h: HashSet[Int]) => {
+      
+      collection.parallel.workstealing.TreeStealer.debug.clear()
+      collection.parallel.workstealing.TreeStealer.debug(hashSetPrettyStrin(gh))
+      val r = aggregateReducableUnion(h)
+      //println("-------------------------------")
+      r.toSeq.sorted
+    }
+    try {
+      testOperation(comparison = seqComparison[Int])(rt)(ht)
+    } catch {
+      case t: Throwable =>
+        collection.parallel.workstealing.TreeStealer.debug.print()
+        throw t
+    }
+  }
+
+  if(TEST_AS_REDUCABLE) test("Reducable.aggregate") {
+    val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
+    val ht = (h: HashSet[Int]) => {
+      //printHashSet(h)
+      collection.parallel.workstealing.TreeStealer.debug.clear()
+      val r = aggregateReducable(h)
+      //println("-------------------------------")
+      r
+    }
+    try {
+      testOperation()(rt)(ht)
+    } catch {
+      case t: Throwable =>
+        collection.parallel.workstealing.TreeStealer.debug.print()
+        throw t
+    }
+  }
+
   test("map") {
     val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
     val ht = (hs: HashSet[Int]) => mapParallel(hs)
     testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
  }
 
+  if(TEST_AS_REDUCABLE) test("Reducable.map") {
+    val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
+    val ht = (hs: HashSet[Int]) => mapReducable(hs).toSet.toPar
+    testOperation(comparison = seqComparisonhashTrieSetComparison[Int])(rt)(ht)
+ }
+
   test("reduce") {
     val rt = (r: Range) => r.reduce(_ + _)
     val at = (a: HashSet[Int]) => reduceParallel(a)
+    intercept[UnsupportedOperationException] {
+      testOperationForSize(0 until 0)(rt)(at)
+    }
+    testOperation(testEmpty = false)(rt)(at)
+  }
+
+  if(TEST_AS_REDUCABLE) test("Reducable.reduce") {
+    val rt = (r: Range) => r.reduce(_ + _)
+    val at = (a: HashSet[Int]) => reduceReducable(a)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(at)
     }
@@ -248,14 +302,14 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => findParallel(a, 1)
     }
   }
- */
 
-  test("Reducable.find") {
-/*    testOperation() {
+
+  if(TEST_AS_REDUCABLE) test("Reducable.find") {
+    testOperation() {
       r => None
     } {
       a => findReducable(a, Int.MaxValue)
-    }*/
+    }
     testOperation() {
       r => Some(1)
     } {
@@ -272,7 +326,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-/*
+
   test("exists") {
     testOperation() {
       r => createHashSet(r).exists(x => x == Int.MaxValue)
@@ -286,7 +340,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
  
-  test("Reducable.exists") {
+  if(TEST_AS_REDUCABLE) test("Reducable.exists") {
     testOperation() {
       r => createHashSet(r).exists(x => x == Int.MaxValue)
     } {
@@ -313,7 +367,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  test("Reducable.forall") {
+  if(TEST_AS_REDUCABLE) test("Reducable.forall") {
     testOperation() {
       r => r.forall(_ < Int.MaxValue)
     } {
@@ -325,8 +379,8 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => forallSmallerReducable(a, a.last)
     }
   }
- */
 
+   
 }
 
 

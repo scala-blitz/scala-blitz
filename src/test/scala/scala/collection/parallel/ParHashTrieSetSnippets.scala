@@ -25,9 +25,15 @@ trait ParHashTrieSetSnippets {
 
   def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(0)(_ + _)(_ + _)
 
+  def aggregateReducable(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(hm.toPar).aggregate(0)(_ + _)(_ + _)
+
   def reduceSequential(a: HashSet[Int]) = aggregateSequential(a)
 
   def reduceParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.reduce(_ + _)
+
+  def reduceReducable(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).reduce(_ + _)
+
+
 
 
 
@@ -43,8 +49,9 @@ trait ParHashTrieSetSnippets {
     }
     sum
   }
-
+  
   def aggregateParallelUnion(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(new HashSet[Int])(_ ++ _)(_ + _)
+  def aggregateReducableUnion(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(hm.toPar).aggregate(new HashSet[Int])(_ ++ _)(_ + _)
 
   def mapSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -57,6 +64,8 @@ trait ParHashTrieSetSnippets {
   }
 
   def mapParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.map(_ * 2)
+
+  def mapReducable(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(hm.toPar).map(_ * 2)
 
   def foldProductSequential(a: HashSet[Int]) = {
     val it = a.iterator
@@ -136,6 +145,28 @@ trait ParHashTrieSetSnippets {
   def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.forall(x => x < elem)
 
   def forallSmallerReducable(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).forall(x => x < elem)
+
+  val other = List(2, 3)
+
+  def flatMapSequential(hs: HashSet[Int]) = {
+    val ib = new SimpleBuffer[Int]
+    val it = hs.iterator
+    while (it.hasNext) {
+      val elem = it.next
+      other.foreach(y => ib.pushback(elem * y))
+    }
+    ib.narr
+  }
+
+  def flatMapParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = {
+    val pa = a.toPar
+    for {
+      x <- pa
+      y <- other
+    } yield {
+      x * y
+    }: @unchecked
+  }
 
 }
 

@@ -140,6 +140,42 @@ trait ParHashSetSnippets {
   def existsParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.exists(x => x == elem)
 
   def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.forall(x => x < elem)
+
+  val other = List(2, 3)
+
+  def flatMapSequential(hs: HashSet[Int]) = {
+    val ib = new SimpleBuffer[Int]
+    val it = hs.iterator
+    while (it.hasNext) {
+      val elem = it.next
+      other.foreach(y => ib.pushback(elem * y))
+    }
+    ib.narr
+  }
+
+  def flatMapParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = {
+    val pa = a.toPar
+    for {
+      x <- pa
+      y <- other
+    } yield {
+      x * y
+    }: @unchecked
+  }
+
+  def filterMod3Sequential(hs: HashSet[Int]) = {
+    val ib = new SimpleBuffer[Int]
+    val it = hs.iterator
+    while (it.hasNext) {
+      val elem = it.next
+      if (elem % 3 == 0) ib.pushback(elem)
+    }
+    ib.narr
+  }
+
+  def filterMod3Parallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(_ % 3 == 0)
+
+
 }
 
 
