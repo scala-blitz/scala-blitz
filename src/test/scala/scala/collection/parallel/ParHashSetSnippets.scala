@@ -37,8 +37,6 @@ trait ParHashSetSnippets {
   }
 
   def mapParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.map(_ * 2)
-
- 
   def reduceSequential(a: HashSet[Int]) = aggregateSequential(a)
 
   def reduceParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.reduce(_ + _)
@@ -100,7 +98,7 @@ trait ParHashSetSnippets {
     var count = 0
     while (it.hasNext) {
       val el = it.next
-      if ((el * el) % 3 == 1) { count += 1 }
+      if ((el * el) % 3 == 0) { count += 1 }
     }
     count
   }
@@ -142,7 +140,6 @@ trait ParHashSetSnippets {
   def existsParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.exists(x => x == elem)
 
   def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.forall(x => x < elem)
- 
 }
 
 

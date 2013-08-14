@@ -44,6 +44,10 @@ class ParHashTrieSetBench extends PerformanceTest.Regression with Serializable w
       using(hashTrieSets(small)) curve("Sequential") in mapSequential
       using(withSchedulers(hashTrieSets(small))) curve("Par") in { t => mapParallel(t._1)(t._2) }
     }
+    measure method "mapReduce" in {
+      using(hashTrieSets(normal)) curve("Sequential") in mapReduceSequential
+      using(withSchedulers(hashTrieSets(normal))) curve("Par") in { t => mapReduceParallel(t._1)(t._2) }
+    }
 
   }
 

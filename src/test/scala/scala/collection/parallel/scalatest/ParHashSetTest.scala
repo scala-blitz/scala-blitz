@@ -59,13 +59,11 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     val ht = (h: HashSet[Int]) => aggregateReducable(h)
     testOperation()(rt)(ht)
   }
-
   test("map") {
     val rt = (r: Range) => HashSet[Int](r: _*).map((x: Int) => x * 2)
     val ht = (hs: HashSet[Int]) => mapParallel(hs)
     testOperation(comparison = hashSetComparison[Int])(rt)(ht)
   }
-
   test("reduce") {
     val rt = (r: Range) => r.reduce(_ + _)
     val at = (a: HashSet[Int]) => reduceParallel(a)
@@ -172,9 +170,9 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
 
   test("count") {
     testOperation() {
-      r => r.count(_ % 2 == 0)
+      r => countSquareMod3Sequential(createHashSet(r))
     } {
-      a => countParallel(a)
+      a => countSquareMod3Parallel(a)
     }
   }
 
@@ -269,6 +267,30 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     }
   }
 
+
+  test("filter") {
+    testOperation(comparison = hashSetComparison[Int]) {
+      r => HashSet() ++= r.filter(_ % 3 == 0)
+    } {
+      a => filterMod3Parallel(a)
+    }
+  }
+
+  test("flatMap") {
+    testOperation(comparison = hashSetComparison[Int]) {
+      r => HashSet() ++= (for (x <- r; y <- other) yield x * y)
+    } {
+      a => flatMapParallel(a)
+    }
+  }
+
+  test("mapReduce") {
+    testOperation() {
+      r => r.map(_ + 1).reduce(_ + _)
+    } {
+      a => mapReduceParallel(a)
+    }
+  }
 
 }
 
