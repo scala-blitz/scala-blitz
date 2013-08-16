@@ -49,6 +49,7 @@ object Reducables {
     def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler): That = macro methods.ReducablesMacros.map[T, S, That, Repr]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.flatMap[T, S, That, Repr]
     def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.filter[T, That, Repr]
+    def groupMapAggregate[K, M](gr:T => K)(mp:T => M)(aggr:(M,M) => M)(implicit kClassTag:ClassTag[K], mClassTag:ClassTag[M],  ctx: WorkstealingTreeScheduler) = macro methods.ReducablesMacros.groupMapAggregate[T, K, M, Repr]
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]] {
