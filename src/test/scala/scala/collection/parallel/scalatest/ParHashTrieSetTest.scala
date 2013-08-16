@@ -96,13 +96,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
   }
 
-  test("groupMapAggregate") {
-    testOperation(comparison = hashMapComparison[Int,Int]) { 
-      r => scala.collection.mutable.HashMap()++r.groupBy(x=>x%15).map(x=>(x._1,x._2.sum))
-    } {
-      p => p.toPar.groupMapAggregate(x=>x%15)(x=>x)(_+_)
-    }
-  }
+
 
 }
 
