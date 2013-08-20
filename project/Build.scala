@@ -33,6 +33,7 @@ object WorkstealingBuild extends Build {
     "java-command",
     "Creates a java vm command for launching a process."
   )
+  
   val javaCommandSetting = javaCommand <<= (
     dependencyClasspath in Compile,
     artifactPath in (Compile, packageBin),
