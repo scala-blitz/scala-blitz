@@ -16,6 +16,11 @@ object Mandelbrot {
     val pixels = new Array[Int](4000 * 4000)
 
     def parallelism = 8
+    def threshold = 10000
+    def xlo = -0.60
+    def ylo = -0.60
+    def xhi = +0.01
+    def yhi = +0.01
 
     private def compute(xc: Double, yc: Double, threshold: Int): Int = {
       var i = 0
@@ -35,11 +40,6 @@ object Mandelbrot {
   
     private def fill(pixels: Array[Int], size: Int)(implicit ws: workstealing.WorkstealingTreeScheduler) {
       val range = 0 until (size * size)
-      val xlo = -2.0
-      val ylo = -2.0
-      val xhi = +2.0
-      val yhi = +2.0
-      val threshold = 10000
   
       for (idx <- range.toPar) {
         val x = idx % size
@@ -47,14 +47,22 @@ object Mandelbrot {
         val xc = xlo + (xhi - xlo) * x / size
         val yc = ylo + (yhi - ylo) * y / size
   
-        pixels(idx) = compute(xc, yc, threshold)
+        val iters = compute(xc, yc, threshold)
+        if (iters == threshold) pixels(idx) = 255 << 24
+        else {
+          val a = 255 << 24
+          val r = (0.4 * iters / threshold * 255).toInt << 16
+          val g = (1.0 * iters / threshold * 255).toInt << 8
+          val b = (2.0 * iters / threshold * 127).toInt << 0
+          pixels(idx) = a | r | g | b
+        }
       }
     }
 
     override def paintComponent(g: Graphics) {
       super.paintComponent(g)
 
-      val size = math.min(getHeight, getWidth)
+      val size = math.min(getWidth, getHeight)
       val conf = new workstealing.WorkstealingTreeScheduler.Config.Default(parallelism)
       implicit val s = new workstealing.WorkstealingTreeScheduler.ForkJoin(conf)
       val start = System.nanoTime
@@ -65,7 +73,15 @@ object Mandelbrot {
       println("Rendering: " + stats)
       frame.setTitle("Mandelbrot: " + stats)
 
-
+      val img = new image.BufferedImage(size, size, image.BufferedImage.TYPE_INT_ARGB)
+      //val raster = img.getData().asInstanceOf[image.WritableRaster]
+      //raster.setPixels(0, 0, size, size, pixels)
+      for (x <- 0 until size; y <- 0 until size) {
+        val color = pixels(y * size + x)
+        img.setRGB(x, y, color)
+      }
+      g.drawImage(img, 0, 0, null)
+      javax.imageio.ImageIO.write(img, "png", new java.io.File("mandelbrot.png"))
     }
   }
 
