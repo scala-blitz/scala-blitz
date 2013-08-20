@@ -15,12 +15,12 @@ object Mandelbrot {
   class MandelCanvas(frame: MandelFrame) extends JComponent {
     val pixels = new Array[Int](4000 * 4000)
 
-    def parallelism = 8
-    def threshold = 10000
-    def xlo = -0.60
-    def ylo = -0.60
-    def xhi = +0.01
-    def yhi = +0.01
+    def parallelism = 1
+    def threshold = 1000
+    def xlo = -1.00
+    def ylo = +0.40
+    def xhi = -0.60
+    def yhi = +0.80
 
     private def compute(xc: Double, yc: Double, threshold: Int): Int = {
       var i = 0
@@ -48,14 +48,11 @@ object Mandelbrot {
         val yc = ylo + (yhi - ylo) * y / size
   
         val iters = compute(xc, yc, threshold)
-        if (iters == threshold) pixels(idx) = 255 << 24
-        else {
-          val a = 255 << 24
-          val r = (0.4 * iters / threshold * 255).toInt << 16
-          val g = (1.0 * iters / threshold * 255).toInt << 8
-          val b = (2.0 * iters / threshold * 127).toInt << 0
-          pixels(idx) = a | r | g | b
-        }
+        val a = 255 << 24
+        val r = math.min(255, 1.0 * iters / threshold * 255).toInt << 16
+        val g = math.min(255, 2.0 * iters / threshold * 255).toInt << 8
+        val b = math.min(255, 3.0 * iters / threshold * 255).toInt << 0
+        pixels(idx) = a | r | g | b
       }
     }
 
