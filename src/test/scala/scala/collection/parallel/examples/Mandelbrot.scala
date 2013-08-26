@@ -147,7 +147,7 @@ object Mandelbrot {
         img.setRGB(x, y, color)
       }
       g.drawImage(img, 0, 0, null)
-      javax.imageio.ImageIO.write(img, "png", new java.io.File("mandelbrot.png"))
+      //javax.imageio.ImageIO.write(img, "png", new java.io.File("mandelbrot.png"))
     }
   }
 
