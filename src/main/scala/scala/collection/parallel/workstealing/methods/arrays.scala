@@ -353,6 +353,29 @@ object ArraysMacros {
     }
   }
 
+  def accumulate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(merger: c.Expr[Merger[T, S]])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
+    import c.universe._
+
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Arrays.Ops[T]](c.applyPrefix), "callee")
+    val tkernel = transformerKernel[T, T, S](c)(callee, merger, reify {
+      (merger: Merger[T, S], elem: T) => merger += elem
+    })
+
+    val operation = reify {
+      import scala.collection.parallel._
+      import scala.collection.parallel.workstealing.Arrays
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      cv.splice
+      val stealer = callee.splice.stealer
+      val kernel = tkernel.splice
+      val merger = ctx.splice.invokeParallelOperation(stealer, kernel)
+      merger.result
+    }
+
+    c.inlineAndReset(operation)
+  }
+
   def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[Array[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._
 

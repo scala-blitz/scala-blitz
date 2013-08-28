@@ -48,44 +48,43 @@ object BarnesHut {
     }
   }
 
-  class Boundaries {
-    var minX = Double.NaN
-    var minY = Double.NaN
-    var maxX = Double.NaN
-    var maxY = Double.NaN
+  val debug = new java.util.concurrent.ConcurrentLinkedQueue[Body]
+
+  class Boundaries extends Accumulator[Body, Boundaries] {
+    var minX = Double.MaxValue
+    var minY = Double.MaxValue
+    var maxX = Double.MinValue
+    var maxY = Double.MinValue
 
     def width = maxX - minX
 
     def height = maxY - minY
 
-    private def isNaN(v: Double) = java.lang.Double.isNaN(v)
-
-    def combine(that: Boundaries) = {
-      def min(x: Double, y: Double) = {
-        if (isNaN(x)) y
-        else if (isNaN(y)) x
-        else math.min(x, y)
-      }
-      def max(x: Double, y: Double) = {
-        if (isNaN(x)) y
-        else if (isNaN(y)) x
-        else math.max(x, y)
-      }
+    def merge(that: Boundaries) = if (this eq that) this else {
       val res = new Boundaries
-      res.minX = min(this.minX, that.minX)
-      res.minY = min(this.minY, that.minY)
-      res.maxX = max(this.maxX, that.maxX)
-      res.maxY = max(this.maxY, that.maxY)
+      res.minX = math.min(this.minX, that.minX)
+      res.minY = math.min(this.minY, that.minY)
+      res.maxX = math.max(this.maxX, that.maxX)
+      res.maxY = math.max(this.maxY, that.maxY)
       res
     }
 
-    def update(b: Body) = {
-      minX = if (isNaN(minX)) b.x else math.min(b.x, minX)
-      minY = if (isNaN(minY)) b.y else math.min(b.y, minY)
-      maxX = if (isNaN(maxX)) b.x else math.max(b.x, maxX)
-      maxY = if (isNaN(maxY)) b.y else math.max(b.y, maxY)
+    def +=(b: Body) = {
+      minX = math.min(b.x, minX)
+      minY = math.min(b.y, minY)
+      maxX = math.max(b.x, maxX)
+      maxY = math.max(b.y, maxY)
       this
     }
+
+    def clear() {
+      minX = Double.MaxValue
+      minY = Double.MaxValue
+      maxX = Double.MinValue
+      maxY = Double.MinValue
+    }
+
+    def result = this
 
     def centerX = (minX + maxX) / 2
 
@@ -98,23 +97,19 @@ object BarnesHut {
 
   def totalBodies = 2000000
 
-  def sectorPrecision = 16
-
-  def width = 1000
-
-  def height = 1000
+  def sectorPrecision = 4
 
   def init() {
-    updateScheduler()
-    updateBodies()
+    initScheduler()
+    initBodies()
   }
 
-  def updateBodies() {
+  def initBodies() {
     bodies = new Array(totalBodies)
     for (i <- 0 until bodies.length) {
       val b = new Body(i)
-      b.x = math.random * width
-      b.y = math.random * height
+      b.x = math.random * 1000
+      b.y = math.random * 1000
       b.xspeed = math.random - 0.5
       b.yspeed = math.random - 0.5
       b.mass = 0.1 + math.random
@@ -122,26 +117,19 @@ object BarnesHut {
     }
   }
 
-  def updateScheduler() {
-    var conf = new workstealing.WorkstealingTreeScheduler.Config.Default(parallelism)
+  def initScheduler() {
+    val conf = new workstealing.WorkstealingTreeScheduler.Config.Default(parallelism)
     scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin(conf)
   }
 
   def step()(implicit s: workstealing.WorkstealingTreeScheduler) {
     def constructTree(): Quad = {
       // compute center and boundaries
-      boundaries = bodies.toPar.aggregate(new Boundaries)(_ combine _) {
-        (bs, b) => bs.update(b)
-      }
+      boundaries = bodies.toPar.accumulate(new Boundaries)
       val centerX = boundaries.centerX
       val centerY = boundaries.centerY
 
-      // group bodies into sectors
-      //val sectors = new Array[Body](sectorPrecision * sectorPrecision)
-
       // create a tree for each sector
-
-      // merge quad tree
 
       null
     }
@@ -178,7 +166,8 @@ object BarnesHut {
       val pixels = new Array[Int](4000 * 4000)
       override def paintComponent(g: Graphics) {
         super.paintComponent(g)
-        
+        val width = getWidth
+        val height = getHeight
         if (boundaries != null) {
           val img = new image.BufferedImage(width, height, image.BufferedImage.TYPE_INT_ARGB)
           for (x <- 0 until width; y <- 0 until height) pixels(y * width + x) = 0
