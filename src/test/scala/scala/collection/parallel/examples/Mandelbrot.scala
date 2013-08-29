@@ -108,6 +108,8 @@ object Mandelbrot {
         val b = math.min(255, 3.0 * iters / threshold * 255).toInt << 0
         pixels(idx) = a | r | g | b
       }
+
+      fj.environment.shutdown()
     }
 
     private def fillWsTree(pixels: Array[Int], wdt: Int, hgt: Int) {
@@ -128,6 +130,8 @@ object Mandelbrot {
         val b = math.min(255, 3.0 * iters / threshold * 255).toInt << 0
         pixels(idx) = a | r | g | b
       }
+
+      s.pool.shutdown()
     }
 
     override def paintComponent(g: Graphics) {

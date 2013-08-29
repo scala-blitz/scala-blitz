@@ -5,7 +5,8 @@ package scala.collection.parallel.examples
 import scala.collection.parallel._
 import scala.collection.parallel.Par._
 import scala.collection.parallel.workstealing.Ops._
-import scala.collection.mutable.HashSet
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 import java.awt._
 import java.awt.event._
 import javax.swing._
@@ -15,50 +16,112 @@ import javax.swing.event._
 
 object BarnesHut {
 
-  var bodies: Array[Body] = _
+  var bodies: Array[Quad.Body] = _
   var scheduler: workstealing.WorkstealingTreeScheduler = _
   var boundaries: Boundaries = _
-
-  case class Body(val id: Int) {
-    var x: Double = _
-    var y: Double = _
-    var xspeed: Double = _
-    var yspeed: Double = _
-    var mass: Double = _
-  }
+  var quadtree: Quad = _
 
   sealed trait Quad {
-    def massX: Double
-    def massY: Double
-    def mass: Double
+    def massX: Float
+    def massY: Float
+    def mass: Float
+    def total: Int
+
+    def update(fromx: Float, fromy: Float, sz: Float, b: Quad.Body): Quad
   }
 
   object Quad {
-    case class Fork(centerX: Double, centerY: Double, size: Double, nw: Quad, ne: Quad, sw: Quad, se: Quad)
-    extends Quad {
-      var massX: Double = _
-      var massY: Double = _
-      var mass: Double = _
+    case class Body(val id: Int) extends Quad {
+      var x: Float = _
+      var y: Float = _
+      var xspeed: Float = _
+      var yspeed: Float = _
+      var mass: Float = _
+  
+      def massX = x
+      def massY = y
+      def total = 1
+  
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = {
+        val cx = fromx + sz / 2
+        val cy = fromy + sz / 2
+        val fork = new Fork(cx, cy, sz)(Empty, Empty, Empty, Empty)
+        fork.update(fromx, fromy, sz, this).update(fromx, fromy, sz, b)
+      }
+
+      def updatePosition(quad: Quad) {
+        var netforcex = 0.0f
+        var netforcey = 0.0f
+
+        def traverse(quad: Quad): Unit = quad match {
+          case f @ Fork(cx, cy, sz) =>
+            // TODO
+          case Body(id) =>
+            // TODO
+          case Empty =>
+            // no force
+        }
+
+        xspeed += netforcex / mass * delta
+        yspeed += netforcey / mass * delta
+        x += xspeed * delta
+        y += yspeed * delta
+      }
     }
-    case class Leaf(body: Body)
+
+    case object Empty extends Quad {
+      def massX = 0.0f
+      def massY = 0.0f
+      def mass = 0.0f
+      def total = 0
+
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = b
+    }
+  
+    case class Fork(val centerX: Float, val centerY: Float, val size: Float)(var nw: Quad, var ne: Quad, var sw: Quad, var se: Quad)
     extends Quad {
-      def massX = body.x
-      def massY = body.y
-      def mass = body.mass
+      var massX: Float = _
+      var massY: Float = _
+      var mass: Float = _
+
+      def total = nw.total + ne.total + sw.total + se.total
+
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = {
+        val hsz = sz / 2
+        if (b.x < centerX) {
+          if (b.y < centerY) nw = nw.update(fromx, fromy, hsz, b)
+          else sw = sw.update(fromx, centerY, hsz, b)
+        } else {
+          if (b.y < centerY) ne = ne.update(centerX, fromy, hsz, b)
+          else se = se.update(centerX, centerY, hsz, b)
+        }
+
+        updateStats()
+
+        this
+      }
+
+      def updateStats() {
+        mass = nw.mass + sw.mass + ne.mass + se.mass
+        massX = (nw.mass * nw.massX + sw.mass * sw.massX + ne.mass * ne.massX + se.mass * se.massX) / mass
+        massY = (nw.mass * nw.massY + sw.mass * sw.massY + ne.mass * ne.massY + se.mass * se.massY) / mass
+      }
     }
   }
 
-  val debug = new java.util.concurrent.ConcurrentLinkedQueue[Body]
+  val debug = new java.util.concurrent.ConcurrentLinkedQueue[Quad.Body]
 
-  class Boundaries extends Accumulator[Body, Boundaries] {
-    var minX = Double.MaxValue
-    var minY = Double.MaxValue
-    var maxX = Double.MinValue
-    var maxY = Double.MinValue
+  class Boundaries extends Accumulator[Quad.Body, Boundaries] {
+    var minX = Float.MaxValue
+    var minY = Float.MaxValue
+    var maxX = Float.MinValue
+    var maxY = Float.MinValue
 
     def width = maxX - minX
 
     def height = maxY - minY
+
+    def size = math.max(width, height)
 
     def merge(that: Boundaries) = if (this eq that) this else {
       val res = new Boundaries
@@ -69,7 +132,7 @@ object BarnesHut {
       res
     }
 
-    def +=(b: Body) = {
+    def +=(b: Quad.Body) = {
       minX = math.min(b.x, minX)
       minY = math.min(b.y, minY)
       maxX = math.max(b.x, maxX)
@@ -78,26 +141,101 @@ object BarnesHut {
     }
 
     def clear() {
-      minX = Double.MaxValue
-      minY = Double.MaxValue
-      maxX = Double.MinValue
-      maxY = Double.MinValue
+      minX = Float.MaxValue
+      minY = Float.MaxValue
+      maxX = Float.MinValue
+      maxY = Float.MinValue
     }
-
-    def result = this
-
-    def centerX = (minX + maxX) / 2
-
-    def centerY = (minY + maxY) / 2
 
     override def toString = s"Boundaries($minX, $minY, $maxX, $maxY)"
   }
 
+  object Sectors {
+    def apply[T <: AnyRef: ClassTag](b: Boundaries)(init: () => T)(comb: (T, T) => T)(op: (T, Quad.Body) => Unit) = {
+      val s = new Sectors(b)(comb)(op)
+      for (x <- 0 until sectorPrecision; y <- 0 until sectorPrecision) s.matrix(y * sectorPrecision + x) = init()
+      s
+    }
+  }
+
+  class Sectors[T <: AnyRef: ClassTag](val boundaries: Boundaries)(val comb: (T, T) => T)(val op: (T, Quad.Body) => Unit)
+  extends Accumulator[Quad.Body, Sectors[T]] {
+    var matrix = new Array[T](sectorPrecision * sectorPrecision)
+
+    def merge(that: Sectors[T]) = {
+      val res = new Sectors(boundaries)(comb)(op)
+      for (x <- 0 until sectorPrecision; y <- 0 until sectorPrecision) {
+        val sid = y * sectorPrecision + x
+        res.matrix(sid) = comb(this.matrix(sid), that.matrix(sid))
+      }
+      res
+    }
+
+    def +=(b: Quad.Body) = {
+      val sx = math.min(sectorPrecision - 1, ((b.x - boundaries.minX) / (boundaries.width / sectorPrecision)).toInt)
+      val sy = math.min(sectorPrecision - 1, ((b.y - boundaries.minY) / (boundaries.height / sectorPrecision)).toInt)
+      val accum = matrix(sy * sectorPrecision + sx)
+      op(accum, b)
+      this
+    }
+
+    def clear() {
+      matrix = new Array(sectorPrecision * sectorPrecision)
+    }
+
+    override def toString = s"Sectors(${matrix.mkString(", ")})"
+  }
+
+  def toQuad(sectors: Sectors[Conc.Buffer[Quad.Body]])(implicit ctx: workstealing.WorkstealingTreeScheduler): Quad = {
+    val quads = sectors.matrix.zipWithIndex.toPar.map(bi => sectorToQuad(sectors.boundaries, bi._1, bi._2))
+    
+    // bind into a quad tree
+    var level = sectorPrecision
+    while (level > 1) {
+      val nextlevel = level / 2
+      for (qy <- 0 until nextlevel; qx <- 0 until nextlevel) {
+        val rx = qx * 2
+        val ry = qy * 2
+        val nw = quads.seq((ry + 0) * level + (rx + 0))
+        val ne = quads.seq((ry + 0) * level + (rx + 1))
+        val sw = quads.seq((ry + 1) * level + (rx + 0))
+        val se = quads.seq((ry + 1) * level + (rx + 1))
+        val size = boundaries.size / nextlevel
+        val centerX = boundaries.minX + size * (qx + 0.5f)
+        val centerY = boundaries.minY + size * (qy + 0.5f)
+        val fork = new Quad.Fork(centerX, centerY, size)(nw, ne, sw, se)
+        fork.updateStats()
+        quads.seq(qy * nextlevel + qx) = fork
+      }
+      level = nextlevel
+    }
+
+    quads.seq(0)
+  }
+
+  def sectorToQuad(boundaries: Boundaries, bs: Conc.Buffer[Quad.Body], sid: Int): Quad = {
+    val sx = sid % sectorPrecision
+    val sy = sid / sectorPrecision
+    val size = boundaries.size
+    val sectorSize = size / sectorPrecision
+    val fromX = boundaries.minX + sx * sectorSize
+    val fromY = boundaries.minY + sy * sectorSize
+    var quad: Quad = Quad.Empty
+
+    for (b <- bs.result) {
+      quad = quad.update(fromX, fromY, sectorSize, b)
+    }
+
+    quad
+  }
+
   def parallelism = Runtime.getRuntime.availableProcessors
 
-  def totalBodies = 2000000
+  def totalBodies = 400000
 
   def sectorPrecision = 4
+
+  def delta = 0.1f
 
   def init() {
     initScheduler()
@@ -107,12 +245,12 @@ object BarnesHut {
   def initBodies() {
     bodies = new Array(totalBodies)
     for (i <- 0 until bodies.length) {
-      val b = new Body(i)
-      b.x = math.random * 1000
-      b.y = math.random * 1000
-      b.xspeed = math.random - 0.5
-      b.yspeed = math.random - 0.5
-      b.mass = 0.1 + math.random
+      val b = new Quad.Body(i)
+      b.x = math.random.toFloat * 1000
+      b.y = math.random.toFloat * 1000
+      b.xspeed = math.random.toFloat - 0.5f
+      b.yspeed = math.random.toFloat - 0.5f
+      b.mass = 0.1f + math.random.toFloat
       bodies(i) = b
     }
   }
@@ -126,19 +264,21 @@ object BarnesHut {
     def constructTree(): Quad = {
       // compute center and boundaries
       boundaries = bodies.toPar.accumulate(new Boundaries)
-      val centerX = boundaries.centerX
-      val centerY = boundaries.centerY
 
-      // create a tree for each sector
+      // construct sectors
+      val sectors = bodies.toPar.accumulate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
+        _ += _
+      }))
 
-      null
+      // construct a quad tree for each sector
+      toQuad(sectors)
     }
 
     def updatePositions(quadtree: Quad) {
     }
 
     val startTime = System.nanoTime
-    val quadtree = constructTree()
+    quadtree = constructTree()
     updatePositions(quadtree)
     val endTime = System.nanoTime
     val totalTime = endTime - startTime
@@ -153,7 +293,15 @@ object BarnesHut {
     rightpanel.setBorder(BorderFactory.createEtchedBorder(border.EtchedBorder.LOWERED))
     add(rightpanel, BorderLayout.EAST)
     val controls = new JPanel
+    controls.setLayout(new GridLayout(0, 1))
     rightpanel.add(controls, BorderLayout.NORTH)
+    val quadcheckbox = new JCheckBox("Show quad")
+    quadcheckbox.addActionListener(new ActionListener {
+      def actionPerformed(e: ActionEvent) {
+        repaint()
+      }
+    })
+    controls.add(quadcheckbox)
     val stepbutton = new JButton("Step")
     stepbutton.addActionListener(new ActionListener {
       def actionPerformed(e: ActionEvent) {
@@ -182,6 +330,33 @@ object BarnesHut {
             val bound = math.min(255, intensity.toInt)
             val color = (255 << 24) | (bound << 16) | (bound << 8) | bound
             img.setRGB(x, y, color)
+          }
+          if (quadcheckbox.isSelected) {
+            val g = img.getGraphics.asInstanceOf[Graphics2D]
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g.setColor(new Color(0, 225, 80, 150))
+            def drawQuad(level: Int, quad: Quad): Unit = if (level < 6) quad match {
+              case f @ Quad.Fork(cx, cy, sz) =>
+                def drawRect(fx: Float, fy: Float, fsz: Float, q: Quad) {
+                  val x = ((fx - boundaries.minX) / boundaries.width * width).toInt
+                  val y = ((fy - boundaries.minY) / boundaries.height * height).toInt
+                  val w = ((fx + fsz - boundaries.minX) / boundaries.width * width).toInt - x
+                  val h = ((fy + fsz - boundaries.minY) / boundaries.height * height).toInt - y
+                  g.drawRect(x, y, w, h)
+                  if (level <= 3) g.drawString("#:" + q.total, x + w / 2, y + h / 2)
+                }
+                drawRect(cx - sz / 2, cy - sz / 2, sz / 2, f.nw)
+                drawRect(cx - sz / 2, cy, sz / 2, f.sw)
+                drawRect(cx, cy - sz / 2, sz / 2, f.ne)
+                drawRect(cx, cy, sz / 2, f.se)
+                drawQuad(level + 1, f.nw)
+                drawQuad(level + 1, f.ne)
+                drawQuad(level + 1, f.sw)
+                drawQuad(level + 1, f.se)
+              case Quad.Empty | Quad.Body(_) =>
+                // done
+            }
+            drawQuad(0, quadtree)
           }
           g.drawImage(img, 0, 0, null)
         }
