@@ -19,6 +19,8 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
   val small = 3000000
   val large = 30000000
 
+  val TEST_TRIES = false // we shouldn't benchmark TRIE based data structures as they still fail tests
+
   /* generators */
 
   val opts = Seq(
@@ -38,14 +40,30 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
     reports.regression.noiseMagnitude -> 0.75)
 
   implicit def range2Reducable(r: Range)(implicit ctx: workstealing.WorkstealingTreeScheduler): Reducable[Int] = par2zippable(r.toPar)
+  implicit def array2Reducable(a: Array[Int])(implicit ctx: workstealing.WorkstealingTreeScheduler): Reducable[Int] = par2zippable(a.toPar)
+
+  implicit def hashTrieSet2Reducable(a: collection.immutable.HashSet[Int])(implicit ctx: workstealing.WorkstealingTreeScheduler): Reducable[Int] = hashTrieSetIsReducable(a.toPar)
+  implicit def hashSet2Reducable(a: collection.mutable.HashSet[Int])(implicit ctx: workstealing.WorkstealingTreeScheduler): Reducable[Int] = hashSetIsReducable(a.toPar)
 
   /* benchmarks */
 
-  performance of "Reducable[Range]" config (opts: _*) in {
+  performance of "Reducables" config (opts: _*) in {
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
-      using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        mapReduceParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        mapReduceParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+        implicit val scheduler = t._2
+        mapReduceParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         mapReduceParallel(t._1)(t._2)
       }
@@ -53,7 +71,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential
-      using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        aggregateParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        aggregateParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+        implicit val scheduler = t._2
+        aggregateParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         aggregateParallel(t._1)(t._2)
       }
@@ -61,7 +91,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     measure method "find" in {
       using(ranges(large)) curve ("Sequential") in findNotExistingSequential
-      using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        findNotExistingParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        findNotExistingParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+        implicit val scheduler = t._2
+        findNotExistingParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         findNotExistingParallel(t._1)(t._2)
       }
@@ -69,7 +111,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     measure method "find(sin)" in {
       using(ranges(tiny)) curve ("Sequential") in findSinSequential
-      using(withSchedulers(ranges(tiny))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(tiny))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        findSinParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(tiny))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        findSinParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(tiny))) curve ("ParHashTrieSet") in { t =>
+        implicit val scheduler = t._2
+        findSinParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(tiny))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         findSinParallel(t._1)(t._2)
       }
@@ -77,7 +131,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     measure method "map(sqrt)" in {
       using(ranges(small)) curve ("Sequential") in mapSqrtSequential
-      using(withSchedulers(ranges(small))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(small))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        mapSqrtParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(small))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        mapSqrtParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(small))) curve ("ParHashTrieSets") in { t =>
+        implicit val scheduler = t._2
+        mapSqrtParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(small))) curve ("ParHashSets") in { t =>
         implicit val scheduler = t._2
         mapSqrtParallel(t._1)(t._2)
       }
@@ -85,7 +151,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
     measure method "flatMap" in {
       using(ranges(small)) curve ("Sequential") in flatMapSequential
-      using(withSchedulers(ranges(small))) curve ("Par") in { t =>
+      using(withSchedulers(ranges(small))) curve ("ParRange") in { t =>
+        implicit val scheduler = t._2
+        flatMapParallel(t._1)(t._2)
+      }
+      using(withSchedulers(arrays(small))) curve ("ParArray") in { t =>
+        implicit val scheduler = t._2
+        flatMapParallel(t._1)(t._2)
+      }
+      if (TEST_TRIES) using(withSchedulers(hashTrieSets(small))) curve ("ParHashTrieSet") in { t =>
+        implicit val scheduler = t._2
+        flatMapParallel(t._1)(t._2)
+      }
+      using(withSchedulers(hashSets(small))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         flatMapParallel(t._1)(t._2)
       }
@@ -95,7 +173,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method "reduce" in {
         using(ranges(large)) curve ("Sequential") in reduceSequential
-        using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+          implicit val scheduler = t._2
+          reduceParallel(t._1)
+        }
+        using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          reduceParallel(t._1)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+          implicit val scheduler = t._2
+          reduceParallel(t._1)
+        }
+        using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
           implicit val scheduler = t._2
           reduceParallel(t._1)
         }
@@ -103,17 +193,42 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method "fold" in {
         using(ranges(large)) curve ("Sequential") in foldSequential
-        using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
           implicit val scheduler = t._2
           foldParallel(t._1)(t._2)
         }
+        using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          foldParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSets") in { t =>
+          implicit val scheduler = t._2
+          foldParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(large))) curve ("ParHashSets") in { t =>
+          implicit val scheduler = t._2
+          foldParallel(t._1)(t._2)
+        }
+
       }
 
       measure method "filter(mod3)" config (
         exec.minWarmupRuns -> 80,
         exec.maxWarmupRuns -> 160) in {
           using(ranges(small)) curve ("Sequential") in filterMod3Sequential
-          using(withSchedulers(ranges(small))) curve ("Par") in { t =>
+          using(withSchedulers(ranges(small))) curve ("ParRange") in { t =>
+            implicit val scheduler = t._2
+            filterMod3Parallel(t._1)(t._2)
+          }
+          using(withSchedulers(arrays(small))) curve ("ParArray") in { t =>
+            implicit val scheduler = t._2
+            filterMod3Parallel(t._1)(t._2)
+          }
+          if (TEST_TRIES) using(withSchedulers(hashTrieSets(small))) curve ("ParHashTrieSets") in { t =>
+            implicit val scheduler = t._2
+            filterMod3Parallel(t._1)(t._2)
+          }
+        using(withSchedulers(hashSets(small))) curve ("ParHashSets") in { t =>
             implicit val scheduler = t._2
             filterMod3Parallel(t._1)(t._2)
           }
@@ -121,7 +236,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method "filter(cos)" in {
         using(ranges(tiny)) curve ("Sequential") in filterCosSequential
-        using(withSchedulers(ranges(tiny))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(tiny))) curve ("ParRange") in { t =>
+          implicit val scheduler = t._2
+          filterCosParallel(t._1)(t._2)
+        }
+        using(withSchedulers(arrays(tiny))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          filterCosParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(tiny))) curve ("ParHashTrieSets") in { t =>
+          implicit val scheduler = t._2
+          filterCosParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(tiny))) curve ("ParHashSets") in { t =>
           implicit val scheduler = t._2
           filterCosParallel(t._1)(t._2)
         }
@@ -129,7 +256,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method "foreach" in {
         using(ranges(small)) curve ("Sequential") in foreachSequential
-        using(withSchedulers(ranges(small))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(small))) curve ("ParRange") in { t =>
+          implicit val scheduler = t._2
+          foreachParallel(t._1)(t._2)
+        }
+        using(withSchedulers(arrays(small))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          foreachParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(small))) curve ("ParHashTrieSet") in { t =>
+          implicit val scheduler = t._2
+          foreachParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(small))) curve ("ParHashSet") in { t =>
           implicit val scheduler = t._2
           foreachParallel(t._1)(t._2)
         }
@@ -137,7 +276,19 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method ("sum") in {
         using(ranges(large)) curve ("Sequential") in sumSequential
-        using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+          implicit val scheduler = t._2
+          sumParallel(t._1)(t._2)
+        }
+        using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          sumParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+          implicit val scheduler = t._2
+          sumParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
           implicit val scheduler = t._2
           sumParallel(t._1)(t._2)
         }
@@ -145,15 +296,40 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
       measure method ("product") in {
         using(ranges(large)) curve ("Sequential") in productSequential
-        using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
           implicit val scheduler = t._2
           productParallel(t._1)(t._2)
         }
+        using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          productParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+          implicit val scheduler = t._2
+          productParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
+          implicit val scheduler = t._2
+          productParallel(t._1)(t._2)
+        }
+
       }
 
       measure method ("count(&1==0)") in {
         using(ranges(large)) curve ("Sequential") in countSequential
-        using(withSchedulers(ranges(large))) curve ("Par") in { t =>
+        using(withSchedulers(ranges(large))) curve ("ParRange") in { t =>
+          implicit val scheduler = t._2
+          countParallel(t._1)(t._2)
+        }
+        using(withSchedulers(arrays(large))) curve ("ParArray") in { t =>
+          implicit val scheduler = t._2
+          countParallel(t._1)(t._2)
+        }
+        if (TEST_TRIES) using(withSchedulers(hashTrieSets(large))) curve ("ParHashTrieSet") in { t =>
+          implicit val scheduler = t._2
+          countParallel(t._1)(t._2)
+        }
+        using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
           implicit val scheduler = t._2
           countParallel(t._1)(t._2)
         }
@@ -161,6 +337,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
     }
 
   }
+
 
 }
 
