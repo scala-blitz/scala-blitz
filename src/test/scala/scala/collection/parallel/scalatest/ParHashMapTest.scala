@@ -163,7 +163,7 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
     }
   }
 
-  test("filter") {
+  test("filter(cos)") {
     testOperation(comparison = hashMapComparison[Int, Int]) {
       r => filterCosSequential(createHashMap(r))
     } {
@@ -178,15 +178,5 @@ class ParHashMapTest extends FunSuite with Timeouts with Tests[HashMap[Int, Int]
       a => flatMapParallel(a)
     }
   }
-
-  test("mapReduce") {
-    testOperation() {
-      r => mapReduceSequential(createHashMap(r))
-    } {
-      a => mapReduceParallel(a)
-    }
-  }
-
-
 }
 

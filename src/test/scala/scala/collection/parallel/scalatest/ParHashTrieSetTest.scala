@@ -15,7 +15,7 @@ import scala.collection.immutable.HashSet
 
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
-  val TEST_AS_REDUCABLE = false
+  val TEST_AS_REDUCABLE = false // disabled, as tests are failing and breaking build. Should be enabled after rewriting stealers
 
   def testForSizes(method: Range => Unit) {
 
@@ -104,7 +104,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     val ht = (h: HashSet[Int]) => {
       
       collection.parallel.workstealing.TreeStealer.debug.clear()
-      collection.parallel.workstealing.TreeStealer.debug(hashSetPrettyStrin(gh))
+      collection.parallel.workstealing.TreeStealer.debug(hashSetPrettyString(h))
       val r = aggregateReducableUnion(h)
       //println("-------------------------------")
       r.toSeq.sorted
@@ -144,8 +144,8 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
 
   if(TEST_AS_REDUCABLE) test("Reducable.map") {
     val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
-    val ht = (hs: HashSet[Int]) => mapReducable(hs).toSet.toPar
-    testOperation(comparison = seqComparisonhashTrieSetComparison[Int])(rt)(ht)
+    val ht = (hs: HashSet[Int]) => (HashSet() ++ mapReducable(hs).seq).toPar
+    testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
  }
 
   test("reduce") {

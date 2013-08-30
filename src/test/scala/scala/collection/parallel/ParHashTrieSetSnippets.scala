@@ -65,6 +65,7 @@ trait ParHashTrieSetSnippets {
 
   def mapParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.map(_ * 2)
 
+
   def mapReducable(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(hm.toPar).map(_ * 2)
 
   def foldProductSequential(a: HashSet[Int]) = {
@@ -79,6 +80,7 @@ trait ParHashTrieSetSnippets {
   def foldProductParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.fold(1)(_ * _)
 
   def foldParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.fold(0)(_ + _)
+  def foldSequential(a: HashSet[Int]) = sumSequential(a)
 
   def sumSequential(a: HashSet[Int]) = {
     val it = a.iterator
@@ -135,6 +137,33 @@ trait ParHashTrieSetSnippets {
   }
 
   def findParallel(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = a.toPar.find(x => x == elem)
+
+  def filterMod3Parallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(x => x % 3 == 1)
+  def filterSinParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(x => math.sin(x) == 1)
+  def filterMod3Sequential(a: HashSet[Int]) = {
+    val b = new SimpleBuffer[Int]()
+    val it = a.iterator
+    while (it.hasNext) {
+      val el = it.next
+      if (el % 3 == 1) b.pushback(el)
+    }
+    b.narr  
+  }
+
+  def filterSinSequential(a: HashSet[Int]) = {
+    val b = new SimpleBuffer[Int]()
+    val it = a.iterator
+    while (it.hasNext) {
+      val el = it.next
+      if (math.sin(el)  == 1) b.pushback(el)
+    }
+    b.narr  
+  }
+
+  def findSequential(a: HashSet[Int], elem: Int) = a.find(x => x == elem)
+
+  def findSinSequential(a: HashSet[Int]) = a.find(x => math.sin(x) == 2)
+  def findSinParallel(a: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.find(x => math.sin(x) == 2)
 
   def findReducable(a: HashSet[Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(a.toPar).find(x => x == elem)
 
