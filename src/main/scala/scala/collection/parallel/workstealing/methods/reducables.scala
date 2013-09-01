@@ -366,17 +366,17 @@ object ReducablesMacros {
       cv.splice
       
       val stealer = callee.splice.stealer
-      val kernel = new Reducables.ReducableKernel[T, HashMapMerger[K, M]] {
-        override def beforeWorkOn(tree: Ref[T, HashMapMerger[K, M]], node: Node[T, HashMapMerger[K, M]]) {
+      val kernel = new Reducables.ReducableKernel[T, HashMapCombiningMerger[K, M]] {
+        override def beforeWorkOn(tree: Ref[T, HashMapCombiningMerger[K, M]], node: Node[T, HashMapCombiningMerger[K, M]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
         def zero = null
-        def combine(a: HashMapMerger[K, M], b: HashMapMerger[K, M]) =
+        def combine(a: HashMapCombiningMerger[K, M], b: HashMapCombiningMerger[K, M]) =
           if (a eq null) b
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[T, HashMapMerger[K, M]], elementsCount: Int) = {
+        def apply(node: Node[T, HashMapCombiningMerger[K, M]], elementsCount: Int) = {
           val merger = node.READ_INTERMEDIATE
           val stealer = node.stealer
           while (stealer.hasNext) {
