@@ -218,7 +218,7 @@ object ArraysMacros {
         new scala.collection.parallel.workstealing.Arrays.ArrayKernel[T, R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
-          def apply(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyerN.splice.apply(from, to, this, callee.array.seq)
+          def apply(node: WorkstealingTreeScheduler.Node[T, R], from: Int, to: Int) = applyerN.splice.apply(from, to, this, callee.array.seq)
         }
       ctx.splice.invokeParallelOperation(stealer, kernel)
     }
