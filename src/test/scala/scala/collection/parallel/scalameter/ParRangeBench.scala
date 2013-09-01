@@ -58,6 +58,11 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       }
     }
 
+    measure method "groupAggregate" in {
+      using(ranges(tiny)) curve ("Sequential") in {x=> x.groupBy(_%15).map{x=>(x._1,x._2.sum)}}
+      using(withSchedulers(ranges(tiny))) curve ("Par") in { t => groupMapAggregateParallel(t._1)(t._2)}
+    }
+
     measure method "find" in {
       using(ranges(large)) curve ("Sequential") in findNotExistingSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => findNotExistingParallel(t._1)(t._2) }

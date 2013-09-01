@@ -347,14 +347,14 @@ object ReducablesMacros {
     }
   }
 
-  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag: ClassTag, M: c.WeakTypeTag: ClassTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]) = {
+  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[WorkstealingTreeScheduler]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
     val (aggrv, aggrg) = c.nonFunctionToLocal[(M, M) => M](aggr)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify { Hashes.newHashMapMerger[K, M](implicitly[ClassTag[K]], implicitly[ClassTag[M]], ctx.splice) }
+    val mergerExpr = reify { Hashes.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
 
     reify {
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
@@ -364,8 +364,9 @@ object ReducablesMacros {
       mpv.splice
       aggrv.splice
       cv.splice
-
-      new Reducables.ReducableKernel[T, HashMapMerger[K, M]] {
+      
+      val stealer = callee.splice.stealer
+      val kernel = new Reducables.ReducableKernel[T, HashMapMerger[K, M]] {
         override def beforeWorkOn(tree: Ref[T, HashMapMerger[K, M]], node: Node[T, HashMapMerger[K, M]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -382,14 +383,13 @@ object ReducablesMacros {
             val elem = stealer.next
             val mappedElem = mpg.splice.apply(elem)
             val elemKey = grg.splice.apply(elem)
-            merger.get(elemKey) match {
-              case Some((chunk, id)) => chunk.elems(id) = aggrg.splice.apply(chunk.elems(id), mappedElem)
-              case None => merger += (elemKey, mappedElem)
-            }
+            merger += (elemKey, mappedElem)         
           }
           merger
         }
       }
+      val resultMerger = ctx.splice.invokeParallelOperation(stealer, kernel)
+      resultMerger.result
     }
 
   }

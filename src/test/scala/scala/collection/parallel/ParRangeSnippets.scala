@@ -245,6 +245,7 @@ def mapReduceSequential(r: Range) = {
   }
 
   def mapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)
+  def groupMapAggregateParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.groupMapAggregate(x=>x%15)(x=>x)((x,y)=>x+y)
   def mapParallel[Repr](r: Range, customCmf: collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)(customCmf, s)
 
   def filterMod3Sequential(r: Range) = {

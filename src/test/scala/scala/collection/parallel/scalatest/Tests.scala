@@ -49,7 +49,7 @@ trait Tests[Repr] extends Timeouts with Helpers {
 
   def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
-  def hashMapComparison[K, V](range: Range, hm: mutable.HashMap[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
+  def hashMapComparison[K, V](range: Range, hm: mutable.Map[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
 
   def immutableHashMapComparison[K, V](range: Range, hm: immutable.HashMap[K, V], phm: Par[immutable.HashMap[K, V]]) = hm == phm.seq
 

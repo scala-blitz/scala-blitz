@@ -16,9 +16,7 @@ import scala.collection.immutable.HashSet
 class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] with ParHashTrieSetSnippets {
 
   val TEST_AS_REDUCABLE = false // disabled, as tests are failing and breaking build. Should be enabled after rewriting stealers
-
   def testForSizes(method: Range => Unit) {
-
     for (i <- 1 to 20000) {
       method(0 to 357)
     }
@@ -63,12 +61,10 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       method(0 to i)
       method(i to 0 by -1)
     }
- 
     for (i <- 1000 to 1 by -1) {
       method(0 to i)
       method(i to 0 by -1)
     }
- 
   }
 
   def targetCollections(r: Range) = Seq(
@@ -135,13 +131,11 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
         throw t
     }
   }
-
   test("map") {
     val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
     val ht = (hs: HashSet[Int]) => mapParallel(hs)
     testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
- }
-
+  }
   if(TEST_AS_REDUCABLE) test("Reducable.map") {
     val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
     val ht = (hs: HashSet[Int]) => (HashSet() ++ mapReducable(hs).seq).toPar
@@ -380,7 +374,6 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-   
 }
 
 

@@ -63,7 +63,10 @@ object HashBuckets {
 
     def setSize(sz: Int) = tableSize = sz
 
-    def tryInsertEntry(k: K, v: V): Boolean = {
+    def USE_OLD_VALUE[V](x:V,y:V)= x
+    def tryInsertEntry(k: K, v: V): Boolean = tryCombineEntry(k,v,USE_OLD_VALUE)
+
+    def tryCombineEntry(k: K, v: V, combiner: (V,V)=>V): Boolean = {
       var h = index(elemHashCode(k))
       val olde = table(h).asInstanceOf[DefaultEntry[K, V]]
 
@@ -71,6 +74,7 @@ object HashBuckets {
       var ce = olde
       while (ce ne null) {
         if (ce.key == k) {
+          ce.value = combiner(ce.value, v)
           h = -1
           ce = null
         } else ce = ce.next
