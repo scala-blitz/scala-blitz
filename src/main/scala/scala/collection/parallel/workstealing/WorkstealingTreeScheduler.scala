@@ -130,7 +130,7 @@ object WorkstealingTreeScheduler {
         try {
           workUntilNoWork(this, root, kernel)
         } catch {
-          case e: Exception => e.printStackTrace()
+          case t: Throwable => t.printStackTrace()
         }
       }
     }
@@ -319,14 +319,14 @@ object WorkstealingTreeScheduler {
       wasCompleted
     }
     
-    @tailrec protected final def pushUp(tree: Ref[T, R], worker: Worker) {
+    @tailrec protected final def pushUp(tree: Ref[T, R], worker: Worker): Unit = {
       val node_t0 = tree.READ
       val r_t1 = node_t0.READ_RESULT
       r_t1 match {
         case NO_RESULT =>
           // we're done, owner did not finish his work yet
         case INTERMEDIATE_READY =>
-          val combinedResult = {
+          val combinedResult = try {
             if (node_t0.isLeaf) node_t0.READ_INTERMEDIATE.asInstanceOf[AnyRef]
             else {
               // check if result already set for children
@@ -338,7 +338,12 @@ object WorkstealingTreeScheduler {
                 combine(node_t0.READ_INTERMEDIATE, subr).asInstanceOf[AnyRef]
               } else NO_RESULT
             }
-          }
+          } catch {
+      case t: Throwable =>
+        println(t)
+        t.printStackTrace()
+        null
+    }
 
           if (combinedResult != NO_RESULT) {
             if (node_t0.CAS_RESULT(r_t1, combinedResult)) {
@@ -351,7 +356,7 @@ object WorkstealingTreeScheduler {
         case _ =>
           // we're done, somebody else already pushed up
       }
-    }    
+    }
 
     /** The neutral element of the reduction.
      */

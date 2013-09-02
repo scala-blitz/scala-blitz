@@ -15,9 +15,11 @@ import javax.swing.event._
 
 
 object BarnesHut {
+  self =>
 
   var bodies: Array[Quad.Body] = _
   var scheduler: workstealing.WorkstealingTreeScheduler = _
+  var initialBoundaries: Boundaries = _
   var boundaries: Boundaries = _
   var quadtree: Quad = _
 
@@ -79,6 +81,7 @@ object BarnesHut {
             }
         }
 
+        println(netforcex, netforcey)
         xspeed += netforcex / mass * delta
         yspeed += netforcey / mass * delta
         x += xspeed * delta
@@ -248,15 +251,15 @@ object BarnesHut {
 
   def parallelism = Runtime.getRuntime.availableProcessors
 
-  def totalBodies = 200000
+  def totalBodies = 20
 
   def sectorPrecision = 4
 
-  def delta = 1.0f
+  def delta = 2.0f
   
   def theta = 0.5f
 
-  def gee = 100000.0f
+  def gee = 1000000.0f
 
   def init() {
     initScheduler()
@@ -269,14 +272,15 @@ object BarnesHut {
       val b = new Quad.Body(i)
       b.x = math.random.toFloat * 1000
       b.y = math.random.toFloat * 1000
-      b.xspeed = math.random.toFloat - 0.5f
-      b.yspeed = math.random.toFloat - 0.5f
+      b.xspeed = 0.0f
+      b.yspeed = 0.0f
       b.mass = 0.1f + math.random.toFloat
       bodies(i) = b
     }
 
     // compute center and boundaries
-    boundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
+    initialBoundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
+    boundaries = initialBoundaries
   }
 
   def initScheduler() {
@@ -284,7 +288,7 @@ object BarnesHut {
     scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin(conf)
   }
 
-  def step()(implicit s: workstealing.WorkstealingTreeScheduler) {
+  def step()(implicit s: workstealing.WorkstealingTreeScheduler): Unit = self.synchronized {
     def constructTree(): Quad = {
       // construct sectors
       val sectors = bodies.toPar.accumulate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
@@ -300,7 +304,7 @@ object BarnesHut {
         b.updatePosition(quadtree)
       }
 
-      // compute center and boundaries
+      // recompute center and boundaries
       boundaries = bodies.toPar.accumulate(new Boundaries)
     }
 
@@ -314,7 +318,7 @@ object BarnesHut {
 
   class BarnesHutFrame extends JFrame("Barnes-Hut") {
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
-    setSize(1024, 600)
+    setSize(800, 600)
     setLayout(new BorderLayout)
     val rightpanel = new JPanel
     rightpanel.setBorder(BorderFactory.createEtchedBorder(border.EtchedBorder.LOWERED))
@@ -329,6 +333,9 @@ object BarnesHut {
       }
     })
     controls.add(quadcheckbox)
+    val animationPanel = new JPanel
+    animationPanel.setLayout(new GridLayout(1, 0))
+    controls.add(animationPanel)
     val stepbutton = new JButton("Step")
     stepbutton.addActionListener(new ActionListener {
       def actionPerformed(e: ActionEvent) {
@@ -336,20 +343,34 @@ object BarnesHut {
         repaint()
       }
     })
-    controls.add(stepbutton)
+    animationPanel.add(stepbutton)
+    val startButton = new JCheckBox("Start")
+    val startTimer = new javax.swing.Timer(0, new ActionListener {
+      def actionPerformed(e: ActionEvent) {
+        step()(scheduler)
+        repaint()
+      }
+    })
+    startButton.addActionListener(new ActionListener {
+      def actionPerformed(e: ActionEvent) {
+        if (startButton.isSelected) startTimer.start()
+        else startTimer.stop()
+      }
+    })
+    animationPanel.add(startButton)
     val canvas = new JComponent {
       val pixels = new Array[Int](4000 * 4000)
-      override def paintComponent(g: Graphics) {
+      override def paintComponent(g: Graphics) = self.synchronized {
         super.paintComponent(g)
         val width = getWidth
         val height = getHeight
-        if (boundaries != null) {
+        if (initialBoundaries != null) {
           val img = new image.BufferedImage(width, height, image.BufferedImage.TYPE_INT_ARGB)
           for (x <- 0 until width; y <- 0 until height) pixels(y * width + x) = 0
           for (b <- bodies) {
-            val px = ((b.x - boundaries.minX) / boundaries.width * width).toInt
-            val py = ((b.y - boundaries.minY) / boundaries.height * height).toInt
-            pixels(py * width + px) += 1
+            val px = ((b.x - initialBoundaries.minX) / initialBoundaries.width * width).toInt
+            val py = ((b.y - initialBoundaries.minY) / initialBoundaries.height * height).toInt
+            if (px >= 0 && px < width && py >= 0 && py < width) pixels(py * width + px) += 1
           }
           for (x <- 0 until width; y <- 0 until height) {
             val factor = 1.0 * bodies.length / (width * height)
@@ -358,17 +379,17 @@ object BarnesHut {
             val color = (255 << 24) | (bound << 16) | (bound << 8) | bound
             img.setRGB(x, y, color)
           }
-          if (quadcheckbox.isSelected) {
+          if (quadcheckbox.isSelected && quadtree != null) {
             val g = img.getGraphics.asInstanceOf[Graphics2D]
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             g.setColor(new Color(0, 225, 80, 150))
             def drawQuad(level: Int, quad: Quad): Unit = if (level < 6) quad match {
               case f @ Quad.Fork(cx, cy, sz) =>
                 def drawRect(fx: Float, fy: Float, fsz: Float, q: Quad) {
-                  val x = ((fx - boundaries.minX) / boundaries.width * width).toInt
-                  val y = ((fy - boundaries.minY) / boundaries.height * height).toInt
-                  val w = ((fx + fsz - boundaries.minX) / boundaries.width * width).toInt - x
-                  val h = ((fy + fsz - boundaries.minY) / boundaries.height * height).toInt - y
+                  val x = ((fx - initialBoundaries.minX) / initialBoundaries.width * width).toInt
+                  val y = ((fy - initialBoundaries.minY) / initialBoundaries.height * height).toInt
+                  val w = ((fx + fsz - initialBoundaries.minX) / initialBoundaries.width * width).toInt - x
+                  val h = ((fy + fsz - initialBoundaries.minY) / initialBoundaries.height * height).toInt - y
                   g.drawRect(x, y, w, h)
                   if (level <= 3) g.drawString("#:" + q.total, x + w / 2, y + h / 2)
                 }
