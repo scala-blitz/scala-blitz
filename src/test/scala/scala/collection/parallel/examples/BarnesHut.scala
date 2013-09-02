@@ -28,6 +28,12 @@ object BarnesHut {
     def total: Int
 
     def update(fromx: Float, fromy: Float, sz: Float, b: Quad.Body): Quad
+
+    def distance(fromx: Float, fromy: Float): Float = {
+      math.sqrt((fromx - massX) * (fromx - massX) + (fromy - massY) * (fromy - massY)).toFloat
+    }
+
+    def force(m: Float, dist: Float) = gee * m * mass / (dist * dist)
   }
 
   object Quad {
@@ -54,12 +60,23 @@ object BarnesHut {
         var netforcey = 0.0f
 
         def traverse(quad: Quad): Unit = quad match {
-          case f @ Fork(cx, cy, sz) =>
-            // TODO
-          case Body(id) =>
-            // TODO
           case Empty =>
             // no force
+          case _ =>
+            // see if node is far enough, or recursion is needed
+            val dist = quad.distance(x, y)
+            quad match {
+              case f @ Fork(cx, cy, sz) if f.size / dist >= theta =>
+                traverse(f)
+              case _ =>
+                val dforce = quad.force(mass, dist)
+                val xn = (quad.massX - x) / dist
+                val yn = (quad.massY - y) / dist
+                val dforcex = dforce * xn
+                val dforcey = dforce * yn
+                netforcex += dforcex
+                netforcey += dforcey
+            }
         }
 
         xspeed += netforcex / mass * delta
@@ -231,11 +248,15 @@ object BarnesHut {
 
   def parallelism = Runtime.getRuntime.availableProcessors
 
-  def totalBodies = 400000
+  def totalBodies = 200000
 
   def sectorPrecision = 4
 
-  def delta = 0.1f
+  def delta = 1.0f
+  
+  def theta = 0.5f
+
+  def gee = 100000.0f
 
   def init() {
     initScheduler()
@@ -253,6 +274,9 @@ object BarnesHut {
       b.mass = 0.1f + math.random.toFloat
       bodies(i) = b
     }
+
+    // compute center and boundaries
+    boundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
   }
 
   def initScheduler() {
@@ -262,9 +286,6 @@ object BarnesHut {
 
   def step()(implicit s: workstealing.WorkstealingTreeScheduler) {
     def constructTree(): Quad = {
-      // compute center and boundaries
-      boundaries = bodies.toPar.accumulate(new Boundaries)
-
       // construct sectors
       val sectors = bodies.toPar.accumulate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
         _ += _
@@ -275,6 +296,12 @@ object BarnesHut {
     }
 
     def updatePositions(quadtree: Quad) {
+      for (b <- bodies.toPar) {
+        b.updatePosition(quadtree)
+      }
+
+      // compute center and boundaries
+      boundaries = bodies.toPar.accumulate(new Boundaries)
     }
 
     val startTime = System.nanoTime

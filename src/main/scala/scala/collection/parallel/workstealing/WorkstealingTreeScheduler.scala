@@ -169,8 +169,8 @@ object WorkstealingTreeScheduler {
     def validateResult[R](r: R): R
   }
 
-  class ThrowCause(e: Exception) extends TerminationCause {
-    def validateResult[R](r: R) = throw e
+  class ThrowCause(t: Throwable) extends TerminationCause {
+    def validateResult[R](r: R) = throw t
   }
 
   trait Kernel[@specialized T, @specialized R] {
@@ -272,7 +272,7 @@ object WorkstealingTreeScheduler {
           } else looping = false
         }
       } catch {
-        case e: Exception => terminationCause = new ThrowCause(e)
+        case t: Throwable => terminationCause = new ThrowCause(t)
       }
 
       completeIteration(node.stealer)
