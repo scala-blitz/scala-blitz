@@ -129,25 +129,30 @@ object IndexedStealer {
       val ms = config.maximumStep
 
       // commit to processing chunks of the collection and process them until termination
-      val until = stealer.untilIndex
-      var looping = true
-      while (looping && notTerminated) {
-        val currstep = node.READ_STEP
-        val currprog = stealer.READ_PROGRESS
+      try {
+        val until = stealer.untilIndex
+        var looping = true
+        while (looping && notTerminated) {
+          val currstep = node.READ_STEP
+          val currprog = stealer.READ_PROGRESS
+    
+          if (currprog >= 0 && currprog < until) {
+            // reserve some work
+            val nprog = math.min(currprog + currstep, until)
+            
+            if (stealer.CAS_PROGRESS(currprog, nprog)) {
+              stealer.nextProgress = currprog
+              stealer.nextUntil = nprog
+              intermediate = combine(intermediate, apply(node, nprog - currprog))
   
-        if (currprog >= 0 && currprog < until) {
-          // reserve some work
-          val nprog = math.min(currprog + currstep, until)
-          
-          if (stealer.CAS_PROGRESS(currprog, nprog)) {
-            stealer.nextProgress = currprog
-            stealer.nextUntil = nprog
-            intermediate = combine(intermediate, apply(node, nprog - currprog))
-
-            // update step
-            node.WRITE_STEP(math.min(ms, currstep * 2))
-          }
-        } else looping = false
+              // update step
+              node.WRITE_STEP(math.min(ms, currstep * 2))
+            }
+          } else looping = false
+        }
+      } catch {
+        case t: Throwable =>
+          setTerminationCause(new ThrowCause(t))
       }
 
       completeIteration(node.stealer)

@@ -29,7 +29,9 @@ object BarnesHut {
     def mass: Float
     def total: Int
 
-    def update(fromx: Float, fromy: Float, sz: Float, b: Quad.Body): Quad
+    def update(fromx: Float, fromy: Float, sz: Float, b: Quad.Body, depth: Int = 0): Quad
+
+    def checkDepth(depth: Int) = assert(depth < 100, "Depth: " + depth)
 
     def distance(fromx: Float, fromy: Float): Float = {
       math.sqrt((fromx - massX) * (fromx - massX) + (fromy - massY) * (fromy - massY)).toFloat
@@ -50,11 +52,11 @@ object BarnesHut {
       def massY = y
       def total = 1
   
-      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = {
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = {
         val cx = fromx + sz / 2
         val cy = fromy + sz / 2
         val fork = new Fork(cx, cy, sz)(Empty, Empty, Empty, Empty)
-        fork.update(fromx, fromy, sz, this).update(fromx, fromy, sz, b)
+        fork.update(fromx, fromy, sz, this, depth + 1).update(fromx, fromy, sz, b, depth + 1)
       }
 
       def updatePosition(quad: Quad) {
@@ -67,9 +69,12 @@ object BarnesHut {
           case _ =>
             // see if node is far enough, or recursion is needed
             val dist = quad.distance(x, y)
-            quad match {
+            if (dist != 0) quad match {
               case f @ Fork(cx, cy, sz) if f.size / dist >= theta =>
-                traverse(f)
+                traverse(f.nw)
+                traverse(f.sw)
+                traverse(f.ne)
+                traverse(f.se)
               case _ =>
                 val dforce = quad.force(mass, dist)
                 val xn = (quad.massX - x) / dist
@@ -81,7 +86,8 @@ object BarnesHut {
             }
         }
 
-        println(netforcex, netforcey)
+        traverse(quad)
+        //println(netforcex, netforcey)
         xspeed += netforcex / mass * delta
         yspeed += netforcey / mass * delta
         x += xspeed * delta
@@ -95,7 +101,7 @@ object BarnesHut {
       def mass = 0.0f
       def total = 0
 
-      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = b
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = b
     }
   
     case class Fork(val centerX: Float, val centerY: Float, val size: Float)(var nw: Quad, var ne: Quad, var sw: Quad, var se: Quad)
@@ -106,14 +112,15 @@ object BarnesHut {
 
       def total = nw.total + ne.total + sw.total + se.total
 
-      def update(fromx: Float, fromy: Float, sz: Float, b: Body) = {
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = {
+        checkDepth(depth)
         val hsz = sz / 2
         if (b.x < centerX) {
-          if (b.y < centerY) nw = nw.update(fromx, fromy, hsz, b)
-          else sw = sw.update(fromx, centerY, hsz, b)
+          if (b.y < centerY) nw = nw.update(fromx, fromy, hsz, b, depth + 1)
+          else sw = sw.update(fromx, centerY, hsz, b, depth + 1)
         } else {
-          if (b.y < centerY) ne = ne.update(centerX, fromy, hsz, b)
-          else se = se.update(centerX, centerY, hsz, b)
+          if (b.y < centerY) ne = ne.update(centerX, fromy, hsz, b, depth + 1)
+          else se = se.update(centerX, centerY, hsz, b, depth + 1)
         }
 
         updateStats()
@@ -251,15 +258,15 @@ object BarnesHut {
 
   def parallelism = Runtime.getRuntime.availableProcessors
 
-  def totalBodies = 20
+  def totalBodies = 200000
 
   def sectorPrecision = 4
 
-  def delta = 2.0f
+  def delta = 0.1f
   
   def theta = 0.5f
 
-  def gee = 1000000.0f
+  def gee = 0.001f
 
   def init() {
     initScheduler()

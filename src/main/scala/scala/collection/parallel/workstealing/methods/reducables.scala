@@ -169,7 +169,7 @@ object ReducablesMacros {
             val next = stealer.next()
             if (pred.splice(next)) result = Some(next)
           }
-          if (result.isDefined) terminationCause = ResultFound
+          if (result.isDefined) setTerminationCause(ResultFound)
           result
         }
       }

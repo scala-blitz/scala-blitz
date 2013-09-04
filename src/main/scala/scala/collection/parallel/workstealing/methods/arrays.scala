@@ -158,7 +158,8 @@ object ArraysMacros {
           while (i < to && !pred.splice(arr(i))) {
             i += 1
           }
-          if (i<to) { terminationCause = ResultFound
+          if (i < to) {
+            setTerminationCause(ResultFound)
             Some(i)
           }
           else None

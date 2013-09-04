@@ -3,6 +3,7 @@ package workstealing
 
 
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 
 
@@ -62,7 +63,7 @@ abstract class WorkstealingTreeScheduler {
 
     val c = root.READ
     val r = c.READ_RESULT
-    r.asInstanceOf[R]
+    kernel.validateResult(r.asInstanceOf[R])
   }
 
 }
@@ -130,7 +131,13 @@ object WorkstealingTreeScheduler {
         try {
           workUntilNoWork(this, root, kernel)
         } catch {
-          case t: Throwable => t.printStackTrace()
+          case t: Throwable =>
+            val st = t.getStackTrace
+            println("Uncaught exception in worker!")
+            println("initial frames: " + st.take(20).mkString("\n"))
+            println("...")
+            println("last frames: " + st.takeRight(20).mkString("\n"))
+            t.printStackTrace()
         }
       }
     }
@@ -177,18 +184,25 @@ object WorkstealingTreeScheduler {
     /** Used for cancelling operations early (e.g. due to exceptions).
      *  Holds information on why the operation failed
      */
-    @volatile protected var terminationCause: TerminationCause = null
+    protected val terminationCauseRef = new AtomicReference[TerminationCause](null)
 
     /** Returns `true` as long as `terminationCause` is `null`.
      */
-    def notTerminated = terminationCause eq null
+    def notTerminated = terminationCauseRef.get eq null
+
+    @tailrec final def setTerminationCause(tc: TerminationCause) {
+      val otc = terminationCauseRef.get
+      if (otc == null) {
+        if (!terminationCauseRef.compareAndSet(null, tc)) setTerminationCause(tc)
+      }
+    }
 
     /** Returns the result if there was no early termination.
      *  Otherwise may throw an exception based on the termination cause.
      */
     def validateResult(r: R): R = {
       if (notTerminated) r
-      else terminationCause.validateResult(r)
+      else terminationCauseRef.get.validateResult(r)
     }
 
     /** Initializes the workstealing tree node.
@@ -272,7 +286,8 @@ object WorkstealingTreeScheduler {
           } else looping = false
         }
       } catch {
-        case t: Throwable => terminationCause = new ThrowCause(t)
+        case t: Throwable =>
+          setTerminationCause(new ThrowCause(t))
       }
 
       completeIteration(node.stealer)
@@ -339,11 +354,10 @@ object WorkstealingTreeScheduler {
               } else NO_RESULT
             }
           } catch {
-      case t: Throwable =>
-        println(t)
-        t.printStackTrace()
-        null
-    }
+            case t: Throwable =>
+              setTerminationCause(new ThrowCause(t))
+              null
+          }
 
           if (combinedResult != NO_RESULT) {
             if (node_t0.CAS_RESULT(r_t1, combinedResult)) {

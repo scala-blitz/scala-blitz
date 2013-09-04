@@ -304,7 +304,7 @@ object RangesMacros {
         def combine(a: Option[Int], b: Option[Int]) = if (a.isDefined) a else b
         def apply0(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], at: Int) = {
           if (pred.splice(at)) {
-            terminationCause = ResultFound
+            setTerminationCause(ResultFound)
             Some(at)
           } else None
         }
@@ -315,7 +315,7 @@ object RangesMacros {
             if (pred.splice(i)) result = Some(i)
             i += 1
           }
-          if (result.isDefined) terminationCause = ResultFound
+          if (result.isDefined) setTerminationCause(ResultFound)
           result
         }
         def applyN(node: WorkstealingTreeScheduler.Node[Int, Option[Int]], from: Int, to: Int, stride: Int) = {
@@ -332,7 +332,7 @@ object RangesMacros {
               i += stride
             }
           }
-          if (result.isDefined) terminationCause = ResultFound
+          if (result.isDefined) setTerminationCause(ResultFound)
           result
         }
       }
