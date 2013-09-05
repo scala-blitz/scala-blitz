@@ -2,15 +2,15 @@ package scala.collection.parallel.examples
 
 
 
+import java.awt._
+import java.awt.event._
+import javax.swing._
+import javax.swing.event._
 import scala.collection.parallel._
 import scala.collection.parallel.Par._
 import scala.collection.parallel.workstealing.Ops._
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
-import java.awt._
-import java.awt.event._
-import javax.swing._
-import javax.swing.event._
 
 
 
@@ -30,8 +30,6 @@ object BarnesHut {
     def total: Int
 
     def update(fromx: Float, fromy: Float, sz: Float, b: Quad.Body, depth: Int = 0): Quad
-
-    def checkDepth(depth: Int) = assert(depth < 100, "Depth: " + depth)
 
     def distance(fromx: Float, fromy: Float): Float = {
       math.sqrt((fromx - massX) * (fromx - massX) + (fromy - massY) * (fromy - massY)).toFloat
@@ -53,10 +51,16 @@ object BarnesHut {
       def total = 1
   
       def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = {
+        assert(depth < 100, s"$fromx, $fromy, $sz; this: ${this.x}, ${this.y}, that: ${b.x}, ${b.y}")
         val cx = fromx + sz / 2
         val cy = fromy + sz / 2
-        val fork = new Fork(cx, cy, sz)(Empty, Empty, Empty, Empty)
-        fork.update(fromx, fromy, sz, this, depth + 1).update(fromx, fromy, sz, b, depth + 1)
+        if (sz > 0.00001f) {
+          val fork = new Fork(cx, cy, sz)(Empty, Empty, Empty, Empty)
+          fork.update(fromx, fromy, sz, this, depth).update(fromx, fromy, sz, b, depth)
+        } else {
+          val bunch = new Bunch(cx, cy, sz)
+          bunch.update(fromx, fromy, sz, this, depth).update(fromx, fromy, sz, b, depth)
+        }
       }
 
       def updatePosition(quad: Quad) {
@@ -69,12 +73,14 @@ object BarnesHut {
           case _ =>
             // see if node is far enough, or recursion is needed
             val dist = quad.distance(x, y)
-            if (dist != 0) quad match {
+            if (dist > 0.2f) quad match {
               case f @ Fork(cx, cy, sz) if f.size / dist >= theta =>
                 traverse(f.nw)
                 traverse(f.sw)
                 traverse(f.ne)
                 traverse(f.se)
+              case Body(thatid) if id == thatid =>
+                // skip self
               case _ =>
                 val dforce = quad.force(mass, dist)
                 val xn = (quad.massX - x) / dist
@@ -83,16 +89,23 @@ object BarnesHut {
                 val dforcey = dforce * yn
                 netforcex += dforcex
                 netforcey += dforcey
+                assert(!netforcey.isNaN, (x, y, quad.massX, quad.massY, quad, dist, dforce, xn, yn))
             }
         }
 
         traverse(quad)
-        //println(netforcex, netforcey)
-        xspeed += netforcex / mass * delta
-        yspeed += netforcey / mass * delta
+
         x += xspeed * delta
         y += yspeed * delta
+        xspeed += netforcex / mass * delta
+        yspeed += netforcey / mass * delta
+        assert(xspeed < 10000, (netforcex, netforcey, this))
+        assert(yspeed < 10000, (netforcex, netforcey, this))
+
+        if (id == 0) println(s"pos: $x, $y, force: $netforcex, $netforcey, speed: $xspeed, $yspeed")
       }
+
+      override def toString = s"Body($id; pos: $x, $y; speed: $xspeed, $yspeed; mass: $mass)"
     }
 
     case object Empty extends Quad {
@@ -113,13 +126,13 @@ object BarnesHut {
       def total = nw.total + ne.total + sw.total + se.total
 
       def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = {
-        checkDepth(depth)
+        if (depth > 95) println(depth, fromx, fromy, centerX, centerY, b.x, b.y)
         val hsz = sz / 2
-        if (b.x < centerX) {
-          if (b.y < centerY) nw = nw.update(fromx, fromy, hsz, b, depth + 1)
+        if (b.x <= centerX) {
+          if (b.y <= centerY) nw = nw.update(fromx, fromy, hsz, b, depth + 1)
           else sw = sw.update(fromx, centerY, hsz, b, depth + 1)
         } else {
-          if (b.y < centerY) ne = ne.update(centerX, fromy, hsz, b, depth + 1)
+          if (b.y <= centerY) ne = ne.update(centerX, fromy, hsz, b, depth + 1)
           else se = se.update(centerX, centerY, hsz, b, depth + 1)
         }
 
@@ -130,10 +143,46 @@ object BarnesHut {
 
       def updateStats() {
         mass = nw.mass + sw.mass + ne.mass + se.mass
-        massX = (nw.mass * nw.massX + sw.mass * sw.massX + ne.mass * ne.massX + se.mass * se.massX) / mass
-        massY = (nw.mass * nw.massY + sw.mass * sw.massY + ne.mass * ne.massY + se.mass * se.massY) / mass
+        if (mass > 0.0f) {
+          massX = (nw.mass * nw.massX + sw.mass * sw.massX + ne.mass * ne.massX + se.mass * se.massX) / mass
+          massY = (nw.mass * nw.massY + sw.mass * sw.massY + ne.mass * ne.massY + se.mass * se.massY) / mass
+        } else {
+          massX = 0.0f
+          massY = 0.0f
+        }
       }
     }
+
+    case class Bunch(centerX: Float, centerY: Float, size: Float) extends Quad {
+      var massX: Float = _
+      var massY: Float = _
+      var mass: Float = _
+      val bodies = ArrayBuffer[Body]()
+
+      def total = bodies.size
+
+      def update(fromx: Float, fromy: Float, sz: Float, b: Body, depth: Int) = {
+        bodies += b
+        updateStats()
+        this
+      }
+
+      def updateStats() {
+        mass = 0
+        massX = 0
+        massY = 0
+        for (b <- bodies) {
+          mass += b.mass
+          massX += b.mass * b.massX
+          massY += b.mass * b.massY
+        }
+        massX /= mass
+        massY /= mass
+      }
+
+      override def toString = s"Quad.Bunch($centerX, $centerY, $size, ${bodies.mkString(", ")})"
+    }
+
   }
 
   val debug = new java.util.concurrent.ConcurrentLinkedQueue[Quad.Body]
@@ -149,6 +198,10 @@ object BarnesHut {
     def height = maxY - minY
 
     def size = math.max(width, height)
+
+    def centerX = minX + width / 2
+
+    def centerY = minY + height / 2
 
     def merge(that: Boundaries) = if (this eq that) this else {
       val res = new Boundaries
@@ -256,17 +309,20 @@ object BarnesHut {
     quad
   }
 
-  def parallelism = Runtime.getRuntime.availableProcessors
+  def parallelism = {
+    val selidx = frame.parcombo.getSelectedIndex
+    frame.parcombo.getItemAt(selidx).toInt
+  }
 
-  def totalBodies = 200000
+  def totalBodies = 20000
 
-  def sectorPrecision = 4
+  def sectorPrecision = 8
 
-  def delta = 0.1f
+  def delta = 0.2f
   
   def theta = 0.5f
 
-  def gee = 0.001f
+  def gee = 100.0f
 
   def init() {
     initScheduler()
@@ -277,11 +333,13 @@ object BarnesHut {
     bodies = new Array(totalBodies)
     for (i <- 0 until bodies.length) {
       val b = new Quad.Body(i)
-      b.x = math.random.toFloat * 1000
-      b.y = math.random.toFloat * 1000
-      b.xspeed = 0.0f
-      b.yspeed = 0.0f
-      b.mass = 0.1f + math.random.toFloat
+      val angle = math.random.toFloat * 2 * math.Pi
+      val radius = 10 + 1000 * math.random.toFloat
+      b.x = radius * math.sin(angle).toFloat
+      b.y = radius * math.cos(angle).toFloat
+      b.xspeed = 0.1f * radius * math.sin(angle + math.Pi / 2).toFloat
+      b.yspeed = 0.1f * radius * math.cos(angle + math.Pi / 2).toFloat
+      b.mass = 0.9f + math.random.toFloat
       bodies(i) = b
     }
 
@@ -291,8 +349,10 @@ object BarnesHut {
   }
 
   def initScheduler() {
-    val conf = new workstealing.WorkstealingTreeScheduler.Config.Default(parallelism)
+    val p = parallelism
+    val conf = new workstealing.WorkstealingTreeScheduler.Config.Default(p)
     scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin(conf)
+    println(s"parallelism level: $p")
   }
 
   def step()(implicit s: workstealing.WorkstealingTreeScheduler): Unit = self.synchronized {
@@ -313,6 +373,7 @@ object BarnesHut {
 
       // recompute center and boundaries
       boundaries = bodies.toPar.accumulate(new Boundaries)
+      println(boundaries)
     }
 
     val startTime = System.nanoTime
@@ -333,6 +394,20 @@ object BarnesHut {
     val controls = new JPanel
     controls.setLayout(new GridLayout(0, 1))
     rightpanel.add(controls, BorderLayout.NORTH)
+    val parallelismPanel = new JPanel
+    val parallelismLabel = new JLabel("Parallelism")
+    parallelismPanel.add(parallelismLabel)
+    val items = 1 to Runtime.getRuntime.availableProcessors map { _.toString } toArray
+    val parcombo = new JComboBox[String](items)
+    parcombo.setSelectedIndex(items.length - 1)
+    parcombo.addActionListener(new ActionListener {
+      def actionPerformed(e: ActionEvent) = self.synchronized {
+        initScheduler()
+        canvas.repaint()
+      }
+    })
+    parallelismPanel.add(parcombo)
+    controls.add(parallelismPanel)
     val quadcheckbox = new JCheckBox("Show quad")
     quadcheckbox.addActionListener(new ActionListener {
       def actionPerformed(e: ActionEvent) {
@@ -373,7 +448,7 @@ object BarnesHut {
         val height = getHeight
         if (initialBoundaries != null) {
           val img = new image.BufferedImage(width, height, image.BufferedImage.TYPE_INT_ARGB)
-          for (x <- 0 until width; y <- 0 until height) pixels(y * width + x) = 0
+          for (x <- 0 until 4000; y <- 0 until 4000) pixels(y * width + x) = 0
           for (b <- bodies) {
             val px = ((b.x - initialBoundaries.minX) / initialBoundaries.width * width).toInt
             val py = ((b.y - initialBoundaries.minY) / initialBoundaries.height * height).toInt
@@ -389,40 +464,100 @@ object BarnesHut {
           if (quadcheckbox.isSelected && quadtree != null) {
             val g = img.getGraphics.asInstanceOf[Graphics2D]
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g.setColor(new Color(0, 225, 80, 150))
-            def drawQuad(level: Int, quad: Quad): Unit = if (level < 6) quad match {
-              case f @ Quad.Fork(cx, cy, sz) =>
-                def drawRect(fx: Float, fy: Float, fsz: Float, q: Quad) {
-                  val x = ((fx - initialBoundaries.minX) / initialBoundaries.width * width).toInt
-                  val y = ((fy - initialBoundaries.minY) / initialBoundaries.height * height).toInt
-                  val w = ((fx + fsz - initialBoundaries.minX) / initialBoundaries.width * width).toInt - x
-                  val h = ((fy + fsz - initialBoundaries.minY) / initialBoundaries.height * height).toInt - y
-                  g.drawRect(x, y, w, h)
-                  if (level <= 3) g.drawString("#:" + q.total, x + w / 2, y + h / 2)
-                }
-                drawRect(cx - sz / 2, cy - sz / 2, sz / 2, f.nw)
-                drawRect(cx - sz / 2, cy, sz / 2, f.sw)
-                drawRect(cx, cy - sz / 2, sz / 2, f.ne)
-                drawRect(cx, cy, sz / 2, f.se)
-                drawQuad(level + 1, f.nw)
-                drawQuad(level + 1, f.ne)
-                drawQuad(level + 1, f.sw)
-                drawQuad(level + 1, f.se)
-              case Quad.Empty | Quad.Body(_) =>
-                // done
+            val green = new Color(0, 225, 80, 150)
+            val red = new Color(200, 0, 0, 150)
+            g.setColor(green)
+            def drawQuad(depth: Int, quad: Quad): Unit = {
+              def drawRect(fx: Float, fy: Float, fsz: Float, q: Quad, fill: Boolean = false) {
+                val x = ((fx - initialBoundaries.minX) / initialBoundaries.width * width).toInt
+                val y = ((fy - initialBoundaries.minY) / initialBoundaries.height * height).toInt
+                val w = ((fx + fsz - initialBoundaries.minX) / initialBoundaries.width * width).toInt - x
+                val h = ((fy + fsz - initialBoundaries.minY) / initialBoundaries.height * height).toInt - y
+                g.drawRect(x, y, w, h)
+                if (fill) g.fillRect(x, y, w, h)
+                if (depth <= 5) g.drawString("#:" + q.total, x + w / 2, y + h / 2)
+              }
+              quad match {
+                case f @ Quad.Fork(cx, cy, sz) =>
+                  drawRect(cx - sz / 2, cy - sz / 2, sz / 2, f.nw)
+                  drawRect(cx - sz / 2, cy, sz / 2, f.sw)
+                  drawRect(cx, cy - sz / 2, sz / 2, f.ne)
+                  drawRect(cx, cy, sz / 2, f.se)
+                  drawQuad(depth + 1, f.nw)
+                  drawQuad(depth + 1, f.ne)
+                  drawQuad(depth + 1, f.sw)
+                  drawQuad(depth + 1, f.se)
+                case Quad.Bunch(cx, cy, sz) =>
+                  // done
+                case Quad.Empty | Quad.Body(_) =>
+                  // done
+              }
             }
             drawQuad(0, quadtree)
           }
           g.drawImage(img, 0, 0, null)
         }
       }
+      addMouseWheelListener(new MouseAdapter {
+        override def mouseWheelMoved(e: MouseWheelEvent) {
+          val rot = e.getWheelRotation
+          val cx = initialBoundaries.centerX
+          val cy = initialBoundaries.centerY
+          val w = initialBoundaries.width
+          val h = initialBoundaries.height
+          val b = new Boundaries
+          if (rot < 0) {
+            b.minX = cx - w / 2.2f
+            b.minY = cx - h / 2.2f
+            b.maxX = cx + w / 2.2f
+            b.maxY = cx + h / 2.2f
+          } else {
+            b.minX = cx - w * 0.6f
+            b.minY = cx - h * 0.6f
+            b.maxX = cx + w * 0.6f
+            b.maxY = cx + h * 0.6f
+          }
+          initialBoundaries = b
+          repaint()
+        }
+      })
+      var xlast = -1
+      var ylast = -1
+      addMouseListener(new MouseAdapter {
+        override def mousePressed(e: MouseEvent) {
+          xlast = -1
+          ylast = -1
+        }
+      })
+      addMouseMotionListener(new MouseMotionAdapter {
+        override def mouseDragged(e: MouseEvent) {
+          val xcurr = e.getX
+          val ycurr = e.getY
+          if (xlast != -1) {
+            val xd = xcurr - xlast
+            val yd = ycurr - ylast
+            val b = new Boundaries
+            val cx = initialBoundaries.centerX - xd * initialBoundaries.width / 1000
+            val cy = initialBoundaries.centerY - yd * initialBoundaries.height / 1000
+            b.minX = cx - initialBoundaries.width / 2
+            b.minY = cy - initialBoundaries.height / 2
+            b.maxX = cx + initialBoundaries.width / 2
+            b.maxY = cy + initialBoundaries.height / 2
+            initialBoundaries = b
+          }
+          xlast = xcurr
+          ylast = ycurr
+          repaint()
+        }
+      })
     }
     add(canvas)
     setVisible(true)
   }
 
+  val frame = new BarnesHutFrame
+
   def main(args: Array[String]) {
-    val frame = new BarnesHutFrame
     init()
   }
 
