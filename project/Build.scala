@@ -42,10 +42,13 @@ object WorkstealingBuild extends Build {
     packageBin in Test
   ) map {
     (dp, jar, testjar, pbc, pbt) => // -XX:+UseConcMarkSweepGC  -XX:-DoEscapeAnalysis -XX:MaxTenuringThreshold=12 -verbose:gc -XX:+PrintGCDetails 
-    val javacommand = "java -Xmx4096m -Xms4096m -XX:+UseCondCardMark -server -cp %s:%s:%s".format(
-      dp.map(_.data).mkString(":"),
-      jar,
-      testjar
+    val sep = java.io.File.pathSeparator
+    val javacommand = "java -Xmx4096m -Xms4096m -XX:+UseCondCardMark -server -cp %s%s%s%s%s".format(
+      dp.map(x => "\"" + x.data + "\"").mkString(sep),
+      sep,
+      "\"" + jar + "\"",
+      sep,
+      "\"" + testjar + "\""
     )
     javacommand
   }

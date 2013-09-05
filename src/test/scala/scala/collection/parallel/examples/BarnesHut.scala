@@ -73,7 +73,7 @@ object BarnesHut {
           case _ =>
             // see if node is far enough, or recursion is needed
             val dist = quad.distance(x, y)
-            if (dist > 0.2f) quad match {
+            if (dist > 1.0f) quad match {
               case f @ Fork(cx, cy, sz) if f.size / dist >= theta =>
                 traverse(f.nw)
                 traverse(f.sw)
@@ -99,8 +99,8 @@ object BarnesHut {
         y += yspeed * delta
         xspeed += netforcex / mass * delta
         yspeed += netforcey / mass * delta
-        assert(xspeed < 10000, (netforcex, netforcey, this))
-        assert(yspeed < 10000, (netforcex, netforcey, this))
+        //assert(netforcex < 1000, (netforcex, netforcey, this))
+        //assert(netforcey < 1000, (netforcex, netforcey, this))
 
         if (id == 0) println(s"pos: $x, $y, force: $netforcex, $netforcey, speed: $xspeed, $yspeed")
       }
@@ -252,8 +252,8 @@ object BarnesHut {
     }
 
     def +=(b: Quad.Body) = {
-      val sx = math.min(sectorPrecision - 1, ((b.x - boundaries.minX) / (boundaries.width / sectorPrecision)).toInt)
-      val sy = math.min(sectorPrecision - 1, ((b.y - boundaries.minY) / (boundaries.height / sectorPrecision)).toInt)
+      val sx = math.min(sectorPrecision - 1, ((b.x - boundaries.minX) / (boundaries.size / sectorPrecision)).toInt)
+      val sy = math.min(sectorPrecision - 1, ((b.y - boundaries.minY) / (boundaries.size / sectorPrecision)).toInt)
       val accum = matrix(sy * sectorPrecision + sx)
       op(accum, b)
       this
@@ -316,13 +316,13 @@ object BarnesHut {
 
   def totalBodies = 20000
 
-  def sectorPrecision = 8
+  def sectorPrecision = 4
 
-  def delta = 0.2f
+  def delta = 0.4f
   
   def theta = 0.5f
 
-  def gee = 100.0f
+  def gee = 10.0f
 
   def init() {
     initScheduler()
@@ -331,17 +331,25 @@ object BarnesHut {
 
   def initBodies() {
     bodies = new Array(totalBodies)
-    for (i <- 0 until bodies.length) {
-      val b = new Quad.Body(i)
-      val angle = math.random.toFloat * 2 * math.Pi
-      val radius = 10 + 1000 * math.random.toFloat
-      b.x = radius * math.sin(angle).toFloat
-      b.y = radius * math.cos(angle).toFloat
-      b.xspeed = 0.1f * radius * math.sin(angle + math.Pi / 2).toFloat
-      b.yspeed = 0.1f * radius * math.cos(angle + math.Pi / 2).toFloat
-      b.mass = 0.9f + math.random.toFloat
-      bodies(i) = b
+
+    def galaxy(from: Int, num: Int, maxradius: Float, cx: Float, cy: Float, sx: Float, sy: Float) {
+      val M = 1.5f * num
+      for (i <- from until (from + num)) {
+        val b = new Quad.Body(i)
+        val angle = math.random.toFloat * 2 * math.Pi
+        val radius = 10 + maxradius * math.random.toFloat
+        b.x = cx + radius * math.sin(angle).toFloat
+        b.y = cy + radius * math.cos(angle).toFloat
+        val speed = 0.00005f * math.sqrt(gee * M) * radius
+        b.xspeed = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
+        b.yspeed = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
+        b.mass = 1.0f + 1.0f * math.random.toFloat
+        bodies(i) = b
+      }
     }
+
+    galaxy(0, bodies.length / 8, 300.0f, 0.0f, 0.0f, 10.0f, 10.0f)
+    galaxy(bodies.length / 8, bodies.length / 8 * 7, 1000.0f, 1800.0f, 1200.0f, -2.0f, -2.0f)
 
     // compute center and boundaries
     initialBoundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
@@ -442,8 +450,8 @@ object BarnesHut {
     animationPanel.add(startButton)
     val canvas = new JComponent {
       val pixels = new Array[Int](4000 * 4000)
-      override def paintComponent(g: Graphics) = self.synchronized {
-        super.paintComponent(g)
+      override def paintComponent(gcan: Graphics) = self.synchronized {
+        super.paintComponent(gcan)
         val width = getWidth
         val height = getHeight
         if (initialBoundaries != null) {
@@ -461,8 +469,17 @@ object BarnesHut {
             val color = (255 << 24) | (bound << 16) | (bound << 8) | bound
             img.setRGB(x, y, color)
           }
+          val g = img.getGraphics.asInstanceOf[Graphics2D]
+          g.setColor(Color.GRAY)
+          if (bodies.length < 20) for (b <- bodies) {
+            val px = ((b.x - initialBoundaries.minX) / initialBoundaries.width * width).toInt
+            val py = ((b.y - initialBoundaries.minY) / initialBoundaries.height * height).toInt
+            if (px >= 0 && px < width && py >= 0 && py < width) {
+              def r(x: Float) = (x * 100).toInt / 100.0f
+              g.drawString(s"${r(b.x)}, ${r(b.y)}", px, py)
+            }
+          }
           if (quadcheckbox.isSelected && quadtree != null) {
-            val g = img.getGraphics.asInstanceOf[Graphics2D]
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             val green = new Color(0, 225, 80, 150)
             val red = new Color(200, 0, 0, 150)
@@ -495,7 +512,7 @@ object BarnesHut {
             }
             drawQuad(0, quadtree)
           }
-          g.drawImage(img, 0, 0, null)
+          gcan.drawImage(img, 0, 0, null)
         }
       }
       addMouseWheelListener(new MouseAdapter {
@@ -559,6 +576,7 @@ object BarnesHut {
 
   def main(args: Array[String]) {
     init()
+    frame.repaint()
   }
 
 }
