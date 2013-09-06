@@ -27,6 +27,11 @@ object BuildSettings {
 
 object WorkstealingBuild extends Build {
   
+  def quote(s: Any) = {
+    if (scala.util.Properties.isWin) "\"" + s.toString + "\""
+    else s.toString
+  }
+
   /* tasks and settings */
   
   val javaCommand = TaskKey[String](
@@ -44,11 +49,11 @@ object WorkstealingBuild extends Build {
     (dp, jar, testjar, pbc, pbt) => // -XX:+UseConcMarkSweepGC  -XX:-DoEscapeAnalysis -XX:MaxTenuringThreshold=12 -verbose:gc -XX:+PrintGCDetails 
     val sep = java.io.File.pathSeparator
     val javacommand = "java -Xmx4096m -Xms4096m -XX:+UseCondCardMark -server -cp %s%s%s%s%s".format(
-      dp.map(x => "\"" + x.data + "\"").mkString(sep),
+      dp.map(x => quote(x.data)).mkString(sep),
       sep,
-      "\"" + jar + "\"",
+      quote(jar),
       sep,
-      "\"" + testjar + "\""
+      quote(testjar)
     )
     javacommand
   }

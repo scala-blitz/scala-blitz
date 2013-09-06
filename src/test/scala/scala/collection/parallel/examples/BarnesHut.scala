@@ -314,15 +314,17 @@ object BarnesHut {
     frame.parcombo.getItemAt(selidx).toInt
   }
 
-  def totalBodies = 20000
+  def totalBodies = frame.bodiesSpinner.getValue.asInstanceOf[Int]
 
-  def sectorPrecision = 4
+  def sectorPrecision = 16
 
-  def delta = 0.4f
+  def delta = 0.1f
   
   def theta = 0.5f
 
-  def gee = 10.0f
+  def eliminationThreshold = 10.0f
+
+  def gee = 100.0f
 
   def init() {
     initScheduler()
@@ -330,26 +332,40 @@ object BarnesHut {
   }
 
   def initBodies() {
+    init2Galaxies()
+  }
+
+  def init2Galaxies() {
     bodies = new Array(totalBodies)
 
     def galaxy(from: Int, num: Int, maxradius: Float, cx: Float, cy: Float, sx: Float, sy: Float) {
-      val M = 1.5f * num
+      val totalM = 1.5f * num
+      val blackHoleM = 1.0f * num
+      val cubmaxradius = maxradius * maxradius * maxradius
       for (i <- from until (from + num)) {
         val b = new Quad.Body(i)
-        val angle = math.random.toFloat * 2 * math.Pi
-        val radius = 10 + maxradius * math.random.toFloat
-        b.x = cx + radius * math.sin(angle).toFloat
-        b.y = cy + radius * math.cos(angle).toFloat
-        val speed = 0.00005f * math.sqrt(gee * M) * radius
-        b.xspeed = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
-        b.yspeed = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
-        b.mass = 1.0f + 1.0f * math.random.toFloat
+        if (i == from) {
+          b.x = cx
+          b.y = cy
+          b.xspeed = sx
+          b.yspeed = sy
+          b.mass = blackHoleM
+        } else {
+          val angle = math.random.toFloat * 2 * math.Pi
+          val radius = 25 + maxradius * math.random.toFloat
+          b.x = cx + radius * math.sin(angle).toFloat
+          b.y = cy + radius * math.cos(angle).toFloat
+          val speed = math.sqrt(gee * blackHoleM / radius + gee * totalM * radius * radius / cubmaxradius)
+          b.xspeed = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
+          b.yspeed = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
+          b.mass = 1.0f + 1.0f * math.random.toFloat
+        }
         bodies(i) = b
       }
     }
 
-    galaxy(0, bodies.length / 8, 300.0f, 0.0f, 0.0f, 10.0f, 10.0f)
-    galaxy(bodies.length / 8, bodies.length / 8 * 7, 1000.0f, 1800.0f, 1200.0f, -2.0f, -2.0f)
+    galaxy(0, bodies.length / 8, 300.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+    galaxy(bodies.length / 8, bodies.length / 8 * 7, 1000.0f, 1800.0f, 1200.0f, 0.0f, 0.0f)
 
     // compute center and boundaries
     initialBoundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
@@ -400,11 +416,10 @@ object BarnesHut {
     rightpanel.setBorder(BorderFactory.createEtchedBorder(border.EtchedBorder.LOWERED))
     add(rightpanel, BorderLayout.EAST)
     val controls = new JPanel
-    controls.setLayout(new GridLayout(0, 1))
+    controls.setLayout(new GridLayout(0, 2))
     rightpanel.add(controls, BorderLayout.NORTH)
-    val parallelismPanel = new JPanel
     val parallelismLabel = new JLabel("Parallelism")
-    parallelismPanel.add(parallelismLabel)
+    controls.add(parallelismLabel)
     val items = 1 to Runtime.getRuntime.availableProcessors map { _.toString } toArray
     val parcombo = new JComboBox[String](items)
     parcombo.setSelectedIndex(items.length - 1)
@@ -414,8 +429,19 @@ object BarnesHut {
         canvas.repaint()
       }
     })
-    parallelismPanel.add(parcombo)
-    controls.add(parallelismPanel)
+    controls.add(parcombo)
+    val bodiesLabel = new JLabel("Total bodies")
+    controls.add(bodiesLabel)
+    val bodiesSpinner = new JSpinner(new SpinnerNumberModel(25000, 4000, 1000000, 1000))
+    bodiesSpinner.addChangeListener(new ChangeListener {
+      def stateChanged(e: ChangeEvent) = self.synchronized {
+        if (frame != null) {
+          init()
+          canvas.repaint()
+        }
+      }
+    })
+    controls.add(bodiesSpinner)
     val quadcheckbox = new JCheckBox("Show quad")
     quadcheckbox.addActionListener(new ActionListener {
       def actionPerformed(e: ActionEvent) {
@@ -460,11 +486,11 @@ object BarnesHut {
           for (b <- bodies) {
             val px = ((b.x - initialBoundaries.minX) / initialBoundaries.width * width).toInt
             val py = ((b.y - initialBoundaries.minY) / initialBoundaries.height * height).toInt
-            if (px >= 0 && px < width && py >= 0 && py < width) pixels(py * width + px) += 1
+            if (px >= 0 && px < width && py >= 0 && py < height) pixels(py * width + px) += 1
           }
-          for (x <- 0 until width; y <- 0 until height) {
-            val factor = 1.0 * bodies.length / (width * height)
-            val intensity = pixels(y * width + x) / factor * 40
+          for (y <- 0 until height; x <- 0 until width) {
+            val factor = 1.0 * bodies.length / math.sqrt(width * height)
+            val intensity = pixels(y * width + x) / factor * 6000
             val bound = math.min(255, intensity.toInt)
             val color = (255 << 24) | (bound << 16) | (bound << 8) | bound
             img.setRGB(x, y, color)
@@ -474,7 +500,7 @@ object BarnesHut {
           if (bodies.length < 20) for (b <- bodies) {
             val px = ((b.x - initialBoundaries.minX) / initialBoundaries.width * width).toInt
             val py = ((b.y - initialBoundaries.minY) / initialBoundaries.height * height).toInt
-            if (px >= 0 && px < width && py >= 0 && py < width) {
+            if (px >= 0 && px < width && py >= 0 && py < height) {
               def r(x: Float) = (x * 100).toInt / 100.0f
               g.drawString(s"${r(b.x)}, ${r(b.y)}", px, py)
             }
