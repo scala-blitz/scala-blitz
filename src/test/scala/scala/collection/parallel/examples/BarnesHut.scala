@@ -19,8 +19,11 @@ object BarnesHut {
 
   var bodies: Array[Quad.Body] = _
   var scheduler: workstealing.WorkstealingTreeScheduler = _
+  var tasksupport: TaskSupport = _
   var initialBoundaries: Boundaries = _
   var boundaries: Boundaries = _
+  var sectors: Sectors[Conc.Buffer[Quad.Body]] = _
+  var buckets: Array[Conc[Quad.Body]] = _
   var quadtree: Quad = _
 
   sealed trait Quad {
@@ -102,7 +105,7 @@ object BarnesHut {
         //assert(netforcex < 1000, (netforcex, netforcey, this))
         //assert(netforcey < 1000, (netforcex, netforcey, this))
 
-        if (id == 0) println(s"pos: $x, $y, force: $netforcex, $netforcey, speed: $xspeed, $yspeed")
+        //if (id == 0) println(s"pos: $x, $y, force: $netforcex, $netforcey, speed: $xspeed, $yspeed")
       }
 
       override def toString = s"Body($id; pos: $x, $y; speed: $xspeed, $yspeed; mass: $mass)"
@@ -241,6 +244,7 @@ object BarnesHut {
   class Sectors[T <: AnyRef: ClassTag](val boundaries: Boundaries)(val comb: (T, T) => T)(val op: (T, Quad.Body) => Unit)
   extends Accumulator[Quad.Body, Sectors[T]] {
     var matrix = new Array[T](sectorPrecision * sectorPrecision)
+    val sectorSize = boundaries.size / sectorPrecision
 
     def merge(that: Sectors[T]) = {
       val res = new Sectors(boundaries)(comb)(op)
@@ -252,8 +256,8 @@ object BarnesHut {
     }
 
     def +=(b: Quad.Body) = {
-      val sx = math.min(sectorPrecision - 1, ((b.x - boundaries.minX) / (boundaries.size / sectorPrecision)).toInt)
-      val sy = math.min(sectorPrecision - 1, ((b.y - boundaries.minY) / (boundaries.size / sectorPrecision)).toInt)
+      val sx = math.min(sectorPrecision - 1, ((b.x - boundaries.minX) / sectorSize).toInt)
+      val sy = math.min(sectorPrecision - 1, ((b.y - boundaries.minY) / sectorSize).toInt)
       val accum = matrix(sy * sectorPrecision + sx)
       op(accum, b)
       this
@@ -263,11 +267,21 @@ object BarnesHut {
       matrix = new Array(sectorPrecision * sectorPrecision)
     }
 
+    def apply(x: Int, y: Int) = matrix(y * sectorPrecision + x)
+
     override def toString = s"Sectors(${matrix.mkString(", ")})"
   }
 
   def toQuad(sectors: Sectors[Conc.Buffer[Quad.Body]])(implicit ctx: workstealing.WorkstealingTreeScheduler): Quad = {
-    val quads = sectors.matrix.zipWithIndex.toPar.map(bi => sectorToQuad(sectors.boundaries, bi._1, bi._2))
+    buckets = sectors.matrix.map(_.result)
+    val indexedBuckets: Array[(Conc[Quad.Body], Int)] = buckets.zipWithIndex
+    val quads: Array[Quad] = if (useWsTree) {
+      indexedBuckets.toPar.map(bi => sectorToQuad(sectors.boundaries, bi._1, bi._2)).seq
+    } else {
+      val pibs = indexedBuckets.par
+      pibs.tasksupport = tasksupport
+      pibs.map(bi => sectorToQuad(sectors.boundaries, bi._1, bi._2)).seq.toArray
+    }
     
     // bind into a quad tree
     var level = sectorPrecision
@@ -276,34 +290,32 @@ object BarnesHut {
       for (qy <- 0 until nextlevel; qx <- 0 until nextlevel) {
         val rx = qx * 2
         val ry = qy * 2
-        val nw = quads.seq((ry + 0) * level + (rx + 0))
-        val ne = quads.seq((ry + 0) * level + (rx + 1))
-        val sw = quads.seq((ry + 1) * level + (rx + 0))
-        val se = quads.seq((ry + 1) * level + (rx + 1))
+        val nw = quads((ry + 0) * level + (rx + 0))
+        val ne = quads((ry + 0) * level + (rx + 1))
+        val sw = quads((ry + 1) * level + (rx + 0))
+        val se = quads((ry + 1) * level + (rx + 1))
         val size = boundaries.size / nextlevel
         val centerX = boundaries.minX + size * (qx + 0.5f)
         val centerY = boundaries.minY + size * (qy + 0.5f)
         val fork = new Quad.Fork(centerX, centerY, size)(nw, ne, sw, se)
         fork.updateStats()
-        quads.seq(qy * nextlevel + qx) = fork
+        quads(qy * nextlevel + qx) = fork
       }
       level = nextlevel
     }
 
-    quads.seq(0)
+    quads(0)
   }
 
-  def sectorToQuad(boundaries: Boundaries, bs: Conc.Buffer[Quad.Body], sid: Int): Quad = {
+  def sectorToQuad(boundaries: Boundaries, bs: Conc[Quad.Body], sid: Int): Quad = {
     val sx = sid % sectorPrecision
     val sy = sid / sectorPrecision
-    val size = boundaries.size
-    val sectorSize = size / sectorPrecision
-    val fromX = boundaries.minX + sx * sectorSize
-    val fromY = boundaries.minY + sy * sectorSize
+    val fromX = boundaries.minX + sx * sectors.sectorSize
+    val fromY = boundaries.minY + sy * sectors.sectorSize
     var quad: Quad = Quad.Empty
 
-    for (b <- bs.result) {
-      quad = quad.update(fromX, fromY, sectorSize, b)
+    for (b <- bs) {
+      quad = quad.update(fromX, fromY, sectors.sectorSize, b)
     }
 
     quad
@@ -316,15 +328,19 @@ object BarnesHut {
 
   def totalBodies = frame.bodiesSpinner.getValue.asInstanceOf[Int]
 
+  var useWsTree = true
+
   def sectorPrecision = 16
 
   def delta = 0.1f
   
   def theta = 0.5f
 
-  def eliminationThreshold = 10.0f
+  def eliminationThreshold = 8.0f
 
-  def gee = 100.0f
+  def eliminationQuantity = 4
+
+  def gee = 200.0f
 
   def init() {
     initScheduler()
@@ -337,6 +353,7 @@ object BarnesHut {
 
   def init2Galaxies() {
     bodies = new Array(totalBodies)
+    val random = new scala.util.Random(213L)
 
     def galaxy(from: Int, num: Int, maxradius: Float, cx: Float, cy: Float, sx: Float, sy: Float) {
       val totalM = 1.5f * num
@@ -351,21 +368,21 @@ object BarnesHut {
           b.yspeed = sy
           b.mass = blackHoleM
         } else {
-          val angle = math.random.toFloat * 2 * math.Pi
-          val radius = 25 + maxradius * math.random.toFloat
+          val angle = random.nextFloat * 2 * math.Pi
+          val radius = 25 + maxradius * random.nextFloat
           b.x = cx + radius * math.sin(angle).toFloat
           b.y = cy + radius * math.cos(angle).toFloat
           val speed = math.sqrt(gee * blackHoleM / radius + gee * totalM * radius * radius / cubmaxradius)
           b.xspeed = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
           b.yspeed = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
-          b.mass = 1.0f + 1.0f * math.random.toFloat
+          b.mass = 1.0f + 1.0f * random.nextFloat
         }
         bodies(i) = b
       }
     }
 
     galaxy(0, bodies.length / 8, 300.0f, 0.0f, 0.0f, 0.0f, 0.0f)
-    galaxy(bodies.length / 8, bodies.length / 8 * 7, 1000.0f, 1800.0f, 1200.0f, 0.0f, 0.0f)
+    galaxy(bodies.length / 8, bodies.length / 8 * 7, 350.0f, -1800.0f, -1200.0f, 0.0f, 0.0f)
 
     // compute center and boundaries
     initialBoundaries = bodies.toPar.accumulate(new Boundaries)(scheduler)
@@ -376,41 +393,119 @@ object BarnesHut {
     val p = parallelism
     val conf = new workstealing.WorkstealingTreeScheduler.Config.Default(p)
     scheduler = new workstealing.WorkstealingTreeScheduler.ForkJoin(conf)
+    tasksupport = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(p))
     println(s"parallelism level: $p")
   }
 
-  def step()(implicit s: workstealing.WorkstealingTreeScheduler): Unit = self.synchronized {
-    def constructTree(): Quad = {
-      // construct sectors
-      val sectors = bodies.toPar.accumulate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
-        _ += _
-      }))
+  val timeMap = collection.mutable.Map[String, (Double, Int)]()
 
-      // construct a quad tree for each sector
-      toQuad(sectors)
+  def timed(title: String)(body: =>Any): Any = {
+    val startTime = System.nanoTime
+    val res = body
+    val endTime = System.nanoTime
+    val totalTime = (endTime - startTime) / 1000000.0
+
+    timeMap.get(title) match {
+      case Some((total, num)) => timeMap(title) = (total + totalTime, num + 1)
+      case None => timeMap(title) = (0.0, 0)
     }
 
-    def updatePositions(quadtree: Quad) {
-      for (b <- bodies.toPar) {
-        b.updatePosition(quadtree)
+    println(s"$title: ${totalTime} ms; avg: ${timeMap(title)._1 / timeMap(title)._2}")
+    res
+  }
+
+  def updateInfo() {
+    val text = timeMap map {
+      case (k, (total, num)) => k + ": " + (total / num * 100).toInt / 100.0 + " ms"
+    } mkString("\n")
+    frame.info.setText(text)
+  }
+
+  def step()(implicit s: workstealing.WorkstealingTreeScheduler): Unit = self.synchronized {
+    def constructTree() {
+      // construct sectors
+      if (useWsTree) {
+        sectors = bodies.toPar.accumulate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
+          _ += _
+        }))
+      } else {
+        sectors = bodies.aggregate(Sectors(boundaries)(() => new Conc.Buffer[Quad.Body])(_ merge _)({
+          _ += _
+        }))(_ += _, _ merge _)
+      }
+
+      // construct a quad tree for each sector
+      quadtree = toQuad(sectors)
+    }
+
+    def updatePositions() {
+      if (useWsTree) {
+        for (buck <- buckets.toPar; b <- buck) b.updatePosition(quadtree)
+      } else {
+        val pbs = buckets.par
+        pbs.tasksupport = tasksupport
+        for (buck <- pbs; b <- buck) b.updatePosition(quadtree)
       }
 
       // recompute center and boundaries
-      boundaries = bodies.toPar.accumulate(new Boundaries)
-      println(boundaries)
+      if (useWsTree) {
+        boundaries = bodies.toPar.accumulate(new Boundaries)
+      } else {
+        boundaries = bodies.aggregate(new Boundaries)(_ += _, _ merge _)
+      }
     }
 
-    val startTime = System.nanoTime
-    quadtree = constructTree()
-    updatePositions(quadtree)
-    val endTime = System.nanoTime
-    val totalTime = endTime - startTime
-    println(totalTime / 1000000.0)
+    def eliminateOutliers() {
+      val outliers = collection.mutable.LinkedHashSet[Quad.Body]()
+
+      def checkOutlier(x: Int, y: Int) {
+        val sector = buckets(y * sectorPrecision + x)
+        if (sector.size < eliminationQuantity) for (b <- sector) {
+          val dx = quadtree.massX - b.x
+          val dy = quadtree.massY - b.y
+          val d = math.sqrt(dx * dx + dy * dy)
+          if (d > eliminationThreshold * sectors.sectorSize) {
+            val nx = dx / d
+            val ny = dy / d
+            val relativeSpeed = b.xspeed * nx + b.yspeed * ny
+            if (relativeSpeed < 0) {
+              val escapeSpeed = math.sqrt(2 * gee * quadtree.mass / d)
+              if (-relativeSpeed > 2 * escapeSpeed) outliers += b
+            }
+          }
+        }
+      }
+
+      for (x <- 0 until sectorPrecision) {
+        checkOutlier(x, 0)
+        checkOutlier(x, sectorPrecision - 1)
+      }
+      for (y <- 1 until sectorPrecision - 1) {
+        checkOutlier(0, y)
+        checkOutlier(sectorPrecision - 1, y)
+      }
+
+      if (outliers.nonEmpty) {
+        bodies = bodies.filterNot(b => outliers contains b)
+      }
+    }
+
+    timed(s"quadtree construction($useWsTree)") {
+      constructTree()
+    }
+    timed(s"position update($useWsTree)") {
+      updatePositions()
+    }
+    timed(s"elimination($useWsTree)") {
+      eliminateOutliers()
+    }
+    println("bodies remaining: " + bodies.length)
+    updateInfo()
   }
 
   class BarnesHutFrame extends JFrame("Barnes-Hut") {
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
-    setSize(800, 600)
+    setSize(1024, 600)
     setLayout(new BorderLayout)
     val rightpanel = new JPanel
     rightpanel.setBorder(BorderFactory.createEtchedBorder(border.EtchedBorder.LOWERED))
@@ -418,6 +513,17 @@ object BarnesHut {
     val controls = new JPanel
     controls.setLayout(new GridLayout(0, 2))
     rightpanel.add(controls, BorderLayout.NORTH)
+    val implLabel = new JLabel("Implementation")
+    controls.add(implLabel)
+    val implcombo = new JComboBox[String](Array("Workstealing tree", "Classic parallel collections"))
+    implcombo.addActionListener(new ActionListener {
+      def actionPerformed(e: ActionEvent) = self.synchronized {
+        if (frame.implcombo.getSelectedItem == "Workstealing tree") useWsTree = true
+        else useWsTree = false
+        canvas.repaint()
+      }
+    })
+    controls.add(implcombo)
     val parallelismLabel = new JLabel("Parallelism")
     controls.add(parallelismLabel)
     val items = 1 to Runtime.getRuntime.availableProcessors map { _.toString } toArray
@@ -474,6 +580,15 @@ object BarnesHut {
       }
     })
     animationPanel.add(startButton)
+    val clearButton = new JButton("Clear")
+    clearButton.addActionListener(new ActionListener {
+      def actionPerformed(e: ActionEvent) {
+        timeMap.clear()
+      }
+    })
+    controls.add(clearButton)
+    val info = new JTextArea("")
+    controls.add(info)
     val canvas = new JComponent {
       val pixels = new Array[Int](4000 * 4000)
       override def paintComponent(gcan: Graphics) = self.synchronized {
