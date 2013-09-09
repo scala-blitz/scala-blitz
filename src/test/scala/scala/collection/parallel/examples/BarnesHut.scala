@@ -340,7 +340,7 @@ object BarnesHut {
 
   def eliminationQuantity = 4
 
-  def gee = 200.0f
+  def gee = 100.0f
 
   def init() {
     initScheduler()
