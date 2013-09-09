@@ -300,6 +300,15 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     }
   }
 
+  test("groupBy") {
+    testOperation(comparison = hashMapSetComparison[Int, Int]) { 
+      r => scala.collection.mutable.HashMap() ++ r.groupBy(x=>x%15)
+    } {
+      p => p.toPar.groupBy(x=>x%15)
+    }
+  }
+
+
 }
 
 

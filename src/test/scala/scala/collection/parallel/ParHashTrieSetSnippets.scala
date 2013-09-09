@@ -23,7 +23,7 @@ trait ParHashTrieSetSnippets {
     sum
   }
 
-  def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate(0)(_ + _)(_ + _)
+  def aggregateParallel(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hm.toPar.aggregate[Int](0){(x : Int, y : Int   ) => x + y}(_ + _)
 
   def aggregateReducable(hm: HashSet[Int])(implicit s: WorkstealingTreeScheduler) = hashTrieSetIsReducable(hm.toPar).aggregate(0)(_ + _)(_ + _)
 

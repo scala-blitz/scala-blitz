@@ -217,13 +217,30 @@ object Hashes {
     new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
   }
 
+  def newHashMapMerger[K, V](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler) = 
+    new HashMapDiscardingMerger[Object, Object](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx).asInstanceOf[HashMapDiscardingMerger[K, V]]
+
+
   def newHashMapCombiningMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: WorkstealingTreeScheduler) = {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
+  }
+
+  def newHashMapCombiningMerger[K, V <: AnyRef](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: WorkstealingTreeScheduler) =  {
+    def castingCombiner(a: Object, b:Object ):Object = valueCombiner(a.asInstanceOf[V], b.asInstanceOf[V])
+    new HashMapCombiningMerger[Object, Object](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, castingCombiner, ctx)
   }
 
   def newHashMapCombiningMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: WorkstealingTreeScheduler, valueCombiner: (V, V) => V) = {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
   }
+
+    def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <:AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler, cmf:CanMergeFrom[Repr, V, That]) = {    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
+  }
+
+    def newHashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <:AnyRef, Repr](implicit ctx: WorkstealingTreeScheduler, cmf:CanMergeFrom[Repr, V, That]) = {
+    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
+  }
+
 
   /**
    * Discards values for already existing keys
@@ -299,12 +316,12 @@ object Hashes {
 
   }
 
-  class HashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That, Repr](
+  class HashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <: AnyRef, Repr](
     val width: Int,
     val loadFactor: Int,
     val seed: Int,
     val cmf: CanMergeFrom[Repr, V, That],
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapCollectingMerger[K, V, That, Repr], Par[HashMap[K, Repr]]] with HashTable.HashUtils[K] {
+    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapCollectingMerger[K, V, That, Repr], Par[HashMap[K, That]]] with HashTable.HashUtils[K] {
 
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
@@ -352,10 +369,9 @@ object Hashes {
       this
     }
 
-    def resultKernel(target: HashBuckets.DefaultEntries[K, Repr], cmf:CanMergeFrom[Repr, V, That]) = ???
     def newHashBucket = new HashMapCollectingMerger(width, loadFactor, seed, cmf , ctx)
 
-    def result = {
+    def result : Par[HashMap[K,That]] = {
       import Par._
       import Ops._
       val expectedSize = keys.foldLeft(0) { (acc, x) =>
@@ -363,10 +379,13 @@ object Hashes {
       }
       val table = new HashBuckets.DefaultEntries[K, Repr](width, expectedSize, loadFactor, seed)
       val stealer = (0 until keys.length).toPar.stealer
-      val kernel = resultKernel(table, cmf)
+      val kernel = new HashMapCollectingMergerResultKernel(width, keys, vals, table.asInstanceOf[HashBuckets.DefaultEntries[K, Object]], cmf)
       val size = ctx.invokeParallelOperation(stealer, kernel)
       table.setSize(size)
-      (new HashMap(table.hashTableContents)).toPar
+      val resultKernel = new HashMapCollectingMergerCallResultKernel[K, V, That]
+      val res = new HashMap(table.hashTableContents)
+      ctx.invokeParallelOperation[(K, Object), Unit](res.toPar.stealer.asInstanceOf[Stealer[(K, Object)]], resultKernel)
+      res.asInstanceOf[HashMap[K, That]].toPar
     }
 
   }
@@ -449,7 +468,6 @@ object Hashes {
     val width: Int
     val keys: Array[Conc.Buffer[K]]
     val vals: Array[Conc.Buffer[V]]
-    val table: HashBuckets.DefaultEntries[K, V]
     override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
     def zero = 0
     def combine(a: Int, b: Int) = a + b
@@ -464,7 +482,7 @@ object Hashes {
       }
       sum
     }
-    def insertEntry(table: HashBuckets.DefaultEntries[K, V], key: K, value: V) = table.tryInsertEntry(key, value)
+    def insertEntry(key: K, value: V): Boolean
     private def storeBucket(i: Int): Int = {
       def traverse(ks: Conc[K], vs: Conc[V]): Int = ks match {
         case knode: Conc.<>[K] =>
@@ -479,7 +497,7 @@ object Hashes {
           while (i < until) {
             val k = kchunkarr(i)
             val v = vchunkarr(i)
-            if (insertEntry(table, k, v)) total += 1
+            if (insertEntry(k, v)) total += 1
             i += 1
           }
           total
@@ -495,7 +513,9 @@ object Hashes {
     val width: Int,
     val keys: Array[Conc.Buffer[K]],
     val vals: Array[Conc.Buffer[V]],
-    val table: HashBuckets.DefaultEntries[K, V]) extends HashMapMergerResultKernel[K, V] {}
+    val table: HashBuckets.DefaultEntries[K, V]) extends HashMapMergerResultKernel[K, V] {
+    def insertEntry(key: K, value: V) = table.tryInsertEntry(key, value)
+  }
 
   class HashMapCombiningMergerResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V](
     val width: Int,
@@ -503,8 +523,48 @@ object Hashes {
     val vals: Array[Conc.Buffer[V]],
     val table: HashBuckets.DefaultEntries[K, V],
     val valueCombiner: (V, V) => V) extends HashMapMergerResultKernel[K, V] {
-    override def insertEntry(table: HashBuckets.DefaultEntries[K, V], key: K, value: V) = table.tryCombineEntry(key, value, valueCombiner)
+    def insertEntry(key: K, value: V) = table.tryCombineEntry(key, value, valueCombiner)
   }
+
+  class HashMapCollectingMergerResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V, That, Repr](
+    val width: Int,
+    val keys: Array[Conc.Buffer[K]],
+    val vals: Array[Conc.Buffer[V]],
+    val table: HashBuckets.DefaultEntries[K, Object],
+    val cmf: CanMergeFrom[Repr, V, That])
+ extends HashMapMergerResultKernel[K, V] {
+    def valueCombiner (merger: Object, value: V) = {
+    merger.asInstanceOf[Merger[V, That]]+=value
+    }
+    def valueInitializer (value:V) = {
+      val merger = cmf.apply()
+      merger +=value
+      merger
+        }
+    override def insertEntry(key: K, value: V) = table.tryAggregateEntry[V](key, value, valueInitializer, valueCombiner)
+  }
+
+  class HashMapCollectingMergerCallResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V, That <: AnyRef] extends scala.collection.parallel.workstealing.Hashes.HashMapKernel[K, Object, Unit] {
+        def zero = ()
+        def combine(a: Unit, b: Unit) = ()
+        def apply(node: WorkstealingTreeScheduler.Node[(K, Object), Unit], from: Int, until: Int) = {
+          val stealer = node.stealer.asInstanceOf[scala.collection.parallel.workstealing.Hashes.HashMapStealer[K, Object]]
+          val table = stealer.table
+          var i = from
+          while (i < until) {
+            var entries = table(i)
+            while (entries != null) {
+              import collection.mutable
+              import mutable.DefaultEntry
+              val de = entries.asInstanceOf[DefaultEntry[K, Object]]
+              de.value = de.value.asInstanceOf[Merger[V, That]].result
+              entries = entries.next
+            }
+            i += 1
+          }
+          ()
+        }
+      }
 
   abstract class HashMapKernel[K, V, R] extends IndexedStealer.IndexedKernel[(K, V), R] {
     def apply(node: Node[(K, V), R], chunkSize: Int): R = {
