@@ -23,8 +23,8 @@ object Mandelbrot {
     }
     def threshold = frame.threshold.getText.toInt
     def zoom = frame.zoomlevel.getValue.asInstanceOf[Int] / 10.0 * 500.0
-    var xoff = 0.0
-    var yoff = 0.0
+    var xoff = -0.9572428
+    var yoff = -0.2956327
     var xlast = -1
     var ylast = -1
     def xlo = xoff - getWidth / zoom
@@ -141,7 +141,7 @@ object Mandelbrot {
       fill(pixels, getWidth, getHeight)
       val end = System.nanoTime
       val time = (end - start) / 1000000.0
-      val stats = "size: " + getWidth + "x" + getHeight + ", parallelism: " + parallelism + ", time: " + time + " ms"
+      val stats = "size: " + getWidth + "x" + getHeight + ", parallelism: " + parallelism + ", time: " + time + " ms" + ", bounds=(" + xoff + ", " + yoff + ")"
       println("Rendering: " + stats)
       frame.setTitle("Mandelbrot: " + stats)
 
@@ -188,7 +188,7 @@ object Mandelbrot {
     controls.add(parcombo)
     controls.add(new JLabel("Zoom"))
     val zoomlevel = new JSpinner
-    zoomlevel.setValue(10)
+    zoomlevel.setValue(157)
     zoomlevel.addChangeListener(new ChangeListener {
       def stateChanged(e: ChangeEvent) {
         canvas.repaint()
@@ -196,7 +196,7 @@ object Mandelbrot {
     })
     controls.add(zoomlevel)
     controls.add(new JLabel("Threshold"))
-    val threshold = new JTextField("1000")
+    val threshold = new JTextField("2000")
     threshold.addActionListener(new ActionListener {
       def actionPerformed(e: ActionEvent) {
         canvas.repaint()
