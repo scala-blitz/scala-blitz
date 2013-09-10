@@ -96,15 +96,15 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  /*if(TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
-    val rt = (r: Range) => r.toSeq
+  if(TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
+    val rt = (r: Range) => r.sorted.toList
     val ht = (h: HashSet[Int]) => {
       
       collection.parallel.workstealing.TreeStealer.debug.clear()
       collection.parallel.workstealing.TreeStealer.debug(hashSetPrettyString(h))
       val r = aggregateReducableUnion(h)
       //println("-------------------------------")
-      r.toSeq.sorted
+      r.toList.sorted
     }
     try {
       testOperation(comparison = seqComparison[Int])(rt)(ht)
@@ -374,7 +374,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => forallSmallerReducable(a, a.last)
     }
   }
-   */
+   
 }
 
 

@@ -1,5 +1,7 @@
 package scala.collection.parallel.workstealing.methods
 
+
+
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
@@ -12,6 +14,8 @@ import scala.collection.immutable.HashSet
 import scala.collection.immutable.HashMap
 import Optimizer.c2opt
 
+
+
 object HashTrieSetMacros {
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
@@ -22,10 +26,7 @@ object HashTrieSetMacros {
     val (zv, zg) = c.nonFunctionToLocal[S](z)
     val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
     val result = reify {
-      import scala._
-      import collection.parallel
-      import parallel._
-      import workstealing._
+      import scala.collection.parallel.workstealing._
 
       val callee = calleeExpression.splice
       val stealer = callee.stealer
@@ -34,24 +35,19 @@ object HashTrieSetMacros {
         comblv.splice
         zv.splice
         def zero = zg.splice
-        def combine(a: S, b: S) = { val r = comboper.splice.apply(a, b); println(" combining " + a + " " + b + " got " + r); r }
-        def apply(node: Node[T, S], ci: Trees.HashSetIndexedStealer[T]): S = {
-          var sum: S = zero
-          println("Started with " + sum)
-          println("1")
-          while (ci.hasNext) {
-            println("2")
-            val el = ci.next
-            println("3")
-            sum = seqoper.splice(sum, el)
-            println("4")
-            println(sum + " seq with " + el)
+        def combine(a: S, b: S) = comboper.splice.apply(a, b)
+        def apply(node: Node[T, S], ci: Trees.HashSetIndexedStealer[T], els: Int): S = {
+          if (els < 1) zero
+          else {
+            var sum = zero
+            var got = 0
+            while (got < els) {
+              val el = ci.next
+              sum = seqoper.splice(sum, el)
+              got += 1
+            }
+            sum
           }
-          println("5")
-          println("returning " + sum)
-          println("6")
-          ???
-          sum
         }
       }
       ctx.splice.invokeParallelOperation(stealer, kernel)
@@ -75,10 +71,12 @@ object HashTrieSetMacros {
       val kernel = new scala.collection.parallel.workstealing.Trees.HashSetKernel[T, Option[T]] {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
-        def apply(node: Node[T, Option[T]], ci: Trees.HashSetIndexedStealer[T]): Option[T] = {
+        def apply(node: Node[T, Option[T]], ci: Trees.HashSetIndexedStealer[T], els: Int): Option[T] = {
           var res: Option[T] = zero
-          while (res.isEmpty && ci.hasNext) {
+          var got = 0
+          while (res.isEmpty && got < els) {
             val el = ci.next
+            got += 1
             if (predoper.splice(el)) { res = Some(el); terminationCause = ResultFound }
           }
           res
@@ -220,12 +218,16 @@ object HashTrieSetMacros {
             r
           }
         }
-        def apply(node: Node[T, ResultCell[M]], ci: Trees.HashSetIndexedStealer[T]): ResultCell[M] = {
+        def apply(node: Node[T, ResultCell[M]], ci: Trees.HashSetIndexedStealer[T], els: Int): ResultCell[M] = {
           val cur = node.READ_INTERMEDIATE
-          if (!ci.hasNext) cur
+          if (els < 1) cur
           else {
             var res = mpg.splice(ci.next)
-            while (ci.hasNext) res = comboper.splice(res, mpg.splice(ci.next))
+            var got = 1
+            while (got < els) {
+              res = comboper.splice(res, mpg.splice(ci.next))
+              got += 1
+            }
             if (cur.isEmpty) cur.result = res
             else cur.result = comboper.splice(cur.result, res)
             cur
@@ -256,9 +258,13 @@ object HashTrieSetMacros {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[T, Merger[S, That]], ci: Trees.HashSetIndexedStealer[T]): Merger[S, That] = {
+        def apply(node: Node[T, Merger[S, That]], ci: Trees.HashSetIndexedStealer[T], els: Int): Merger[S, That] = {
           val merger = node.READ_INTERMEDIATE
-          while (ci.hasNext) applyer.splice(merger, ci.next)
+          var got = 0
+          while (got < els) {
+            applyer.splice(merger, ci.next)
+            got += 1
+          }
           merger
         }
       }

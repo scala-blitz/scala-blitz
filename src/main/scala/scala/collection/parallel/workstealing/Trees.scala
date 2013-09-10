@@ -171,7 +171,7 @@ object Trees {
       }
     }
 
-    def next(): T = chunkIterator.next
+    def next(): T = {nextProgress +=1 ; chunkIterator.next}
     def newStealer(start: Int, until: Int) = {
       val result = new HashSetIndexedStealer(root, start, until)
       result.setPos(start)
@@ -179,6 +179,7 @@ object Trees {
     }
 
     final def setPos(pos: Int) {
+//      println("Set Post "  + pos)
       resetIterator(root)
       val posStack = chunkIterator.initPosStack
       val arrayStack: Array[Array[collection.immutable.Iterable[T @uV]]] = chunkIterator.initArrayStack
@@ -191,6 +192,8 @@ object Trees {
       def isTrie(x: AnyRef) = x.isInstanceOf[HashSet.HashTrieSet[_]]
 
       def goDeeper(elementsToSkip: Int, remainingSet: HashSet[T]) {
+//        println("going deeper into "+ remainingSet)
+//        println("need to skip" + elementsToSkip)
         val children = totalChildren(remainingSet)
         var el = elementsToSkip
         var pos = 0
@@ -202,8 +205,8 @@ object Trees {
           subtree = child(remainingSet, pos + 1)
         }
 
+//        println("Has children "+ children + " selected "+ pos)
         if (pos + 1 < children) {
-
           arrayStack(depth) = getElems(remainingSet)
           posStack(depth) = pos + 1
           depth += 1
@@ -213,6 +216,7 @@ object Trees {
           goDeeper(el, subtree.asInstanceOf[HashSet[T]])
         } else {
           subIter = subtree.iterator
+//          println("Skipping elements : " + el + " in subtree " + subtree )
           while (el > 0) { el -= 1; subIter.next }
           chunkIterator.setSubInter(subIter)
         }
@@ -220,10 +224,15 @@ object Trees {
       }
       goDeeper(pos, root)
       depth -= 1;
+//      println("Setting arrayStack "+ arrayStack.map{x=> if(x eq null) "null" else x.mkString}.mkString("[", " ","]"))
+//      println("Setting posStack "+ posStack.mkString("[", " ","]"))
+//      println("Setting depth " + depth)
       chunkIterator.setArrayStack(arrayStack)
       chunkIterator.setPosStack(posStack)
       chunkIterator.setDepth(depth)
       if (depth >= 0) {
+//        println("Setting arrayD " + arrayStack(depth).mkString)
+//        println("Setting posD " + posStack(depth))
         chunkIterator.setArrayD(arrayStack(depth))
         chunkIterator.setPosD(posStack(depth))
       }
@@ -532,12 +541,12 @@ object Trees {
     }
   }
 
-  abstract class HashSetKernel[T, R] extends Kernel[T, R] {
+  abstract class HashSetKernel[T, R] extends  IndexedStealer.IndexedKernel[T, R] {
     def apply(node: Node[T, R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[HashSetIndexedStealer[T]]
-      apply(node, stealer)
+      apply(node, stealer, chunkSize)
     }
-    def apply(node: Node[T, R], ci: HashSetIndexedStealer[T]): R
+    def apply(node: Node[T, R], ci: HashSetIndexedStealer[T], chunkSize: Int): R
   }
 
   class HashMapStealer[K, V](val root: HashMap[K, V]) extends {
