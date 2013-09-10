@@ -171,7 +171,7 @@ object Trees {
       }
     }
 
-    def next(): T = {nextProgress +=1 ; chunkIterator.next}
+    def next(): T = { nextProgress += 1; chunkIterator.next }
     def newStealer(start: Int, until: Int) = {
       val result = new HashSetIndexedStealer(root, start, until)
       result.setPos(start)
@@ -179,62 +179,55 @@ object Trees {
     }
 
     final def setPos(pos: Int) {
-//      println("Set Post "  + pos)
-      resetIterator(root)
-      val posStack = chunkIterator.initPosStack
-      val arrayStack: Array[Array[collection.immutable.Iterable[T @uV]]] = chunkIterator.initArrayStack
-      var depth = chunkIterator.initDepth
+      if (root.isEmpty) { chunkIterator.setSubInter(null); chunkIterator.setDepth(-1) } else {
+        resetIterator(root)
 
-      def getElems(x: Iterable[T]): Array[collection.immutable.Iterable[T]] = (x match {
-        case x: HashSet.HashTrieSet[_] => x.elems
-      }).asInstanceOf[Array[collection.immutable.Iterable[T]]]
+        val posStack = chunkIterator.initPosStack
+        val arrayStack: Array[Array[collection.immutable.Iterable[T @uV]]] = chunkIterator.initArrayStack
+        var depth = chunkIterator.initDepth
 
-      def isTrie(x: AnyRef) = x.isInstanceOf[HashSet.HashTrieSet[_]]
+        def getElems(x: Iterable[T]): Array[collection.immutable.Iterable[T]] = (x match {
+          case x: HashSet.HashTrieSet[_] => x.elems
+        }).asInstanceOf[Array[collection.immutable.Iterable[T]]]
 
-      def goDeeper(elementsToSkip: Int, remainingSet: HashSet[T]) {
-//        println("going deeper into "+ remainingSet)
-//        println("need to skip" + elementsToSkip)
-        val children = totalChildren(remainingSet)
-        var el = elementsToSkip
-        var pos = 0
-        var subtree = child(remainingSet, pos + 1)
-        var subIter: Iterator[T] = null
-        while (pos < children && el - subtree.size >= 0) {
-          el -= subtree.size
-          pos += 1;
-          subtree = child(remainingSet, pos + 1)
+        def isTrie(x: AnyRef) = x.isInstanceOf[HashSet.HashTrieSet[_]]
+
+        def goDeeper(elementsToSkip: Int, remainingSet: HashSet[T]) {
+          val children = totalChildren(remainingSet)
+          var el = elementsToSkip
+          var pos = 0
+          var subtree = child(remainingSet, pos + 1)
+          var subIter: Iterator[T] = null
+          while (pos < children && el - subtree.size >= 0) {
+            el -= subtree.size
+            pos += 1;
+            subtree = child(remainingSet, pos + 1)
+          }
+
+          if (pos + 1 < children) {
+            arrayStack(depth) = getElems(remainingSet)
+            posStack(depth) = pos + 1
+            depth += 1
+          }
+          if (isTrie(subtree)) {
+
+            goDeeper(el, subtree.asInstanceOf[HashSet[T]])
+          } else {
+            subIter = subtree.iterator
+            while (el > 0) { el -= 1; subIter.next }
+            chunkIterator.setSubInter(subIter)
+          }
+
         }
-
-//        println("Has children "+ children + " selected "+ pos)
-        if (pos + 1 < children) {
-          arrayStack(depth) = getElems(remainingSet)
-          posStack(depth) = pos + 1
-          depth += 1
+        goDeeper(pos, root)
+        depth -= 1;
+        chunkIterator.setArrayStack(arrayStack)
+        chunkIterator.setPosStack(posStack)
+        chunkIterator.setDepth(depth)
+        if (depth >= 0) {
+          chunkIterator.setArrayD(arrayStack(depth))
+          chunkIterator.setPosD(posStack(depth))
         }
-        if (isTrie(subtree)) {
-
-          goDeeper(el, subtree.asInstanceOf[HashSet[T]])
-        } else {
-          subIter = subtree.iterator
-//          println("Skipping elements : " + el + " in subtree " + subtree )
-          while (el > 0) { el -= 1; subIter.next }
-          chunkIterator.setSubInter(subIter)
-        }
-
-      }
-      goDeeper(pos, root)
-      depth -= 1;
-//      println("Setting arrayStack "+ arrayStack.map{x=> if(x eq null) "null" else x.mkString}.mkString("[", " ","]"))
-//      println("Setting posStack "+ posStack.mkString("[", " ","]"))
-//      println("Setting depth " + depth)
-      chunkIterator.setArrayStack(arrayStack)
-      chunkIterator.setPosStack(posStack)
-      chunkIterator.setDepth(depth)
-      if (depth >= 0) {
-//        println("Setting arrayD " + arrayStack(depth).mkString)
-//        println("Setting posD " + posStack(depth))
-        chunkIterator.setArrayD(arrayStack(depth))
-        chunkIterator.setPosD(posStack(depth))
       }
     }
 
@@ -280,7 +273,7 @@ object Trees {
         Trees.kv(hm1)
       }
     }
-    def next(): (K, V) = chunkIterator.next
+    def next(): (K, V) = { nextProgress += 1; chunkIterator.next }
     def newStealer(start: Int, until: Int) = {
       val result = new HashMapIndexedStealer(root, start, until)
       result.setPos(start)
@@ -288,53 +281,55 @@ object Trees {
     }
 
     final def setPos(pos: Int) {
-      resetIterator(root)
-      val posStack = chunkIterator.initPosStack
-      val arrayStack: Array[Array[collection.immutable.Iterable[(K, V) @uV]]] = chunkIterator.initArrayStack
-      var depth = chunkIterator.initDepth
+      if (root.isEmpty) { chunkIterator.setSubInter(null); chunkIterator.setDepth(-1) }
+      else {
+        resetIterator(root)
+        val posStack = chunkIterator.initPosStack
+        val arrayStack: Array[Array[collection.immutable.Iterable[(K, V) @uV]]] = chunkIterator.initArrayStack
+        var depth = chunkIterator.initDepth
 
-      def getElems(x: Iterable[(K, V)]): Array[collection.immutable.Iterable[(K, V)]] = (x match {
-        case x: HashMap.HashTrieMap[_, _] => x.elems
-      }).asInstanceOf[Array[collection.immutable.Iterable[(K, V)]]]
+        def getElems(x: Iterable[(K, V)]): Array[collection.immutable.Iterable[(K, V)]] = (x match {
+          case x: HashMap.HashTrieMap[_, _] => x.elems
+        }).asInstanceOf[Array[collection.immutable.Iterable[(K, V)]]]
 
-      def isTrie(x: AnyRef) = x.isInstanceOf[HashMap.HashTrieMap[_, _]]
+        def isTrie(x: AnyRef) = x.isInstanceOf[HashMap.HashTrieMap[_, _]]
 
-      def goDeeper(elementsToSkip: Int, remainingSet: HashMap[K, V]) {
-        val children = totalChildren(remainingSet)
-        var el = elementsToSkip
-        var pos = 0
-        var subtree = child(remainingSet, pos + 1)
-        var subIter: Iterator[(K, V)] = null
-        while (pos < children && el - subtree.size >= 0) {
-          el -= subtree.size
-          pos += 1;
-          subtree = child(remainingSet, pos + 1)
+        def goDeeper(elementsToSkip: Int, remainingSet: HashMap[K, V]) {
+          val children = totalChildren(remainingSet)
+          var el = elementsToSkip
+          var pos = 0
+          var subtree = child(remainingSet, pos + 1)
+          var subIter: Iterator[(K, V)] = null
+          while (pos < children && el - subtree.size >= 0) {
+            el -= subtree.size
+            pos += 1;
+            subtree = child(remainingSet, pos + 1)
+          }
+
+          if (pos + 1 < children) {
+            arrayStack(depth) = getElems(remainingSet)
+            posStack(depth) = pos + 1
+            depth += 1
+          }
+          if (isTrie(subtree)) {
+
+            goDeeper(el, subtree.asInstanceOf[HashMap[K, V]])
+          } else {
+            subIter = subtree.iterator
+            while (el > 0) { el -= 1; subIter.next }
+            chunkIterator.setSubInter(subIter)
+          }
+
         }
-
-        if (pos + 1 < children) {
-
-          arrayStack(depth) = getElems(remainingSet)
-          posStack(depth) = pos + 1
-          depth += 1
+        goDeeper(pos, root)
+        depth -= 1;
+        chunkIterator.setArrayStack(arrayStack)
+        chunkIterator.setPosStack(posStack)
+        chunkIterator.setDepth(depth)
+        if (depth >= 0) {
+          chunkIterator.setArrayD(arrayStack(depth))
+          chunkIterator.setPosD(posStack(depth))
         }
-        if (isTrie(subtree)) {
-
-          goDeeper(el, subtree.asInstanceOf[HashMap[K, V]])
-        } else {
-          subIter = subtree.iterator
-          while (el > 0) { el -= 1; subIter.next }
-          chunkIterator.setSubInter(subIter)
-        }
-
-      }
-      goDeeper(pos, root)
-      depth -= 1;
-      chunkIterator.setArrayStack(arrayStack)
-      chunkIterator.setPosStack(posStack)
-      chunkIterator.setDepth(depth)
-      if (depth >= 0) {
-        chunkIterator.setArrayD(arrayStack(depth))
-        chunkIterator.setPosD(posStack(depth))
       }
     }
 
@@ -541,7 +536,7 @@ object Trees {
     }
   }
 
-  abstract class HashSetKernel[T, R] extends  IndexedStealer.IndexedKernel[T, R] {
+  abstract class HashSetKernel[T, R] extends IndexedStealer.IndexedKernel[T, R] {
     def apply(node: Node[T, R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[HashSetIndexedStealer[T]]
       apply(node, stealer, chunkSize)
@@ -729,12 +724,11 @@ object Trees {
     }
   }
 
-  abstract class HashMapKernel[K, V, R] extends Kernel[(K, V), R] {
+  abstract class HashMapKernel[K, V, R] extends IndexedStealer.IndexedKernel[(K, V), R] {
     def apply(node: Node[(K, V), R], chunkSize: Int): R = {
       val stealer = node.stealer.asInstanceOf[HashMapIndexedStealer[K, V]]
-      apply(node, stealer)
+      apply(node, stealer, chunkSize)
     }
-    def apply(node: Node[(K, V), R], ci: HashMapIndexedStealer[K, V]): R
+    def apply(node: Node[(K, V), R], ci: HashMapIndexedStealer[K, V], chunkSize: Int): R
   }
-
 }

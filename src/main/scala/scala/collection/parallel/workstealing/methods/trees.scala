@@ -1,7 +1,5 @@
 package scala.collection.parallel.workstealing.methods
 
-
-
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
@@ -13,8 +11,6 @@ import scala.collection.parallel.Merger
 import scala.collection.immutable.HashSet
 import scala.collection.immutable.HashMap
 import Optimizer.c2opt
-
-
 
 object HashTrieSetMacros {
 
@@ -36,12 +32,12 @@ object HashTrieSetMacros {
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: Node[T, S], ci: Trees.HashSetIndexedStealer[T], els: Int): S = {
-          if (els < 1) zero
+        def apply(node: Node[T, S], ci: Trees.HashSetIndexedStealer[T], elems: Int): S = {
+          if (elems < 1) zero
           else {
             var sum = zero
             var got = 0
-            while (got < els) {
+            while (got < elems) {
               val el = ci.next
               sum = seqoper.splice(sum, el)
               got += 1
@@ -71,10 +67,10 @@ object HashTrieSetMacros {
       val kernel = new scala.collection.parallel.workstealing.Trees.HashSetKernel[T, Option[T]] {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
-        def apply(node: Node[T, Option[T]], ci: Trees.HashSetIndexedStealer[T], els: Int): Option[T] = {
+        def apply(node: Node[T, Option[T]], ci: Trees.HashSetIndexedStealer[T], elems: Int): Option[T] = {
           var res: Option[T] = zero
           var got = 0
-          while (res.isEmpty && got < els) {
+          while (res.isEmpty && got < elems) {
             val el = ci.next
             got += 1
             if (predoper.splice(el)) { res = Some(el); terminationCause = ResultFound }
@@ -218,13 +214,13 @@ object HashTrieSetMacros {
             r
           }
         }
-        def apply(node: Node[T, ResultCell[M]], ci: Trees.HashSetIndexedStealer[T], els: Int): ResultCell[M] = {
+        def apply(node: Node[T, ResultCell[M]], ci: Trees.HashSetIndexedStealer[T], elems: Int): ResultCell[M] = {
           val cur = node.READ_INTERMEDIATE
-          if (els < 1) cur
+          if (elems < 1) cur
           else {
             var res = mpg.splice(ci.next)
             var got = 1
-            while (got < els) {
+            while (got < elems) {
               res = comboper.splice(res, mpg.splice(ci.next))
               got += 1
             }
@@ -258,10 +254,10 @@ object HashTrieSetMacros {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[T, Merger[S, That]], ci: Trees.HashSetIndexedStealer[T], els: Int): Merger[S, That] = {
+        def apply(node: Node[T, Merger[S, That]], ci: Trees.HashSetIndexedStealer[T], elems: Int): Merger[S, That] = {
           val merger = node.READ_INTERMEDIATE
           var got = 0
-          while (got < els) {
+          while (got < elems) {
             applyer.splice(merger, ci.next)
             got += 1
           }
@@ -373,9 +369,10 @@ object HashTrieMapMacros {
         comblv.splice
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: Node[(K, V), S], ci: Trees.HashMapIndexedStealer[K, V]): S = {
+        def apply(node: Node[(K, V), S], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): S = {
+          var got = 0
           var res = zero
-          while (ci.hasNext) res = seqoper.splice(res, ci.next)
+          while (got < elems) { res = seqoper.splice(res, ci.next); got += 1 }
           res
         }
       }
@@ -400,11 +397,13 @@ object HashTrieMapMacros {
       val kernel = new scala.collection.parallel.workstealing.Trees.HashMapKernel[K, V, Option[(K, V)]] {
         def zero = None
         def combine(a: Option[(K, V)], b: Option[(K, V)]) = if (a.isDefined) a else b
-        def apply(node: Node[(K, V), Option[(K, V)]], ci: Trees.HashMapIndexedStealer[K, V]): Option[(K, V)] = {
+        def apply(node: Node[(K, V), Option[(K, V)]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): Option[(K, V)] = {
           var result: Option[(K, V)] = None
-          while (result.isEmpty && ci.hasNext) {
+          var got = 0
+          while (got < elems && result.isEmpty) {
             val el = ci.next
             if (predoper.splice(el)) { result = Some(el); terminationCause = ResultFound }
+            got += 1
           }
           result
         }
@@ -464,12 +463,13 @@ object HashTrieMapMacros {
             r
           }
         }
-        def apply(node: Node[(K, V), ResultCell[M]], ci: Trees.HashMapIndexedStealer[K, V]): ResultCell[M] = {
+        def apply(node: Node[(K, V), ResultCell[M]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): ResultCell[M] = {
           val cur = node.READ_INTERMEDIATE
-          if (!ci.hasNext) cur
+          if (elems < 1) cur
           else {
+            var got = 1
             var res = mpg.splice(ci.next)
-            while (ci.hasNext) res = comboper.splice(res, mpg.splice(ci.next))
+            while (got < elems) { res = comboper.splice(res, mpg.splice(ci.next)); got += 1 }
             if (cur.isEmpty) cur.result = res
             else cur.result = comboper.splice(cur.result, res)
             cur
@@ -500,9 +500,10 @@ object HashTrieMapMacros {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[(K, V), Merger[S, That]], ci: Trees.HashMapIndexedStealer[K, V]): Merger[S, That] = {
+        def apply(node: Node[(K, V), Merger[S, That]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): Merger[S, That] = {
           val merger = node.READ_INTERMEDIATE
-          while (ci.hasNext) applyer.splice(merger, ci.next)
+          var got = 0
+          while (got < elems) { applyer.splice(merger, ci.next); got += 1 }
           merger
         }
       }
