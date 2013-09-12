@@ -59,12 +59,12 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     val generator = new java.util.Random(42)
     for (size <- sizes(from)) yield 
     (for(i<-0 until size) 
-      yield (for(j<-0 until size; if (j!=i&& generator.nextFloat()<prob)) yield (j)).toArray
+      yield (for(j<-0 until size; if (j!=i&& generator.nextFloat() < prob)) yield (j)).toArray
     ).toArray
   }
 
 
-  def getPageRankSequential(graph: Array[Array[Int]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
+  def getPageRankSequential(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
 
     // Precompute some values that will be used often for the updates.
     val numVertices = graph.size
@@ -103,9 +103,7 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     vertices
   }
 
-
-
-  def getPageRankNew(graph: Array[Array[Int]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9)(implicit s: WorkstealingTreeScheduler) = {
+  def getPageRankNew(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9)(implicit s: WorkstealingTreeScheduler) = {
 
     // Precompute some values that will be used often for the updates.
     val numVertices = graph.size
@@ -120,19 +118,17 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
         vertex
     }
 
-
     var done = false
     var currentIteration = 1
     val result = StringBuilder.newBuilder
 
     while (!done) {
       // Tell all vertices to spread their mass and get back the missing mass.
-      val redistributedMassPairs = vertices.flatMap{x=>x.spreadMass}
+      val redistributedMassPairs = vertices flatMap { x => x.spreadMass }
 
-
-      val totalMissingMass = vertices.mapReduce{x=> x.missingMass}(_+_)
+      val totalMissingMass = vertices.mapReduce(x => x.missingMass)(_ + _)
       val eachVertexRedistributedMass = totalMissingMass / numVertices
-      val redistributedMass = redistributedMassPairs.groupMapAggregate(x => x._1)( x => x._2)((x,y) => x + y) 
+      val redistributedMass = redistributedMassPairs.groupMapAggregate(x => x._1)(x => x._2)((x, y) => x + y)
       redistributedMass.foreach { x => vertices.seq(x._1).takeMass(x._2) }
       val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
 
@@ -152,13 +148,13 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     var outdegree = neighbors.length
     var receivedMass = 0.0
 
-    def missingMass = if (outdegree == 0)pagerank else 0.0
+    def missingMass = if (outdegree == 0) pagerank else 0.0
 
     def spreadMass = {
       if (outdegree == 0)  Array.empty[(Int,Double)]
       else {
         val amountPerNeighbor = pagerank / outdegree
-         neighbors.map(x=>(x, amountPerNeighbor))
+        neighbors.map(x => (x, amountPerNeighbor))
       }
     }
 
