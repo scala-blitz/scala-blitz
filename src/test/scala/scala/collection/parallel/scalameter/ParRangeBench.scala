@@ -22,7 +22,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
+    exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
   val pcopts = Seq(
@@ -33,6 +33,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     reports.regression.noiseMagnitude -> 0.75)
 
   /* benchmarks */
+
 
   performance of "Par[Range]" config (opts: _*) in {
     measure method "reduce" in {
@@ -45,8 +46,38 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
+      using(ranges(large)) curve ("SequentialCollections") in mapReduceSequentialCollections
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
     }
+
+    val list = List(2, 3, 5)
+    measure method "for3Generators" in {
+      using(ranges(tiny/10)) curve ("Sequential") in { r=>
+       for {
+          x <- r
+          y <- list
+          z <- list
+        } yield {
+          x * y * z
+        }: @unchecked
+      }
+      
+      using(withSchedulers(ranges(tiny/10))) curve ("Par") in { t => implicit val scheduler = t._2;
+        val r = t._1
+        for {
+          x <- r
+          y <- list
+          z <- list
+        } yield {
+          x * y * z
+        }: @unchecked
+      }
+
+    }
+    
+
+
+
 
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential

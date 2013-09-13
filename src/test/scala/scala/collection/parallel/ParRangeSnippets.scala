@@ -23,7 +23,7 @@ trait ParRangeSnippets {
     if (sum == 0) ???
   }
 
-def mapReduceSequential(r: Range) = {
+  def mapReduceSequential(r: Range) = {
     var i = r.head
     val to = r.last
     var sum = 0
@@ -33,6 +33,8 @@ def mapReduceSequential(r: Range) = {
     }
     if (sum == 0) ???
   }
+
+  def mapReduceSequentialCollections(r: Range) =     r.map(_+1).reduce(_+_)  
 
   def reduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.reduce(_ + _)
 
