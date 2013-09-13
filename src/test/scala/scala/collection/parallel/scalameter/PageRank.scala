@@ -1,4 +1,5 @@
 package scala.collection.parallel
+package scalameter
 
 
 
@@ -24,13 +25,11 @@ import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporte
  * PageRank test
  */
 
-object PageRank extends PerformanceTest.Regression with Serializable  with scalameter.Generators{
+object PageRank extends PerformanceTest.Regression with Serializable with scalameter.Generators {
 
   /* configuration */
 
-  lazy val persistor = new SerializationPersistor
-
-  
+  lazy val persistor = new SerializationPersistor  
 
   /* inputs */
 
@@ -75,15 +74,13 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
 
   }
 
-
   def generateData(from:Int, prob:Double = 0.05) = {
     val generator = new java.util.Random(42)
     for (size <- sizes(from)) yield 
-    (for(i<-0 until size) 
-      yield (for(j<-0 until size; if (j!=i&& generator.nextFloat() < prob)) yield (j)).toArray
+    (for(i <- 0 until size) 
+      yield (for(j <- 0 until size; if (j != i && generator.nextFloat() < prob)) yield (j)).toArray
     ).toArray
   }
-
 
   def getPageRankSequentialOpt(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
 

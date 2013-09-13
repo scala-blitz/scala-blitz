@@ -50,6 +50,10 @@ trait Generators {
     val ss = for (par <- parallelismLevels) yield new WorkstealingTreeScheduler.ForkJoin(new Config.Default(par))
     ss.cached
   }
+  val tasksupports = {
+    val ss = for (par <- parallelismLevels) yield new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(par))
+    ss.cached
+  }
   def withSchedulers[Repr](colls: Gen[Repr]): Gen[(Repr, WorkstealingTreeScheduler)] = for {
     c <- colls
     s <- schedulers
