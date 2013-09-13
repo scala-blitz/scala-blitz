@@ -34,7 +34,6 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
   /* benchmarks */
 
-
   performance of "Par[Range]" config (opts: _*) in {
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
@@ -50,34 +49,44 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
     }
 
-    val list = List(2, 3, 5)
     measure method "for3Generators" in {
-      using(ranges(tiny/10)) curve ("Sequential") in { r=>
+      val list = List(2, 3, 5)
+      using(ranges(tiny / 5)) curve ("Sequential") in { r=>
        for {
           x <- r
           y <- list
           z <- list
         } yield {
           x * y * z
-        }: @unchecked
+        }
       }
-      
-      using(withSchedulers(ranges(tiny/10))) curve ("Par") in { t => implicit val scheduler = t._2;
+      using(withSchedulers(ranges(tiny / 5))) curve ("Par-non-fused") in { t =>
+        import Par._
+        import workstealing.Ops._
+        implicit val scheduler = t._2
         val r = t._1
         for {
-          x <- r
+          x <- r.toPar
+          y <- list
+          z <- list
+        } yield {
+           x * y * z
+        }
+      }
+      using(withSchedulers(ranges(tiny / 5))) curve ("Par") in { t =>
+        import Par._
+        import workstealing.Ops._
+        implicit val scheduler = t._2
+        val r = t._1
+        for {
+          x <- r.toPar
           y <- list
           z <- list
         } yield {
           x * y * z
         }: @unchecked
       }
-
     }
-    
-
-
-
 
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential
