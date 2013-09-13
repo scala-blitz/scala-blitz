@@ -43,13 +43,34 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     measure method "time" in {
 
      using(data) curve ("Sequential") in {
-        data =>
+        data => 
           getPageRankSequential(data)
       }
+
+      using(data) curve ("SequentialOpt") in {
+        data => 
+          getPageRankSequentialOpt(data)
+      }
+
+     using(data) curve ("PC") in {
+        data => 
+          getPageRankOldPC(data)
+      }
+
+     using(data) curve ("PCOpt") in {
+        data => 
+          getPageRankOldPCOpt(data)
+      }
+
       using(withSchedulers(data)) curve ("Par") in {
         datas =>
           getPageRankNew(datas._1)(datas._2)
       }
+      using(withSchedulers(data)) curve ("ParOpt") in {
+        datas =>
+          getPageRankNewOpt(datas._1)(datas._2)
+      }
+
     }
 
   }
@@ -63,6 +84,45 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     ).toArray
   }
 
+
+  def getPageRankSequentialOpt(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
+
+    // Precompute some values that will be used often for the updates.
+    val numVertices = graph.size
+    val uniformProbability = 1.0 / numVertices
+    val jumpTimesUniform = jumpFactor / numVertices
+    val oneMinusJumpFactor = 1.0 - jumpFactor
+
+    // Create the vertex, and put in a map so we can get them by ID.
+    val vertices = graph.zipWithIndex.map {
+      case (adjacencyList, vertexId) =>
+        val vertex = new Vertex(adjacencyList, uniformProbability, vertexId)
+        vertex
+    }
+
+    var done = false
+    var currentIteration = 1
+    val result = StringBuilder.newBuilder
+
+    while (!done) {
+      // Tell all vertices to spread their mass and get back the missing mass.
+      val redistributedMassPairs = vertices.flatMap { x => x.spreadMass }
+
+      val totalMissingMass = vertices.map{x=> x.missingMass}.sum
+      val eachVertexRedistributedMass = totalMissingMass / numVertices
+//      val redistributedMass = redistributedMassPairs.groupBy(x => x._1).map { x => (x._1, x._2.aggregate(0.0)({ (x, y) => x + y._2 }, _ + _)) }
+      redistributedMassPairs.foreach { x => vertices(x._1).takeMass(x._2) }
+      val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
+
+      val averageDiff =  diffs.sum / numVertices
+//      println("Iteration " + currentIteration        + ": average diff == " + averageDiff)
+      currentIteration += 1
+      if (currentIteration > maxIters || averageDiff < diffTolerance) {
+        done = true
+      }
+    }
+    vertices
+  }
 
   def getPageRankSequential(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
 
@@ -105,7 +165,7 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
 
   def getPageRankNew(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9)(implicit s: WorkstealingTreeScheduler) = {
 
-    // Precompute some values that will be used often for the updates.
+    // Precompute some values that will be used often for the updates. 
     val numVertices = graph.size
     val uniformProbability = 1.0 / numVertices
     val jumpTimesUniform = jumpFactor / numVertices
@@ -142,6 +202,129 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
     vertices
   }
 
+  def getPageRankNewOpt(graph: Array[Array[Int]], maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9)(implicit s: WorkstealingTreeScheduler) = {
+
+    // Precompute some values that will be used often for the updates. 
+    val numVertices = graph.size
+    val uniformProbability = 1.0 / numVertices
+    val jumpTimesUniform = jumpFactor / numVertices
+    val oneMinusJumpFactor = 1.0 - jumpFactor
+
+    // Create the vertex, and put in a map so we can get them by ID.
+    val vertices = graph.zipWithIndex.toPar.map {
+      case (adjacencyList, vertexId) =>
+        val vertex = new VertexAtomic(adjacencyList, uniformProbability, vertexId)
+        vertex
+    }
+
+    var done = false
+    var currentIteration = 1
+    val result = StringBuilder.newBuilder
+
+    while (!done) {
+      // Tell all vertices to spread their mass and get back the missing mass.
+      val redistributedMassPairs = vertices flatMap { x => x.spreadMass }
+
+      val totalMissingMass = vertices.mapReduce(x => x.missingMass)(_ + _)
+      val eachVertexRedistributedMass = totalMissingMass / numVertices
+      redistributedMassPairs.foreach { x => vertices.seq(x._1).takeMass(x._2) }
+      val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
+
+      val averageDiff =  diffs.sum / numVertices
+//      println("Iteration " + currentIteration        + ": average diff == " + averageDiff)
+      currentIteration += 1
+      if (currentIteration > maxIters || averageDiff < diffTolerance) {
+        done = true
+      }
+    }
+    vertices
+  }
+
+  def getPageRankOldPC(graph: Array[Array[Int]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
+
+    // Precompute some values that will be used often for the updates.
+    val numVertices = graph.size
+    val uniformProbability = 1.0 / numVertices
+    val jumpTimesUniform = jumpFactor / numVertices
+    val oneMinusJumpFactor = 1.0 - jumpFactor
+
+    // Create the vertex actors, and put in a map so we can
+    // get them by ID.
+    val vertices = graph.zipWithIndex.par.map {
+      case (adjacencyList, vertexId) =>
+        val vertex = new Vertex(adjacencyList, uniformProbability, vertexId)
+        vertex
+    }
+
+    // The list of vertex actors, used for dispatching messages to all.
+
+    var done = false
+    var currentIteration = 1
+    val result = StringBuilder.newBuilder
+
+    while (!done) {
+      // Tell all vertices to spread their mass and get back the missing mass.
+      val redistributedMassPairs = vertices.flatMap { x => x.spreadMass }
+
+      val totalMissingMass = vertices.map{x=> x.missingMass}.sum
+      val eachVertexRedistributedMass = totalMissingMass / numVertices
+      val redistributedMass = redistributedMassPairs.groupBy(x => x._1).map { x => (x._1, x._2.aggregate(0.0)({ (x, y) => x + y._2 }, _ + _)) }
+      redistributedMass.foreach { x => vertices(x._1).takeMass(x._2) }
+      val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
+
+      val averageDiff =  diffs.sum / numVertices
+//      println("Iteration " + currentIteration        + ": average diff == " + averageDiff)
+      currentIteration += 1
+      if (currentIteration > maxIters || averageDiff < diffTolerance) {
+        done = true
+      }
+    }
+
+
+  }
+
+  def getPageRankOldPCOpt(graph: Array[Array[Int]], ntop: Int = 20, maxIters: Int = 50, jumpFactor: Double = .15, diffTolerance: Double = 1E-9) = {
+
+    // Precompute some values that will be used often for the updates.
+    val numVertices = graph.size
+    val uniformProbability = 1.0 / numVertices
+    val jumpTimesUniform = jumpFactor / numVertices
+    val oneMinusJumpFactor = 1.0 - jumpFactor
+
+    // Create the vertex actors, and put in a map so we can
+    // get them by ID.
+    val vertices = graph.zipWithIndex.par.map {
+      case (adjacencyList, vertexId) =>
+        val vertex = new VertexAtomic(adjacencyList, uniformProbability, vertexId)
+        vertex
+    }
+
+    // The list of vertex actors, used for dispatching messages to all.
+
+    var done = false
+    var currentIteration = 1
+    val result = StringBuilder.newBuilder
+
+    while (!done) {
+      // Tell all vertices to spread their mass and get back the missing mass.
+      val redistributedMassPairs = vertices.flatMap { x => x.spreadMass }
+
+      val totalMissingMass = vertices.map{x=> x.missingMass}.sum
+      val eachVertexRedistributedMass = totalMissingMass / numVertices
+      redistributedMassPairs.foreach { x => vertices(x._1).takeMass(x._2) }
+      val diffs = vertices.map { x => x.Update(jumpTimesUniform, oneMinusJumpFactor, eachVertexRedistributedMass) }
+
+      val averageDiff =  diffs.sum / numVertices
+//      println("Iteration " + currentIteration        + ": average diff == " + averageDiff)
+      currentIteration += 1
+      if (currentIteration > maxIters || averageDiff < diffTolerance) {
+        done = true
+      }
+    }
+
+
+  }
+
 
   class Vertex(var neighbors: Array[Int], var pagerank: Double, id: Int) {
 
@@ -166,6 +349,49 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
       val diff = math.abs(pagerank - updatedPagerank)
       pagerank = updatedPagerank
       receivedMass = 0.0
+      diff
+
+    }
+  }
+
+  
+  class VertexAtomic(var neighbors: Array[Int], var pagerank: Double, id: Int) {
+
+
+    def long2Double(l:Long) = java.lang.Double.longBitsToDouble(l)
+    def double2Long(d:Double) = java.lang.Double.doubleToRawLongBits(d)
+
+    var outdegree = neighbors.length
+
+//    var receivedMass = 0.0
+    val holder = new java.util.concurrent.atomic.AtomicLong(double2Long(0.0))
+
+    def missingMass = if (outdegree == 0) pagerank else 0.0
+
+    def spreadMass = {
+      if (outdegree == 0)  Array.empty[(Int,Double)]
+      else {
+        val amountPerNeighbor = long2Double(holder.get) / outdegree
+        neighbors.map(x => (x, amountPerNeighbor))
+      }
+    }
+
+    def takeMass(contribution: Double) = {
+      var done = false
+      while(!done) {
+        val oldValue = holder.get
+        val newValue = long2Double(oldValue) + contribution
+        done = holder.compareAndSet(oldValue, double2Long(newValue))
+      }
+    }
+
+    def getPageRank = (id, pagerank)
+    def Update(jumpTimesUniform: Double, oneMinusJumpFactor: Double, redistributedMass: Double) = {
+      val updatedPagerank =
+        jumpTimesUniform + oneMinusJumpFactor * (redistributedMass + long2Double(holder.get))
+      val diff = math.abs(pagerank - updatedPagerank)
+      pagerank = updatedPagerank
+      holder.set(double2Long(0.0))
       diff
 
     }
