@@ -47,7 +47,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
 //      using(ranges(large)) curve ("SequentialCollections") in mapReduceSequentialCollections
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
-      using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallelNotFused(t._1)(t._2) }
+      using(withSchedulers(ranges(large))) curve ("ParNotFused") in { t => mapReduceParallelNotFused(t._1)(t._2) }
     }
 
     measure method "for3Generators" in {
