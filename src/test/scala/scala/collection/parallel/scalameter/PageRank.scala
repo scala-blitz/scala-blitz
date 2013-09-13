@@ -38,7 +38,7 @@ object PageRank extends PerformanceTest.Regression with Serializable  with scala
 
   /* tests  */
  
-  performance of "PageRank" config (exec.independentSamples -> 4, exec.benchRuns -> 20, exec.jvmflags -> "-Xms2048M -Xmx2048M") in {
+  performance of "PageRank" config (exec.independentSamples -> 4, exec.benchRuns -> 20, exec.jvmflags -> "-Xms3072M -Xmx3072M") in {
 
     measure method "time" in {
 
