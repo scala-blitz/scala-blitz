@@ -39,6 +39,7 @@ trait ParRangeSnippets {
   def reduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.reduce(_ + _)
 
   def mapReduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.mapReduce(_ + 1)(_ + _)
+  def mapReduceParallelNotFused(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1).reduce(_ + _)
 
   def aggregateSequential(r: Range) = {
     var i = r.head
