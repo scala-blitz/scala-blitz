@@ -96,7 +96,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  if(TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
+  if(false && TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
     val rt = (r: Range) => r.sorted.toList
     val ht = (h: HashSet[Int]) => {
       
