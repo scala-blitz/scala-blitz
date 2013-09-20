@@ -24,6 +24,15 @@ package object workstealing {
     }
   }
 
+  final case class ProgressStatus(val start: Int, var progress: Int)
+
+  object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
+    def validateResult[R](r: R) = if (r.isInstanceOf[Option[_]]) r else ???
+  }
+
+}
+
+package workstealing {
   class ResultCell[@specialized T] {
     private var r: T = _
     private var empty = true
@@ -35,12 +44,5 @@ package object workstealing {
     def isEmpty = empty
     override def toString = if (empty) "ResultCell(empty)" else "ResultCell(" + r + ")"
   }
-
-  final case class ProgressStatus(val start: Int, var progress: Int)
-
-  object ResultFound extends WorkstealingTreeScheduler.TerminationCause {
-    def validateResult[R](r: R) = if (r.isInstanceOf[Option[_]]) r else ???
-  }
-
 }
 

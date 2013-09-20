@@ -51,9 +51,9 @@ object PageRank extends PerformanceTest.Regression with Serializable with scalam
           getPageRankOldPC(data._1)(data._2)
       }
 
-      using(withTaskSupports(data)) curve ("PC") in {
+      using(withTaskSupports(data)) curve ("PCOpt") in {
         data =>
-          getPageRankOldPC(data._1)(data._2)
+          getPageRankOldPCOpt(data._1)(data._2)
       }
 
       using(withSchedulers(data)) curve ("Par") in {

@@ -110,13 +110,13 @@ object RangesMacros {
     invokeAggregateKernel[Int, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateZero(c), aggregate1[Int](c)(init, seqoper), aggregateN[Int](c)(init, seqoper))(ctx)
   }
 
-  def aggregateZero[R: c.WeakTypeTag](c: Context): c.Expr[(Int, Ranges.RangeKernel[R]) => R] = c.universe.reify { (at: Int, kernel: Ranges.RangeKernel[R]) => kernel.zero }
+  def aggregateZero[R: c.WeakTypeTag](c: Context): c.Expr[(WorkstealingTreeScheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R] = c.universe.reify { (node: WorkstealingTreeScheduler.Node[Int, R], at: Int, kernel: Ranges.RangeKernel[R]) => node.READ_INTERMEDIATE }
 
-  def aggregate1[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, kernel: Ranges.RangeKernel[R]) =>
+  def aggregate1[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node:WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, kernel: Ranges.RangeKernel[R]) =>
     {
       val fin = if (from > to) from else to
-      var i: Int = from + to - fin + 1
-      var sum: R = init.splice.apply(from)
+      var i: Int = from + to - fin
+      var sum: R = node.READ_INTERMEDIATE
       while (i <= fin) {
         sum = oper.splice(sum, i)
         i += 1
@@ -125,10 +125,10 @@ object RangesMacros {
     }
   }
 
-  def aggregateN[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[R]) =>
+  def aggregateN[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[R]) =>
     {
-      var i = from + stride
-      var sum: R = init.splice.apply(from)
+      var i = from
+      var sum: R = node.READ_INTERMEDIATE
       if (stride > 0) {
         while (i <= to) {
           sum = oper.splice(sum, i)
@@ -144,7 +144,7 @@ object RangesMacros {
     }
   }
 
-  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Int, Ranges.RangeKernel[R]) => R], applyer1: c.Expr[(Int, Int, Ranges.RangeKernel[R]) => R], applyerN: c.Expr[(Int, Int, Int, Ranges.RangeKernel[R]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(WorkstealingTreeScheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R], applyer1: c.Expr[(WorkstealingTreeScheduler.Node[Int, R], Int, Int, Ranges.RangeKernel[R]) => R], applyerN: c.Expr[(WorkstealingTreeScheduler.Node[Int, R], Int, Int, Int, Ranges.RangeKernel[R]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
@@ -159,9 +159,9 @@ object RangesMacros {
         new scala.collection.parallel.workstealing.Ranges.RangeKernel[R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
-          def apply0(node: WorkstealingTreeScheduler.Node[Int, R], at: Int) = applyer0.splice.apply(at, this)
-          def apply1(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyer1.splice.apply(from, to, this)
-          def applyN(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, stride: Int) = applyerN.splice.apply(from, to, stride, this)
+          def apply0(node: WorkstealingTreeScheduler.Node[Int, R], at: Int) = applyer0.splice.apply(node, at, this)
+          def apply1(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int) = applyer1.splice.apply(node, from, to, this)
+          def applyN(node: WorkstealingTreeScheduler.Node[Int, R], from: Int, to: Int, stride: Int) = applyerN.splice.apply(node, from, to, stride, this)
         }
       ctx.splice.invokeParallelOperation(stealer, kernel)
     }
@@ -364,7 +364,7 @@ object RangesMacros {
     }
   }
 
-  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
+  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: WorkstealingTreeScheduler.Node[Int, Array[U]], from: Int, to: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
       val arr = kernel.zero
       val fin = if (from > to) from else to
@@ -381,7 +381,7 @@ object RangesMacros {
     }
   }
 
-  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
+  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: WorkstealingTreeScheduler.Node[Int, Array[U]], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
       val arr = kernel.zero
       var i = from

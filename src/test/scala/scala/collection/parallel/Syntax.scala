@@ -82,12 +82,12 @@ object Syntax {
     implicit val ws: Scheduler = null
     val list = List(2, 3, 5)
     val pa: Par[Array[Int]] = Array(1, 2, 3).toPar
-    for {
-      x <- pa
+    for { 
+      x <- pa     
       y <- list
-      z <- list
+      zzzzzzzz <- list
     } yield {
-      x * y * z
+      x * y * zzzzzzzz          
     }: @unchecked
   }
 
