@@ -73,7 +73,7 @@ object HashTrieSetMacros {
           while (res.isEmpty && got < elems) {
             val el = ci.next
             got += 1
-            if (predoper.splice(el)) { res = Some(el); terminationCause = ResultFound }
+            if (predoper.splice(el)) { res = Some(el); setTerminationCause(ResultFound) }
           }
           res
         }
@@ -402,7 +402,7 @@ object HashTrieMapMacros {
           var got = 0
           while (got < elems && result.isEmpty) {
             val el = ci.next
-            if (predoper.splice(el)) { result = Some(el); terminationCause = ResultFound }
+            if (predoper.splice(el)) { result = Some(el); setTerminationCause(ResultFound) }
             got += 1
           }
           result

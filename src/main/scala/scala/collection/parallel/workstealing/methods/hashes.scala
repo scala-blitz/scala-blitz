@@ -409,7 +409,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
               import mutable.DefaultEntry
               val de = entries.asInstanceOf[DefaultEntry[K, V]]
               val kv = (de.key, de.value)
-              if (pred.splice(kv)) {result = kv; terminationCause = ResultFound}
+              if (pred.splice(kv)) {result = kv; setTerminationCause(ResultFound)}
               entries = entries.next
             }
             i += 1
