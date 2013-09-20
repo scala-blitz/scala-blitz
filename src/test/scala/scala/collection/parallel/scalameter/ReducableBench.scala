@@ -15,9 +15,9 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
   /* config */
 
   def persistor = new SerializationPersistor
-  val tiny = 300000
+  val tiny =  300000
   val small = 3000000
-  val large = 30000000
+  val large = 6000000
 
   val TEST_TRIES = false // we shouldn't benchmark TRIE based data structures as they still fail tests
 
@@ -63,7 +63,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
         implicit val scheduler = t._2
         mapReduceParallel(t._1)(t._2)
       }
-      using(withSchedulers(hashSets(large))) curve ("ParHashSet") in { t =>
+      using(withSchedulers(hashSets(small))) curve ("ParHashSet") in { t =>
         implicit val scheduler = t._2
         mapReduceParallel(t._1)(t._2)
       }
