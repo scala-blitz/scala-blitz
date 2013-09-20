@@ -107,7 +107,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       r.toList.sorted
     }
     try {
-      testOperation(comparison = seqComparison[Int])(rt)(ht)
+      testOperation(comparison = seqComparison[Int], numSec = 12)(rt)(ht)
     } catch {
       case t: Throwable =>
         collection.parallel.workstealing.TreeStealer.debug.print()
