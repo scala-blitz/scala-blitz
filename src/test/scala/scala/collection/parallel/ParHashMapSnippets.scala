@@ -13,6 +13,8 @@ import collection.mutable.HashMap
 
 trait ParHashMapSnippets {
 
+  def sumPairs = ((x:(Int, Int), y:(Int, Int)) => (x._1 + y._1, x._2 + y._2))
+
   def aggregateSequential(hm: HashMap[Int, Int]) = {
     val it = hm.iterator
     var sum = 0
@@ -99,7 +101,7 @@ trait ParHashMapSnippets {
     def fromInt(x: Int): (Int, Int) = ???
     def minus(x: (Int, Int), y: (Int, Int)): (Int, Int) = ???
     def negate(x: (Int, Int)): (Int, Int) = ???
-    def plus(x: (Int, Int), y: (Int, Int)): (Int, Int) = (x._1 + y._1, x._2 + y._2)
+    def plus(x: (Int, Int), y: (Int, Int)): (Int, Int) = sumPairs(x, y)
     def times(x: (Int, Int), y: (Int, Int)) = ???
     def toDouble(x: (Int, Int)): Double = ???
     def toFloat(x: (Int, Int)): Float = ???
@@ -121,7 +123,7 @@ trait ParHashMapSnippets {
     def minus(x: (Int, Int), y: (Int, Int)): (Int, Int) = ???
     def negate(x: (Int, Int)): (Int, Int) = ???
     def plus(x: (Int, Int), y: (Int, Int)): (Int, Int) = ???
-    def times(x: (Int, Int), y: (Int, Int)) = (x._1 + y._1, x._2 + y._2)
+    def times(x: (Int, Int), y: (Int, Int)) = sumPairs(x, y)
     def toDouble(x: (Int, Int)): Double = ???
     def toFloat(x: (Int, Int)): Float = ???
     def toInt(x: (Int, Int)): Int = ???
@@ -152,6 +154,42 @@ trait ParHashMapSnippets {
   def existsParallel(hm: HashMap[Int, Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hm.toPar.exists(_ == (elem, elem))
 
   def forallSmallerParallel(hm: HashMap[Int, Int], elem: Int)(implicit s: WorkstealingTreeScheduler) = hm.toPar.forall(x => x._1 < elem && x._2 < elem)
+
+  def filterCosSequential(hs: HashMap[Int, Int]) = {
+    var ib = HashMap[Int, Int]()
+    val it = hs.iterator
+    while (it.hasNext) {
+      val elem = it.next
+      if (math.cos(elem._1) > 0.0) ib+=elem
+    }
+    ib
+  }
+
+
+  def filterCosParallel(a: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.filter(x => math.cos(x._1) > 0.0)
+
+  val other = List((2, 2), (3, 3))
+
+  def flatMapSequential(hs: HashMap[Int, Int]) = {
+    var ib = HashMap[Int, Int]()
+    val it = hs.iterator
+    while (it.hasNext) {
+      val elem = it.next
+      other.foreach(y => ib+= sumPairs(y, elem))
+    }
+    ib
+  }
+
+  def flatMapParallel(a: HashMap[Int, Int])(implicit s: WorkstealingTreeScheduler) = {
+    val pa = a.toPar
+    for {
+      x <- pa
+      y <- other
+    } yield {
+      sumPairs(x, y)
+    }: @unchecked
+  }
+
 
 }
 

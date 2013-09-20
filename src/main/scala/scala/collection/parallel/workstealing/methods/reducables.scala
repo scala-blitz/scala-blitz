@@ -347,14 +347,14 @@ object ReducablesMacros {
     }
   }
 
-  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag: ClassTag, M: c.WeakTypeTag: ClassTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(ctx: c.Expr[WorkstealingTreeScheduler]) = {
+  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[WorkstealingTreeScheduler]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
     val (aggrv, aggrg) = c.nonFunctionToLocal[(M, M) => M](aggr)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify { Hashes.newHashMapMerger[K, M](implicitly[ClassTag[K]], implicitly[ClassTag[M]], ctx.splice) }
+    val mergerExpr = reify { Hashes.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
 
     reify {
       import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
@@ -364,35 +364,80 @@ object ReducablesMacros {
       mpv.splice
       aggrv.splice
       cv.splice
-
-      new Reducables.ReducableKernel[T, HashMapMerger[K, M]] {
-        override def beforeWorkOn(tree: Ref[T, HashMapMerger[K, M]], node: Node[T, HashMapMerger[K, M]]) {
+      
+      val stealer = callee.splice.stealer
+      val kernel = new Reducables.ReducableKernel[T, HashMapCombiningMerger[K, M]] {
+        override def beforeWorkOn(tree: Ref[T, HashMapCombiningMerger[K, M]], node: Node[T, HashMapCombiningMerger[K, M]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
         def zero = null
-        def combine(a: HashMapMerger[K, M], b: HashMapMerger[K, M]) =
+        def combine(a: HashMapCombiningMerger[K, M], b: HashMapCombiningMerger[K, M]) =
           if (a eq null) b
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[T, HashMapMerger[K, M]], elementsCount: Int) = {
+        def apply(node: Node[T, HashMapCombiningMerger[K, M]], elementsCount: Int) = {
           val merger = node.READ_INTERMEDIATE
           val stealer = node.stealer
           while (stealer.hasNext) {
             val elem = stealer.next
             val mappedElem = mpg.splice.apply(elem)
             val elemKey = grg.splice.apply(elem)
-            merger.get(elemKey) match {
-              case Some((chunk, id)) => chunk.elems(id) = aggrg.splice.apply(chunk.elems(id), mappedElem)
-              case None => merger += (elemKey, mappedElem)
-            }
+            merger += (elemKey, mappedElem)         
           }
           merger
         }
       }
+      val resultMerger = ctx.splice.invokeParallelOperation(stealer, kernel)
+      resultMerger.result
     }
 
   }
+
+  def groupBy[T: c.WeakTypeTag, K: c.WeakTypeTag, Repr: c.WeakTypeTag, That <:AnyRef : c.WeakTypeTag ](c: Context)(gr: c.Expr[T => K])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], tClassTag: c.Expr[scala.reflect.ClassTag[T]], ctx: c.Expr[WorkstealingTreeScheduler], cmf:c.Expr[CanMergeFrom[Repr, T, That]]) = {
+    import c.universe._
+
+    val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
+    val (cmfv, cmfg) = c.nonFunctionToLocal[CanMergeFrom[Repr, T, That]](cmf)
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val mergerExpr = reify { Hashes.newHashMapCollectingMerger[K, T, That, Repr](kClassTag.splice, tClassTag.splice, ctx.splice, cmfg.splice) }
+
+    reify {
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler
+      import scala.collection.parallel.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.parallel.workstealing.Hashes._
+      grv.splice
+      cv.splice
+      cmfv.splice
+      
+      val stealer = callee.splice.stealer
+      val kernel = new Reducables.ReducableKernel[T, HashMapCollectingMerger[K, T, That, Repr]] {
+        override def beforeWorkOn(tree: Ref[T, HashMapCollectingMerger[K, T, That, Repr]], node: Node[T, HashMapCollectingMerger[K, T, That, Repr]]) {
+          node.WRITE_INTERMEDIATE(mergerExpr.splice)
+        }
+        def zero = null
+        def combine(a: HashMapCollectingMerger[K, T, That, Repr], b: HashMapCollectingMerger[K, T, That, Repr]) =
+          if (a eq null) b
+          else if (b eq null) a
+          else if (a eq b) a
+          else a merge b
+        def apply(node: Node[T, HashMapCollectingMerger[K, T, That, Repr]], elementsCount: Int) = {
+          val merger = node.READ_INTERMEDIATE
+          val stealer = node.stealer
+          while (stealer.hasNext) {
+            val elem = stealer.next
+            val elemKey = grg.splice.apply(elem)
+            merger += (elemKey, elem)         
+          }
+          merger
+        }
+      }
+      val resultMerger = ctx.splice.invokeParallelOperation(stealer, kernel)
+      resultMerger.result
+    }
+
+  }
+
 
   def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
     import c.universe._

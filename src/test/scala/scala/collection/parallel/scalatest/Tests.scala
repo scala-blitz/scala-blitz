@@ -49,7 +49,24 @@ trait Tests[Repr] extends Timeouts with Helpers {
 
   def concComparison[T](range: Range, r: Seq[T], pc: Par[Conc[T]]) = r == pc.seq.toBuffer
 
-  def hashMapComparison[K, V](range: Range, hm: mutable.HashMap[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
+  def hashMapComparison[K, V](range: Range, hm: mutable.Map[K, V], phm: Par[mutable.HashMap[K, V]]) = hm == phm.seq
+
+  def hashMapArrayComparison[K, V](range: Range, hm: mutable.Map[K, Seq[V]], phm: Par[mutable.HashMap[K, Par[Array[V]]]]) = {
+    val hm2 = phm.seq
+    hm.keySet ==  hm2.keySet && hm.forall(x=> {x._2.toSet == hm2(x._1).seq.toSet})
+  }
+
+  def hashMapImmutableSetComparison[K, V](range: Range, hm: mutable.Map[K, Seq[V]], phm: Par[mutable.HashMap[K, Par[immutable.Set[V]]]]) = {
+    val hm2 = phm.seq
+    hm.keySet ==  hm2.keySet && hm.forall(x=> {x._2.toSet == hm2(x._1).seq.toSet})
+  }
+
+  def hashMapSetComparison[K, V](range: Range, hm: mutable.Map[K, Seq[V]], phm: Par[mutable.HashMap[K, Par[mutable.Set[V]]]]) = {
+    val hm2 = phm.seq
+    hm.keySet ==  hm2.keySet && hm.forall(x=> {x._2.toSet == hm2(x._1).seq.toSet})
+  }
+
+  def immutableHashMapComparison[K, V](range: Range, hm: immutable.HashMap[K, V], phm: Par[immutable.HashMap[K, V]]) = hm == phm.seq
 
   def hashSetComparison[T](range: Range, hs: mutable.Set[T], phs: Par[mutable.HashSet[T]]) = hs == phs.seq
 

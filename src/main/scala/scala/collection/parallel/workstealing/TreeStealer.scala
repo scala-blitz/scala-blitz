@@ -165,7 +165,10 @@ object TreeStealer {
 
     def hasNext = chunkIterator.hasNext
 
-    def next() = chunkIterator.next()
+    def next() = { val n = chunkIterator.next()
+      debug("returning el " + n + " \n")
+      n
+    }
 
     final def state = {
       val code = READ_STACK(0)
@@ -449,7 +452,7 @@ object TreeStealer {
       check(!(left.depth == 0 && left.READ_STACK(0) == 0), (this, left, right))
       check(!(right.depth == 0 && right.READ_STACK(0) == 0), (this, left, right))
 
-      //debug((this.toString, left.toString, right.toString))
+      debug((this.toString, left.toString, right.toString))
 
       (left, right)
     }
@@ -493,9 +496,10 @@ object TreeStealer {
   }
 
   object debug {
+    val DEBUG_ENABLED = false
     val log = new java.util.concurrent.ConcurrentLinkedQueue[AnyRef]
 
-    def apply(x: AnyRef) = log.add(x)
+    def apply(x: AnyRef) = if(DEBUG_ENABLED) log.add(x)
 
     def clear() {
       log.clear()

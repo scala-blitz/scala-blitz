@@ -37,6 +37,11 @@ trait Generators {
     for (i <- 0 until size) hs += i
     hs
   }
+  def hashSets(from: Int) = for (size <- sizes(from)) yield {
+    val hs = new mutable.HashSet[Int]
+    for (i <- 0 until size) hs += i
+    hs
+  }
 
   def withArrays[Repr <% TraversableOnce[_]](gen: Gen[Repr]) = for (coll <- gen) yield (coll, new Array[Int](coll.size))
 
@@ -45,6 +50,16 @@ trait Generators {
     val ss = for (par <- parallelismLevels) yield new WorkstealingTreeScheduler.ForkJoin(new Config.Default(par))
     ss.cached
   }
+  val tasksupports = {
+    val ss = for (par <- parallelismLevels) yield new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(par))
+    ss.cached
+  }
+
+  def withTaskSupports[Repr](colls: Gen[Repr]): Gen[(Repr, ForkJoinTaskSupport)] = for {
+    c <- colls
+    s <- tasksupports
+  } yield (c, s)
+
   def withSchedulers[Repr](colls: Gen[Repr]): Gen[(Repr, WorkstealingTreeScheduler)] = for {
     c <- colls
     s <- schedulers

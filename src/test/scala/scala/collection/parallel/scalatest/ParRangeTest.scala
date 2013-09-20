@@ -69,6 +69,22 @@ class ParRangeTest extends FunSuite with Timeouts with Tests[Range] with ParRang
     }
   }
 
+  test("groupMapAggregate") {
+    testOperation(comparison = hashMapComparison[Int,Int]) { 
+      r => scala.collection.mutable.HashMap()++r.groupBy(x=>x%15).map(x=>(x._1,x._2.sum))
+    } {
+      p => p.toPar.groupMapAggregate(x=>x%15)(x=>x)(_+_)
+    }
+  }
+
+  test("groupBy") {
+    testOperation(comparison = hashMapArrayComparison[Int, Int]) { 
+      r => scala.collection.mutable.HashMap() ++ r.groupBy(x=>x%15)
+    } {
+      p => p.toPar.groupBy(x=>x%15)
+    }
+  }
+
   test("aggregate") {
     testOperation() {
       r => r.aggregate(0)(_ + _, _ + _)

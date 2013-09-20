@@ -147,7 +147,7 @@ class HashesBench extends PerformanceTest.Regression with Serializable with Gene
   }
 
   def hashMapMergerAdd(sz: Int) {
-    val merger = new workstealing.Hashes.HashMapMerger[Int, Int](5, 450, 27, null)
+    val merger = new workstealing.Hashes.HashMapDiscardingMerger[Int, Int](5, 450, 27, null)
     var i = 0
     while (i < sz) {
       val kv = (i, i)

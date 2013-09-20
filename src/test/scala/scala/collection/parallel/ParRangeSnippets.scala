@@ -23,7 +23,7 @@ trait ParRangeSnippets {
     if (sum == 0) ???
   }
 
-def mapReduceSequential(r: Range) = {
+  def mapReduceSequential(r: Range) = {
     var i = r.head
     val to = r.last
     var sum = 0
@@ -34,9 +34,12 @@ def mapReduceSequential(r: Range) = {
     if (sum == 0) ???
   }
 
+  def mapReduceSequentialCollections(r: Range) =     r.map(_+1).reduce(_+_)  
+
   def reduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.reduce(_ + _)
 
   def mapReduceParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.mapReduce(_ + 1)(_ + _)
+  def mapReduceParallelNotFused(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1).reduce(_ + _)
 
   def aggregateSequential(r: Range) = {
     var i = r.head
@@ -245,6 +248,7 @@ def mapReduceSequential(r: Range) = {
   }
 
   def mapParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)
+  def groupMapAggregateParallel(r: Range)(implicit s: WorkstealingTreeScheduler) = r.toPar.groupMapAggregate(x=>x%15)(x=>x)((x,y)=>x+y)
   def mapParallel[Repr](r: Range, customCmf: collection.parallel.generic.CanMergeFrom[Par[Range], Int, Par[Repr]])(implicit s: WorkstealingTreeScheduler) = r.toPar.map(_ + 1)(customCmf, s)
 
   def filterMod3Sequential(r: Range) = {

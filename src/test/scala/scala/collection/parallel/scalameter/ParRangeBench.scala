@@ -22,7 +22,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
     exec.independentSamples -> 6,
-    exec.jvmflags -> "-server -Xms1536m -Xmx1536m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
+    exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
   val pcopts = Seq(
@@ -45,7 +45,48 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
+//      using(ranges(large)) curve ("SequentialCollections") in mapReduceSequentialCollections
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
+      using(withSchedulers(ranges(large))) curve ("ParNotFused") in { t => mapReduceParallelNotFused(t._1)(t._2) }
+    }
+
+    measure method "for3Generators" in {
+      val list = List(2, 3, 5)
+      using(ranges(tiny / 5)) curve ("Sequential") in { r=>
+       for {
+          x <- r
+          y <- list
+          z <- list
+        } yield {
+          x * y * z
+        }
+      }
+      using(withSchedulers(ranges(tiny / 5))) curve ("Par-non-fused") in { t =>
+        import Par._
+        import workstealing.Ops._
+        implicit val scheduler = t._2
+        val r = t._1
+        for {
+          x <- r.toPar
+          y <- list
+          z <- list
+        } yield {
+           x * y * z
+        }
+      }
+      using(withSchedulers(ranges(tiny / 5))) curve ("Par") in { t =>
+        import Par._
+        import workstealing.Ops._
+        implicit val scheduler = t._2
+        val r = t._1
+        for {
+          x <- r.toPar
+          y <- list
+          z <- list
+        } yield {
+          x * y * z
+        }: @unchecked
+      }
     }
 
     measure method "aggregate" in {
@@ -56,6 +97,11 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
           r.par.aggregate(0)(_ + _, _ + _)
         }
       }
+    }
+
+    measure method "groupAggregate" in {
+      using(ranges(tiny)) curve ("Sequential") in {x=> x.groupBy(_%15).map{x=>(x._1,x._2.sum)}}
+      using(withSchedulers(ranges(tiny))) curve ("Par") in { t => groupMapAggregateParallel(t._1)(t._2)}
     }
 
     measure method "find" in {
