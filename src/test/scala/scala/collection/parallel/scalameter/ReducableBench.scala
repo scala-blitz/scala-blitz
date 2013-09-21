@@ -15,9 +15,9 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
   /* config */
 
   def persistor = new SerializationPersistor
-  val tiny =  300000
-  val small = 3000000
-  val large = 6000000
+  val tiny =  60000
+  val small = 600000
+  val large = 1000000
 
   val TEST_TRIES = false // we shouldn't benchmark TRIE based data structures as they still fail tests
 

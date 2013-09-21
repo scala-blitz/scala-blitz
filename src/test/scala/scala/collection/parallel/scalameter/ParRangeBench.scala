@@ -47,7 +47,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(ranges(large)) curve ("Sequential") in mapReduceSequential
 //      using(ranges(large)) curve ("SequentialCollections") in mapReduceSequentialCollections
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
-      using(withSchedulers(ranges(large))) curve ("ParNotFused") in { t => mapReduceParallelNotFused(t._1)(t._2) }
+      using(withSchedulers(ranges(small))) curve ("ParNotFused") in { t => mapReduceParallelNotFused(t._1)(t._2) }
     }
 
     measure method "for3Generators" in {
@@ -115,13 +115,13 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     }
 
     measure method "map(sqrt)" in {
-      using(ranges(small)) curve ("Sequential") in mapSqrtSequential
-      using(withSchedulers(ranges(small))) curve ("Par") in { t => mapSqrtParallel(t._1)(t._2) }
+      using(ranges(tiny)) curve ("Sequential") in mapSqrtSequential
+      using(withSchedulers(ranges(tiny))) curve ("Par") in { t => mapSqrtParallel(t._1)(t._2) }
     }
 
     measure method "flatMap" in {
-      using(ranges(small)) curve ("Sequential") in flatMapSequential
-      using(withSchedulers(ranges(small))) curve ("Par") in { t => flatMapParallel(t._1)(t._2) }
+      using(ranges(tiny)) curve ("Sequential") in flatMapSequential
+      using(withSchedulers(ranges(tiny))) curve ("Par") in { t => flatMapParallel(t._1)(t._2) }
     }
 
     performance of "derivative" in {
