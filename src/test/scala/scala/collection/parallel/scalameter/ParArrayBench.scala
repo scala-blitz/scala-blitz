@@ -41,6 +41,36 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
 
   performance of "Par[Array]" config(opts: _*) in {
 
+    measure method "Boxing" config(opts: _*) in {
+      using(arrays(large)) curve ("Sequential") in {x=> noboxing(x)(_+_)}
+      using(arrays(large)) curve ("SequentialBoxedOp") in {x=> boxing(x)(_+_) }
+      using(arrays(large)) curve ("SequentialSpecialized") in {x=> boxingSpec(x)(_+_) }
+      using(arraysBoxed(small)) curve ("SequentialBoxedOpBoxedData") in {x=> boxingSpec(x)(_+_) }
+    }
+
+    measure method "Dispatch" config(opts: _*) in {
+      val helpers= new Helpers
+      import helpers._
+      
+      var j = 0
+      var methodId = 0
+
+      using(arrays(large)) curve ("Dynamic") in { arr =>
+        val method = methodId % 5
+        methodId = methodId + 1
+
+        val inc:Int = if(method == 1) sum1(arr)(_ + _ + 3)
+        else if(method == 2) sum1(arr)(_ + _ + 1)
+        else if(method == 3) sum1(arr)(_ + _ + 5)
+        else if(method == 4) sum1(arr)(_ + _ + 2)
+        else  sum1(arr)(_ + _ + 4)
+        j = j + inc
+      }
+      using(arrays(large)) curve ("Static") in { arr =>
+        sum2(arr)
+      }
+    }
+
     measure method "reduce" in {
       using(arrays(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(arrays(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
@@ -123,3 +153,37 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
 
 
 
+class Helpers extends Serializable{
+
+  def sum1(source:Array[Int])(f: (Int, Int) => Int): Int = {
+    var idx = 1
+    var sum = source(0)
+    val limit1 = source.size/2
+    val limit2 = source.size
+    while(idx < limit1) { //intensionaly increasing method size, to make sure that method doesn't inline entirely
+      sum = f(sum, source(idx))
+      idx = idx + 1
+    }
+    while(idx < limit2) {
+      sum = f(sum, source(idx))
+      idx = idx + 1
+    }
+    sum
+  }
+
+  def sum2(source:Array[Int]): Int = {
+    var idx = 1
+    var sum = source(0)
+    val limit1 = source.size/2
+    val limit2 = source.size
+    while(idx < limit1) { //intensionaly increasing method size, to make sure that method doesn't inline entirely
+      sum = sum + source(idx) + 5
+      idx = idx + 1
+    }
+    while(idx < limit2) {
+      sum = sum + source(idx) + 5
+      idx = idx + 1
+    }
+    sum
+  }
+}

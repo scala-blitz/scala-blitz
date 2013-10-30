@@ -35,6 +35,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   /* benchmarks */
 
   performance of "Par[Range]" config (opts: _*) in {
+
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }

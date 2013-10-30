@@ -38,6 +38,42 @@ trait ParArraySnippets {
     sum
   }
 
+  def noboxing(a: Array[Int])(op:(Int, Int)=>Int) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+
+
+
+  def boxing[T](a: Array[T])(op:(T, T)=>T) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+  
+  def boxingSpec[@specialized T](a: Array[T])(op:(T, T)=>T) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+
+
   def reduceParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.reduce(_ + _)
 
   def mapReduceSequential(a: Array[Int]) = {
