@@ -38,6 +38,39 @@ trait ParArraySnippets {
     sum
   }
 
+  def noboxing(a: Array[Int])(op: (Int, Int) => Int) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+
+  def boxing[T](a: Array[T])(op: (T, T) => T) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+
+  def boxingSpec[@specialized T](a: Array[T])(op: (T, T) => T) = {
+    var i = 1
+    val until = a.length
+    var sum = a(0)
+    while (i < until) {
+      sum = op(sum, a(i))
+      i += 1
+    }
+    sum
+  }
+
   def reduceParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = a.toPar.reduce(_ + _)
 
   def mapReduceSequential(a: Array[Int]) = {
@@ -147,12 +180,12 @@ trait ParArraySnippets {
 
   def foreachSequential(a: Array[Int]) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    a.foreach(x=>  if (x % 500 == 0) ai.incrementAndGet())
+    a.foreach(x => if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
   def foreachParallel(a: Array[Int])(implicit s: WorkstealingTreeScheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    a.toPar.foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
+    a.toPar.foreach(x => if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
@@ -215,12 +248,4 @@ trait ParArraySnippets {
   }
 
 }
-
-
-
-
-
-
-
-
 
