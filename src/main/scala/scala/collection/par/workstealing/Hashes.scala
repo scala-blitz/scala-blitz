@@ -300,8 +300,6 @@ object Hashes {
     def newHashBucket = new HashMapDiscardingMerger(width, loadFactor, seed, ctx)
 
     def result = {
-      import Par._
-      import Ops._
       val expectedSize = keys.foldLeft(0) { (acc, x) =>
         if (x ne null) acc + x.size else acc
       }
@@ -372,8 +370,6 @@ object Hashes {
     def newHashBucket = new HashMapCollectingMerger(width, loadFactor, seed, cmf , ctx)
 
     def result : Par[HashMap[K,That]] = {
-      import Par._
-      import Ops._
       val expectedSize = keys.foldLeft(0) { (acc, x) =>
         if (x ne null) acc + x.size else acc
       }
@@ -447,8 +443,6 @@ object Hashes {
     def newHashBucket = new HashMapCombiningMerger(width, loadFactor, seed, valueCombiner, ctx)
 
     def result = {
-      import Par._
-      import Ops._
       val expectedSize = keys.foldLeft(0) { (acc, x) =>
         if (x ne null) acc + x.size else acc
       }
@@ -623,8 +617,6 @@ object Hashes {
     }
 
     def result = {
-      import Par._
-      import Ops._
       val expectedSize = keys.foldLeft(0) { (acc, x) =>
         if (x ne null) acc + x.size else acc
       }

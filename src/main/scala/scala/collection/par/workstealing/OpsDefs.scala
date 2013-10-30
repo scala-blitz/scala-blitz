@@ -13,10 +13,8 @@ with Ranges.Scope
 with Concs.Scope
 with Hashes.Scope 
 with Trees.Scope
-with Reducables.Scope{
+with Reducables.Scope {
 
   type Scheduler = WorkstealingTreeScheduler
 
 }
-
-object Ops extends OpsDefs {}

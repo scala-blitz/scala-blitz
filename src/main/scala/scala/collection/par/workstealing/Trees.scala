@@ -468,8 +468,6 @@ object Trees {
     }
 
     def result = {
-      import Par._
-      import Ops._
       val stealer = (0 until elems.length).toPar.stealer
       val root = new Array[HashSet[T]](1 << 5)
       val kernel = new HashSetMergerResultKernel(elems, root)
@@ -651,8 +649,6 @@ object Trees {
     }
 
     def result = {
-      import Par._
-      import Ops._
       val stealer = (0 until keys.length).toPar.stealer
       val root = new Array[HashMap[K, V]](1 << 5)
       val kernel = new HashMapMergerResultKernel(keys, vals, root)

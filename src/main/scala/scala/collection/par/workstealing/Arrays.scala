@@ -72,9 +72,6 @@ object Arrays {
     def newBuffer(conc: Conc[T]) = new ArrayMerger(maxChunkSize, conc, new Array[T](Conc.INITIAL_SIZE), 0, ctx)
 
     def concToTo(c: Conc[T]) = {
-      import workstealing.Ops._
-      import Par._
-
       val array = new Array[T](c.size)
       c.toPar.genericCopyToArray(array, 0, array.length)(ctx)
       new Par(array)
@@ -93,7 +90,7 @@ object Arrays {
 
   class ArrayMerger2ZippableMergerConvertor[T](val merger:ArrayMerger[T])(implicit ctx: WorkstealingTreeScheduler) extends Merger[T, Zippable[T]] {
     def +=(elem: T) = { merger += (elem); this }
-    def result = Par.par2zippable(merger.result)(new Array2ZippableConvertor[T])
+    def result = par2zippable(merger.result)(new Array2ZippableConvertor[T])
     def clear() = merger.clear()
     def merge(that: Merger[T, Zippable[T]]) = {
       that match {
