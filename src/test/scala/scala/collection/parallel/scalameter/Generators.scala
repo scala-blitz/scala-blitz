@@ -17,7 +17,7 @@ trait Generators {
   def arrays(from: Int) = for (size <- sizes(from)) yield (0 until size).toArray
   def arraysBoxed(from: Int) = for (size <- sizes(from)) yield {
     val r = new Array[java.lang.Integer](size)
-    (0 until size).foreach{x=>r(x) = x:java.lang.Integer}
+    (0 until size).foreach { x => r(x) = x: java.lang.Integer }
     r
   }
 
