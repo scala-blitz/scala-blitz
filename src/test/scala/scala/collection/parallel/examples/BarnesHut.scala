@@ -42,12 +42,8 @@ object BarnesHut {
   }
 
   object Quad {
-    case class Body(val id: Int) extends Quad {
-      var x: Float = _
-      var y: Float = _
-      var xspeed: Float = _
-      var yspeed: Float = _
-      var mass: Float = _
+    case class Body(val id: Int)(val x: Float, val y: Float, val xspeed: Float, val yspeed: Float, val mass: Float, var index: Int)
+    extends Quad {
   
       def massX = x
       def massY = y
@@ -98,10 +94,13 @@ object BarnesHut {
 
         traverse(quad)
 
-        x += xspeed * delta
-        y += yspeed * delta
-        xspeed += netforcex / mass * delta
-        yspeed += netforcey / mass * delta
+        val nx = x + xspeed * delta
+        val ny = y + yspeed * delta
+        val nxspeed = xspeed + netforcex / mass * delta
+        val nyspeed = yspeed + netforcey / mass * delta
+
+        bodies(index) = new Quad.Body(id)(nx, ny, nxspeed, nyspeed, mass, index)
+
         //assert(netforcex < 1000, (netforcex, netforcey, this))
         //assert(netforcey < 1000, (netforcex, netforcey, this))
 
@@ -360,22 +359,18 @@ object BarnesHut {
       val blackHoleM = 1.0f * num
       val cubmaxradius = maxradius * maxradius * maxradius
       for (i <- from until (from + num)) {
-        val b = new Quad.Body(i)
-        if (i == from) {
-          b.x = cx
-          b.y = cy
-          b.xspeed = sx
-          b.yspeed = sy
-          b.mass = blackHoleM
+        val b = if (i == from) {
+          new Quad.Body(i)(cx, cy, sx, sy, blackHoleM, i)
         } else {
           val angle = random.nextFloat * 2 * math.Pi
           val radius = 25 + maxradius * random.nextFloat
-          b.x = cx + radius * math.sin(angle).toFloat
-          b.y = cy + radius * math.cos(angle).toFloat
+          val starx = cx + radius * math.sin(angle).toFloat
+          val stary = cy + radius * math.cos(angle).toFloat
           val speed = math.sqrt(gee * blackHoleM / radius + gee * totalM * radius * radius / cubmaxradius)
-          b.xspeed = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
-          b.yspeed = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
-          b.mass = 1.0f + 1.0f * random.nextFloat
+          val starspeedx = sx + (speed * math.sin(angle + math.Pi / 2)).toFloat
+          val starspeedy = sy + (speed * math.cos(angle + math.Pi / 2)).toFloat
+          val starmass = 1.0f + 1.0f * random.nextFloat
+          new Quad.Body(i)(starx, stary, starspeedx, starspeedy, starmass, i)
         }
         bodies(i) = b
       }
@@ -487,6 +482,7 @@ object BarnesHut {
 
       if (outliers.nonEmpty) {
         bodies = bodies.filterNot(b => outliers contains b)
+        for (i <- 0 until bodies.length) bodies(i).index = i
       }
     }
 
