@@ -91,7 +91,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
 
 
 object IndexedStealer {
-  import WorkstealingTreeScheduler._
+  import Scheduler._
 
   val PROGRESS_OFFSET = unsafe.objectFieldOffset(classOf[IndexedStealer[_]].getDeclaredField("progress"))
 

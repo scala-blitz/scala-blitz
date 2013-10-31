@@ -14,9 +14,9 @@ object Zippables {
     implicit def canMergeZippable[T]: CanMergeFrom[Zippable[_], Int, Zippable[T]] = ???
   }
 
-  trait OpsLike[+T, +Repr] extends Any /*with ZippableOps[T, Repr, WorkstealingTreeScheduler]*/ with Reducables.OpsLike[T, Repr] {
+  trait OpsLike[+T, +Repr] extends Any /*with ZippableOps[T, Repr, Scheduler]*/ with Reducables.OpsLike[T, Repr] {
     def stealer: PreciseStealer[T]
-    def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = ???
+    def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: Scheduler): Unit = ???
   }
 
   class Ops[T](val z: Zippable[T]) extends AnyVal with OpsLike[T, Zippable[T]] {

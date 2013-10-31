@@ -17,13 +17,14 @@ import scala.collection.mutable.DefaultEntry
 import scala.collection.parallel.Splitter
 
 
+
 object Hashes {
 
-  import WorkstealingTreeScheduler.{ Kernel, Node }
+  import Scheduler.{ Kernel, Node }
 
   trait Scope {
     implicit def hashMapOps[K, V](a: Par[HashMap[K, V]]) = new Hashes.HashMapOps(a)
-    implicit def canMergeHashMap[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
+    implicit def canMergeHashMap[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
       def apply(from: Par[HashMap[_, _]]) = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
@@ -37,11 +38,11 @@ object Hashes {
       }
     }
     implicit def hashSetOps[T](a: Par[HashSet[T]]) = new Hashes.HashSetOps(a)
-    implicit def canMergeHashSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
+    implicit def canMergeHashSet[T: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
-    implicit def canMergeIntHashSet(implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], Int, Par[HashSet[Int]]] {
+    implicit def canMergeIntHashSet(implicit ctx: Scheduler) = new CanMergeFrom[Par[HashSet[_]], Int, Par[HashSet[Int]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
@@ -61,22 +62,22 @@ object Hashes {
       val contents = hashmap.seq.hashTableContents
       new HashMapStealer(contents, 0, contents.table.length)
     }
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashMapMacros.aggregate[K, V, S]
-    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashMapMacros.fold[K, V, U]
-    override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro internal.HashMapMacros.count[K, V, U]
-    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That], ctx: WorkstealingTreeScheduler) = macro internal.HashMapMacros.filter[K, V, That]
-    override def mapReduce[R](mapper: ((K, V)) => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro internal.HashMapMacros.mapReduce[K, V, R]
-    override def reduce[U >: (K, V)](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.HashMapMacros.reduce[K, V, U]
-    override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashMapMacros.min[K, V, U]
-    override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashMapMacros.max[K, V, U]
-    override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.HashMapMacros.foreach[K, V, U]
-    override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashMapMacros.sum[K, V, U]
-    override def product[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashMapMacros.product[K, V, U]
-    override def find[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro internal.HashMapMacros.find[K, V, U]
-    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashMapMacros.exists[K, V, U]
-    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashMapMacros.forall[K, V, U]
-    override def map[T, That](mp: ((K, V)) => T)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashMapMacros.map[K, V, T, That]
-    override def flatMap[T, That](mp: ((K, V)) => TraversableOnce[T])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: WorkstealingTreeScheduler) = macro internal.HashMapMacros.flatMap[K, V, T, That]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler) = macro internal.HashMapMacros.aggregate[K, V, S]
+    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashMapMacros.fold[K, V, U]
+    override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.HashMapMacros.count[K, V, U]
+    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That], ctx: Scheduler) = macro internal.HashMapMacros.filter[K, V, That]
+    override def mapReduce[R](mapper: ((K, V)) => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.HashMapMacros.mapReduce[K, V, R]
+    override def reduce[U >: (K, V)](op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashMapMacros.reduce[K, V, U]
+    override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashMapMacros.min[K, V, U]
+    override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashMapMacros.max[K, V, U]
+    override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashMapMacros.foreach[K, V, U]
+    override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashMapMacros.sum[K, V, U]
+    override def product[U >: (K, V)](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashMapMacros.product[K, V, U]
+    override def find[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Option[(K, V)] = macro internal.HashMapMacros.find[K, V, U]
+    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashMapMacros.exists[K, V, U]
+    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashMapMacros.forall[K, V, U]
+    override def map[T, That](mp: ((K, V)) => T)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: Scheduler): That = macro internal.HashMapMacros.map[K, V, T, That]
+    override def flatMap[T, That](mp: ((K, V)) => TraversableOnce[T])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: Scheduler) = macro internal.HashMapMacros.flatMap[K, V, T, That]
 
     def seq = hashmap
   }
@@ -86,24 +87,24 @@ object Hashes {
       val contents = hashset.seq.hashTableContents
       new HashSetStealer(contents, 0, contents.table.length)
     }
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashSetMacros.aggregate[T, S]
-    override def foreach[U >: T](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.HashSetMacros.foreach[T, U]
-    override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro internal.HashSetMacros.mapReduce[T, R]
-    override def reduce[U >: T](op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashSetMacros.reduce[T, U]
-    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.HashSetMacros.fold[T, U]
-    override def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashSetMacros.sum[T, U]
-    override def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashSetMacros.product[T, U]
-    override def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashSetMacros.min[T, U]
-    override def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashSetMacros.max[T, U]
-    override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro internal.HashSetMacros.count[T, U]
-    override def find[U >: T](pred: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro internal.HashSetMacros.find[T, U]
-    override def exists[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashSetMacros.exists[T, U]
-    override def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashSetMacros.forall[T, U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.HashSetMacros.aggregate[T, S]
+    override def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashSetMacros.foreach[T, U]
+    override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.HashSetMacros.mapReduce[T, R]
+    override def reduce[U >: T](op: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashSetMacros.reduce[T, U]
+    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashSetMacros.fold[T, U]
+    override def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashSetMacros.sum[T, U]
+    override def product[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashSetMacros.product[T, U]
+    override def min[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashSetMacros.min[T, U]
+    override def max[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashSetMacros.max[T, U]
+    override def count[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.HashSetMacros.count[T, U]
+    override def find[U >: T](pred: U => Boolean)(implicit ctx: Scheduler): Option[T] = macro internal.HashSetMacros.find[T, U]
+    override def exists[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashSetMacros.exists[T, U]
+    override def forall[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashSetMacros.forall[T, U]
 
-    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: WorkstealingTreeScheduler) = macro internal.HashSetMacros.filter[T, That]
-    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler) = macro internal.HashSetMacros.flatMap[T, S, That]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: Scheduler) = macro internal.HashSetMacros.filter[T, That]
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler) = macro internal.HashSetMacros.flatMap[T, S, That]
 
-    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashSetMacros.map[T, S, That]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler): That = macro internal.HashSetMacros.map[T, S, That]
     def seq = hashset
   }
 
@@ -209,35 +210,35 @@ object Hashes {
     }
   }
 
-  def newHashMapMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler) = {
+  def newHashMapMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler) = {
     new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
   }
 
-  def newHashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: WorkstealingTreeScheduler) = {
+  def newHashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: Scheduler) = {
     new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
   }
 
-  def newHashMapMerger[K, V](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler) = 
+  def newHashMapMerger[K, V](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler) = 
     new HashMapDiscardingMerger[Object, Object](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx).asInstanceOf[HashMapDiscardingMerger[K, V]]
 
 
-  def newHashMapCombiningMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: WorkstealingTreeScheduler) = {
+  def newHashMapCombiningMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: Scheduler) = {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
   }
 
-  def newHashMapCombiningMerger[K, V <: AnyRef](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: WorkstealingTreeScheduler) =  {
+  def newHashMapCombiningMerger[K, V <: AnyRef](callee: Par[HashMap[K, V]], valueCombiner: (V, V) => V)(implicit ctx: Scheduler) =  {
     def castingCombiner(a: Object, b:Object ):Object = valueCombiner(a.asInstanceOf[V], b.asInstanceOf[V])
     new HashMapCombiningMerger[Object, Object](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, castingCombiner, ctx)
   }
 
-  def newHashMapCombiningMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: WorkstealingTreeScheduler, valueCombiner: (V, V) => V) = {
+  def newHashMapCombiningMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: Scheduler, valueCombiner: (V, V) => V) = {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
   }
 
-    def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <:AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: WorkstealingTreeScheduler, cmf:CanMergeFrom[Repr, V, That]) = {    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
+    def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <:AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
   }
 
-    def newHashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <:AnyRef, Repr](implicit ctx: WorkstealingTreeScheduler, cmf:CanMergeFrom[Repr, V, That]) = {
+    def newHashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <:AnyRef, Repr](implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {
     new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
   }
 
@@ -249,7 +250,7 @@ object Hashes {
     val width: Int,
     val loadFactor: Int,
     val seed: Int,
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapDiscardingMerger[K, V], Par[HashMap[K, V]]] with HashTable.HashUtils[K] {
+    val ctx: Scheduler) extends HashBuckets[K, (K, V), HashMapDiscardingMerger[K, V], Par[HashMap[K, V]]] with HashTable.HashUtils[K] {
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
 
@@ -319,7 +320,7 @@ object Hashes {
     val loadFactor: Int,
     val seed: Int,
     val cmf: CanMergeFrom[Repr, V, That],
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapCollectingMerger[K, V, That, Repr], Par[HashMap[K, That]]] with HashTable.HashUtils[K] {
+    val ctx: Scheduler) extends HashBuckets[K, (K, V), HashMapCollectingMerger[K, V, That, Repr], Par[HashMap[K, That]]] with HashTable.HashUtils[K] {
 
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
@@ -391,7 +392,7 @@ object Hashes {
     val loadFactor: Int,
     val seed: Int,
     val valueCombiner: (V, V) => V,
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapCombiningMerger[K, V], Par[HashMap[K, V]]] with HashTable.HashUtils[K] {
+    val ctx: Scheduler) extends HashBuckets[K, (K, V), HashMapCombiningMerger[K, V], Par[HashMap[K, V]]] with HashTable.HashUtils[K] {
 
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
@@ -462,7 +463,7 @@ object Hashes {
     val width: Int
     val keys: Array[Conc.Buffer[K]]
     val vals: Array[Conc.Buffer[V]]
-    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    override def incrementStepFactor(config: Scheduler.Config) = 1
     def zero = 0
     def combine(a: Int, b: Int) = a + b
     def apply(node: Node[Int, Int], chunkSize: Int): Int = {
@@ -541,7 +542,7 @@ object Hashes {
   class HashMapCollectingMergerCallResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V, That <: AnyRef] extends scala.collection.par.workstealing.Hashes.HashMapKernel[K, Object, Unit] {
         def zero = ()
         def combine(a: Unit, b: Unit) = ()
-        def apply(node: WorkstealingTreeScheduler.Node[(K, Object), Unit], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[(K, Object), Unit], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, Object]]
           val table = stealer.table
           var i = from
@@ -568,11 +569,11 @@ object Hashes {
     def apply(node: Node[(K, V), R], from: Int, until: Int): R
   }
 
-  def newHashSetMerger[@specialized(Int, Long) T <: AnyVal: ClassTag](callee: Par[HashSet[T]])(implicit ctx: WorkstealingTreeScheduler) = {
+  def newHashSetMerger[@specialized(Int, Long) T <: AnyVal: ClassTag](callee: Par[HashSet[T]])(implicit ctx: Scheduler) = {
     new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
   }
 
-  def newHashSetMerger[T](callee: Par[HashSet[T]])(implicit ctx: WorkstealingTreeScheduler) = {
+  def newHashSetMerger[T](callee: Par[HashSet[T]])(implicit ctx: Scheduler) = {
     new HashSetMerger[Object](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx).asInstanceOf[HashSetMerger[T]]
   }
 
@@ -580,7 +581,7 @@ object Hashes {
     val width: Int,
     val loadFactor: Int,
     val seed: Int,
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with FlatHashTable.HashUtils[T] {
+    val ctx: Scheduler) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with FlatHashTable.HashUtils[T] {
     val keys = new Array[Conc.Buffer[T]](1 << width)
 
     def newHashBucket = new HashSetMerger(width, loadFactor, seed, ctx)
@@ -637,7 +638,7 @@ object Hashes {
     val width: Int,
     val keys: Array[Conc.Buffer[T]],
     val table: HashBuckets.FlatEntries[T]) extends IndexedStealer.IndexedKernel[Int, Int] {
-    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    override def incrementStepFactor(config: Scheduler.Config) = 1
     def zero = 0
     def combine(a: Int, b: Int) = a + b
     def apply(node: Node[Int, Int], chunkSize: Int): Int = {

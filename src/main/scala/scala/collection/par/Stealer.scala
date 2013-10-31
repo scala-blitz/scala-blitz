@@ -2,9 +2,6 @@ package scala.collection.par
 
 
 
-
-
-
 trait Stealer[@specialized +T] {
 
   def next(): T

@@ -12,7 +12,7 @@ import scala.annotation.unchecked.{ uncheckedVariance => uV }
 
 object Trees {
 
-  import WorkstealingTreeScheduler.{ Kernel, Node }
+  import Scheduler.{ Kernel, Node }
 
   val TRIE_ITERATOR_NAME = classOf[TrieIterator[_]].getName.replace(".", "$")
   val HASHSET1_NAME = classOf[TrieIterator[_]].getName.replace(".", "$")
@@ -71,12 +71,12 @@ object Trees {
 
   trait Scope {
     implicit def hashTrieSetOps[T](a: Par[HashSet[T]]) = new Trees.HashSetOps(a)
-    implicit def canMergeHashTrieSet[T: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
+    implicit def canMergeHashTrieSet[T: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](ctx)
       def apply() = new HashSetMerger[T](ctx)
     }
     implicit def hashTrieMapOps[K, V](a: Par[HashMap[K, V]]) = new Trees.HashMapOps(a)
-    implicit def canMergeHashTrieMap[K: ClassTag, V: ClassTag](implicit ctx: WorkstealingTreeScheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
+    implicit def canMergeHashTrieMap[K: ClassTag, V: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
       def apply(from: Par[HashMap[_, _]]) = new HashMapMerger[K, V](ctx)
       def apply() = new HashMapMerger[K, V](ctx)
     }
@@ -108,23 +108,23 @@ object Trees {
       s.rootInit()
       s
     }*/
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieSetMacros.aggregate[T, S]
-    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieSetMacros.mapReduce[T, T, M]
-    override def min[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieSetMacros.min[T, U]
-    override def max[U >: T](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieSetMacros.max[T, U]
-    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieSetMacros.reduce[T, U]
-    override def foreach[U >: T](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.HashTrieSetMacros.foreach[T, U]
-    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieSetMacros.fold[T, U]
-    override def sum[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieSetMacros.sum[T, U]
-    override def product[U >: T](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieSetMacros.product[T, U]
-    override def count[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro internal.HashTrieSetMacros.count[T, U]
-    override def find[U >: T](pred: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[T] = macro internal.HashTrieSetMacros.find[T, U]
-    override def exists[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashTrieSetMacros.exists[T, U]
-    override def forall[U >: T](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashTrieSetMacros.forall[T, U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.aggregate[T, S]
+    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.mapReduce[T, T, M]
+    override def min[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.min[T, U]
+    override def max[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.max[T, U]
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.reduce[T, U]
+    override def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashTrieSetMacros.foreach[T, U]
+    override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieSetMacros.fold[T, U]
+    override def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.sum[T, U]
+    override def product[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.product[T, U]
+    override def count[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.HashTrieSetMacros.count[T, U]
+    override def find[U >: T](pred: U => Boolean)(implicit ctx: Scheduler): Option[T] = macro internal.HashTrieSetMacros.find[T, U]
+    override def exists[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashTrieSetMacros.exists[T, U]
+    override def forall[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashTrieSetMacros.forall[T, U]
 
-    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieSetMacros.map[T, S, That]
-    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieSetMacros.flatMap[T, S, That]
-    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieSetMacros.filter[T, That]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler): That = macro internal.HashTrieSetMacros.map[T, S, That]
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler): That = macro internal.HashTrieSetMacros.flatMap[T, S, That]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: Scheduler): That = macro internal.HashTrieSetMacros.filter[T, That]
     def seq = hashset
   }
 
@@ -139,24 +139,24 @@ object Trees {
       s.rootInit()
       s
     }*/
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieMapMacros.aggregate[K, V, S]
-    override def mapReduce[M](mp: ((K, V)) => M)(combop: (M, M) => M)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieMapMacros.mapReduce[K, V, M]
-    override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieMapMacros.min[K, V, U]
-    override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieMapMacros.max[K, V, U]
-    override def reduce[U >: (K, V)](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler) = macro internal.HashTrieMapMacros.reduce[K, V, U]
-    override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.HashTrieMapMacros.foreach[K, V, U]
-    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieMapMacros.fold[K, V, U]
-    override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieMapMacros.sum[K, V, U]
-    override def product[U >: (K, V)](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.HashTrieMapMacros.product[K, V, U]
-    override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro internal.HashTrieMapMacros.count[K, V, U]
-    override def find[U >: (K, V)](pred: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[(K, V)] = macro internal.HashTrieMapMacros.find[K, V, U]
-    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashTrieMapMacros.exists[K, V, U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.aggregate[K, V, S]
+    override def mapReduce[M](mp: ((K, V)) => M)(combop: (M, M) => M)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.mapReduce[K, V, M]
+    override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.min[K, V, U]
+    override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.max[K, V, U]
+    override def reduce[U >: (K, V)](operator: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.reduce[K, V, U]
+    override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashTrieMapMacros.foreach[K, V, U]
+    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieMapMacros.fold[K, V, U]
+    override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.sum[K, V, U]
+    override def product[U >: (K, V)](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.product[K, V, U]
+    override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.HashTrieMapMacros.count[K, V, U]
+    override def find[U >: (K, V)](pred: U => Boolean)(implicit ctx: Scheduler): Option[(K, V)] = macro internal.HashTrieMapMacros.find[K, V, U]
+    override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashTrieMapMacros.exists[K, V, U]
 
-    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.HashTrieMapMacros.forall[K, V, U]
+    override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashTrieMapMacros.forall[K, V, U]
 
-    override def map[S, That](func: ((K, V)) => S)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieMapMacros.map[K, V, S, That]
-    override def flatMap[S, That](func: ((K, V)) => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieMapMacros.flatMap[K, V, S, That]
-    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], (K, V), That], ctx: WorkstealingTreeScheduler): That = macro internal.HashTrieMapMacros.filter[K, V, That]
+    override def map[S, That](func: ((K, V)) => S)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: Scheduler): That = macro internal.HashTrieMapMacros.map[K, V, S, That]
+    override def flatMap[S, That](func: ((K, V)) => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], S, That], ctx: Scheduler): That = macro internal.HashTrieMapMacros.flatMap[K, V, S, That]
+    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], (K, V), That], ctx: Scheduler): That = macro internal.HashTrieMapMacros.filter[K, V, That]
     def seq = hashmap
   }
 
@@ -429,7 +429,7 @@ object Trees {
   }
 
   class HashSetMerger[@specialized(Int, Long) T: ClassTag](
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with HashUtils {
+    val ctx: Scheduler) extends HashBuckets[T, T, HashSetMerger[T], Par[HashSet[T]]] with HashUtils {
     val elems = new Array[Conc.Buffer[T]](1 << width)
 
     def newHashBucket = new HashSetMerger[T](ctx)
@@ -497,7 +497,7 @@ object Trees {
   class HashSetMergerResultKernel[@specialized(Int, Long) T](
     val elems: Array[Conc.Buffer[T]],
     val root: Array[HashSet[T]]) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
-    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    override def incrementStepFactor(config: Scheduler.Config) = 1
     def zero = ()
     def combine(a: Unit, b: Unit) = a
     def apply(node: Node[Int, Unit], chunkSize: Int) {
@@ -597,7 +597,7 @@ object Trees {
   }
 
   class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long) V: ClassTag](
-    val ctx: WorkstealingTreeScheduler) extends HashBuckets[K, (K, V), HashMapMerger[K, V], Par[HashMap[K, V]]] with HashUtils {
+    val ctx: Scheduler) extends HashBuckets[K, (K, V), HashMapMerger[K, V], Par[HashMap[K, V]]] with HashUtils {
     val keys = new Array[Conc.Buffer[K]](1 << width)
     val vals = new Array[Conc.Buffer[V]](1 << width)
 
@@ -679,7 +679,7 @@ object Trees {
     val keys: Array[Conc.Buffer[K]],
     val vals: Array[Conc.Buffer[V]],
     val root: Array[HashMap[K, V]]) extends IndexedStealer.IndexedKernel[Int, Unit] with HashUtils {
-    override def incrementStepFactor(config: WorkstealingTreeScheduler.Config) = 1
+    override def incrementStepFactor(config: Scheduler.Config) = 1
     def zero = ()
     def combine(a: Unit, b: Unit) = a
     def apply(node: Node[Int, Unit], chunkSize: Int) {

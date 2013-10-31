@@ -22,15 +22,15 @@ object Concs {
 
   class Ops[T](val c: Conc[T]) extends AnyVal with Zippables.OpsLike[T, Conc[T]] {
     def stealer: PreciseStealer[T] = new ConcStealer(c, 0, c.size)
-    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.ConcsMacros.reduce[T, U]
-    override def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.ConcsMacros.copyToArray[T, U]
-    def genericCopyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = internal.ConcsMethods.copyToArray[T, U](c, arr, start, len)(ctx)
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.ConcsMacros.reduce[T, U]
+    override def copyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: Scheduler): Unit = macro internal.ConcsMacros.copyToArray[T, U]
+    def genericCopyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: Scheduler): Unit = internal.ConcsMethods.copyToArray[T, U](c, arr, start, len)(ctx)
     def seq = c
   }
   
   /* stealer implementation */
 
-  import WorkstealingTreeScheduler.{ Kernel, Node }
+  import Scheduler.{ Kernel, Node }
 
   class ConcStealer[@specialized(Int, Long, Float, Double) T](val conc: Conc[T], sidx: Int, eidx: Int) extends IndexedStealer.Flat[T](sidx, eidx) {
     val stack = new Array[Conc[T]](conc.level + 1)

@@ -6,7 +6,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing._
-import scala.collection.par.workstealing.WorkstealingTreeScheduler.Node
+import scala.collection.par.workstealing.Scheduler.Node
 import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Merger
@@ -20,7 +20,7 @@ import Optimizer.c2opt
 object HashMapMacros {
 
   def aggregate[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => 
-S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
+S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, (K, V)) => S](seqop)
@@ -40,7 +40,7 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: WorkstealingTreeScheduler.Node[(K, V), S], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[(K, V), S], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
           val table = stealer.table
           var i = from
@@ -67,22 +67,24 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.
   }
 
   def reduce[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(op: c.Expr[(T, T) => T])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     mapReduce[K, V, T](c)(reify { u: ((K, V)) => u })(op)(ctx)
   }
 
   def mapReduce[K: c.WeakTypeTag, V: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[((K, V)) => R])(reducer: 
-c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[((K, V)) => R](mapper)
     val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
+      import scala._
       import collection.par
-      import par.workstealing._
+      import par._
+      import workstealing._
       import par.workstealing.ResultCell
 
       lv.splice
@@ -91,8 +93,8 @@ c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
       val stealer = callee.stealer
 
       val kernel = new scala.collection.par.workstealing.Hashes.HashMapKernel[K, V, ResultCell[R]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[(K, V), ResultCell[R]], node: 
-WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]]) {
+        override def beforeWorkOn(tree: Scheduler.Ref[(K, V), ResultCell[R]], node: 
+Scheduler.Node[(K, V), ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
         def zero = new ResultCell[R]
@@ -106,7 +108,7 @@ WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]]) {
             r
           }
         }
-        def apply(node: WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[(K, V), ResultCell[R]], from: Int, until: Int) = {
           val rc = node.READ_INTERMEDIATE
           if (from < until) {
             val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
@@ -166,7 +168,7 @@ WorkstealingTreeScheduler.Node[(K, V), ResultCell[R]]) {
   }
 
   def min[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
@@ -178,7 +180,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
   }
 
   def max[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
@@ -190,7 +192,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
   }
 
   def product[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -203,7 +205,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
   }
 
   def sum[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -216,12 +218,12 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
   }
 
   def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => 
-U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     aggregate[K, V, U](c)(z)(op)(op)(ctx)
   }
 
   def count[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
@@ -236,7 +238,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
   }
 
   def foreach[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
@@ -256,8 +258,13 @@ c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       new Hashes.HashMapKernel[K, V, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -292,7 +299,7 @@ c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
   }
 
   def filter[K: c.WeakTypeTag, V: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(pred: c.Expr[((K, V)) => Boolean])(cmf: 
-c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
@@ -304,11 +311,17 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Worksteali
 (K, V)) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
+
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+
       import scala.reflect.ClassTag
-      import scala.collection.par._
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice
@@ -322,7 +335,7 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Worksteali
   }
 
   def map[K: c.WeakTypeTag, V: c.WeakTypeTag, T: c.WeakTypeTag , That: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => 
-T])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+T])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => T](mp)
@@ -334,11 +347,15 @@ T])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[Workstea
 merger += mpg.splice.apply(elem) })
 
     val operation = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.reflect.ClassTag
-      import scala.collection.par._
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       mpv.splice
       cv.splice
       cmfv.splice
@@ -352,7 +369,7 @@ merger += mpg.splice.apply(elem) })
   }
 
   def flatMap[K: c.WeakTypeTag, V: c.WeakTypeTag, T: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => 
-TraversableOnce[T]])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): 
+TraversableOnce[T]])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[Scheduler]): 
 c.Expr[That] =   {  
 import c.universe._
 
@@ -365,11 +382,15 @@ import c.universe._
 mpg.splice.apply(elem).foreach{merger += _} })
 
     val operation = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.reflect.ClassTag
-      import scala.collection.par._
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       mpv.splice
       cv.splice
       cmfv.splice
@@ -384,15 +405,20 @@ mpg.splice.apply(elem).foreach{merger += _} })
 
 
   def find[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
+c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[((K, V)) => Boolean](p)
 
     val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       val kernel = new Hashes.HashMapKernel[K, V, Option[(K, V)]] {
         lv.splice
         def zero = None
@@ -424,7 +450,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[(K, V)]] = {
   }
 
   def forall[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -437,7 +463,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
   }
 
   def exists[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[T => Boolean])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[K, V, T](c)(p)(ctx)
@@ -452,7 +478,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
 object HashSetMacros {
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, 
-T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
+T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
@@ -472,7 +498,7 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: WorkstealingTreeScheduler.Node[T, S], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[T, S], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
           val table = stealer.table
           var i = from
@@ -491,7 +517,7 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
     c.inlineAndReset(result)
   }
 
-  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(pred: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[T]] = {
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(pred: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
     import c.universe._
 
     val (predv, predg) = c.nonFunctionToLocal[T => Boolean](pred)
@@ -507,7 +533,7 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
         predv.splice
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
-        def apply(node: WorkstealingTreeScheduler.Node[T, Option[T]], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[T, Option[T]], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
           val table = stealer.table
           var i = from
@@ -525,7 +551,7 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
   }
 
 
-  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -537,7 +563,7 @@ T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
     }
   }
 
-  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[T, U](c)(p)(ctx)
@@ -553,8 +579,13 @@ c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       new scala.collection.par.workstealing.Hashes.HashSetKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -565,7 +596,7 @@ c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: WorkstealingTreeScheduler.Node[T, Merger[S, That]], from: Int, until: Int) = {
+        def apply(node: Scheduler.Node[T, Merger[S, That]], from: Int, until: Int) = {
           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
           val table = stealer.table
           val cmb = node.READ_INTERMEDIATE
@@ -582,7 +613,7 @@ c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
   }
 
   def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: 
-c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => S](func)
@@ -594,10 +625,14 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeSche
 f.splice(elem) })
 
     val operation = reify {
-      import scala.collection.par._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -610,7 +645,7 @@ f.splice(elem) })
   }
 
   def filter[T: c.WeakTypeTag,  That: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: 
-c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => Boolean](pred)
@@ -622,10 +657,14 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[WorkstealingTreeSche
       if(f.splice(elem))merger +=elem })
 
     val operation = reify {
-      import scala.collection.par._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -639,7 +678,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[WorkstealingTreeSche
 
 
   def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: 
-c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -651,10 +690,15 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[WorkstealingTreeSche
 f.splice(elem).foreach(x=> merger +=x) })
 
     val operation = reify {
-      import scala.collection.par._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+
       import scala.collection.par.workstealing.Hashes
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -668,15 +712,18 @@ f.splice(elem).foreach(x=> merger +=x) })
 
 
   def mapReduce[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[T => R])(reducer: 
-c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[T => R](mapper)
     val calleeExpression = c.Expr[Hashes.HashSetOps[T]](c.applyPrefix)
     val result = reify {
+      import scala._
       import collection.par
-      import par.workstealing._
+      import par._
+      import workstealing._
+
       import par.workstealing.ResultCell
 
       lv.splice
@@ -685,8 +732,8 @@ c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
       val stealer = callee.stealer
 
       val kernel = new scala.collection.par.workstealing.Hashes.HashSetKernel[T, ResultCell[R]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[R]], node: 
-WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
+        override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[R]], node: 
+Scheduler.Node[T, ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
         def zero = new ResultCell[R]
@@ -700,7 +747,7 @@ WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
             r
           }
         }
-         def apply(node: WorkstealingTreeScheduler.Node[T, ResultCell[R]], from: Int, until: Int) = {
+         def apply(node: Scheduler.Node[T, ResultCell[R]], from: Int, until: Int) = {
            val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
            val table = stealer.table
            val cmb = node.READ_INTERMEDIATE
@@ -733,14 +780,14 @@ WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
   }
 
   def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     mapReduce[T, U](c)(reify { u: T => u })(op)(ctx)
   }
 
   def min[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
+c.Expr[Scheduler]): c.Expr[TT] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
@@ -752,7 +799,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
   }
 
   def max[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[T]], ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
+c.Expr[Scheduler]): c.Expr[TT] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[T]](ord)
@@ -765,7 +812,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
 
 
 
-  def product[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+  def product[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -777,7 +824,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
     }
   }
 
-    def sum[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+    def sum[TT: c.WeakTypeTag, T >: TT: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -790,12 +837,12 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[TT] = {
   }
 
   def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => 
-U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     aggregate[T, U](c)(z)(op)(op)(ctx)
   }
 
   def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (pv, pred) = c.nonFunctionToLocal[T => Boolean](p)
@@ -810,7 +857,7 @@ c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
   }
 
   def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: 
-c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actv, actg) = c.nonFunctionToLocal[T => Unit](action)

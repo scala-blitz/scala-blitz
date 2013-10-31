@@ -14,13 +14,13 @@ import scala.collection.par.Merger
 import scala.collection.par.PreciseStealer
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing.internal.Optimizer._
-import scala.collection.par.workstealing.WorkstealingTreeScheduler.Node
+import scala.collection.par.workstealing.Scheduler.Node
 
 
 
 object ReducablesMacros {
 
-  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[S] = {
+  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
@@ -30,14 +30,14 @@ object ReducablesMacros {
     invokeAggregateKernel[T, S, Repr](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateN[T, S](c)(init, seqoper))(ctx)
   }
 
-  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     val (lv, oper: c.Expr[(U, U) => U]) = c.nonFunctionToLocal[(U, U) => U](op)
     val (zv, zg: c.Expr[U]) = c.nonFunctionToLocal[U](z)
     val init = c.universe.reify { a: U => oper.splice.apply(zg.splice, a) }
     invokeAggregateKernel[T, U, Repr](c)(lv, zv)(zg)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -53,7 +53,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, U, Repr](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[U => Unit](action)
@@ -64,7 +64,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, Unit, Repr](c)(actionv)(zero)(comboop)(aggregateN[T, Unit](c)(init, seqoper))(ctx)
   }
 
-  def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -80,7 +80,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, U, Repr](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Int] = {
+  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (predicv, predic) = c.nonFunctionToLocal[T => Boolean](p)
@@ -113,7 +113,7 @@ object ReducablesMacros {
     }
   }
 
-  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducables.ReducableKernel[T, R]) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducables.ReducableKernel[T, R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
@@ -147,14 +147,18 @@ object ReducablesMacros {
     c.inlineAndReset(result)
   }
 
-  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Option[T]] = {
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
 
     val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
     val result = reify {
-      import scala.collection.par.workstealing._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import internal._
       lv.splice
       val callee = calleeExpression.splice
@@ -179,7 +183,7 @@ object ReducablesMacros {
     c.inlineAndReset(result)
   }
 
-  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -191,7 +195,7 @@ object ReducablesMacros {
     }
   }
 
-  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Boolean] = {
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[T, U, Repr](c)(p)(ctx)
@@ -200,20 +204,24 @@ object ReducablesMacros {
     }
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     mapReduce[T, U, U, Repr](c)(reify { u: U => u })(op)(ctx)
   }
 
-  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[R] = {
+  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[U => R](mapper)
     val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
     val result = reify {
-      import scala.collection.par.workstealing._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       lv.splice
       mv.splice
 
@@ -221,7 +229,7 @@ object ReducablesMacros {
       val stealer = callee.stealer
 
       val kernel = new scala.collection.par.workstealing.Reducables.ReducableKernel[T, ResultCell[R]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[R]], node: WorkstealingTreeScheduler.Node[T, ResultCell[R]]) {
+        override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[R]], node: Scheduler.Node[T, ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
         def zero = new ResultCell[R]
@@ -267,7 +275,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -278,7 +286,7 @@ object ReducablesMacros {
     }
   }
 
-  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[T] = {
+  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -289,18 +297,23 @@ object ReducablesMacros {
     }
   }
 
-  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T, Repr]], ctx: c.Expr[WorkstealingTreeScheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
+  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T, Repr]], ctx: c.Expr[Scheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
     import c.universe._
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
       val sTag = getTagForS.splice
       val rootStealer = callee.splice.stealer.asInstanceOf[PreciseStealer[T]]
       val len = rootStealer.totalElements
       val sarray = sTag.newArray(len)
       val kernel = new Reducables.CopyMapReducableKernel[T, S] {
-        import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+        import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
         def resultArray = sarray
         def apply(node: Node[T, Unit], elementsToGet: Int) = {
@@ -322,8 +335,13 @@ object ReducablesMacros {
     import c.universe._
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       new Reducables.ReducableKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -347,7 +365,7 @@ object ReducablesMacros {
     }
   }
 
-  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[WorkstealingTreeScheduler]) = {
+  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[Scheduler]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
@@ -357,8 +375,13 @@ object ReducablesMacros {
     val mergerExpr = reify { Hashes.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       import scala.collection.par.workstealing.Hashes._
       grv.splice
       mpv.splice
@@ -394,7 +417,7 @@ object ReducablesMacros {
 
   }
 
-  def groupBy[T: c.WeakTypeTag, K: c.WeakTypeTag, Repr: c.WeakTypeTag, That <:AnyRef : c.WeakTypeTag ](c: Context)(gr: c.Expr[T => K])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], tClassTag: c.Expr[scala.reflect.ClassTag[T]], ctx: c.Expr[WorkstealingTreeScheduler], cmf:c.Expr[CanMergeFrom[Repr, T, That]]) = {
+  def groupBy[T: c.WeakTypeTag, K: c.WeakTypeTag, Repr: c.WeakTypeTag, That <:AnyRef : c.WeakTypeTag ](c: Context)(gr: c.Expr[T => K])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], tClassTag: c.Expr[scala.reflect.ClassTag[T]], ctx: c.Expr[Scheduler], cmf:c.Expr[CanMergeFrom[Repr, T, That]]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
@@ -403,8 +426,13 @@ object ReducablesMacros {
     val mergerExpr = reify { Hashes.newHashMapCollectingMerger[K, T, That, Repr](kClassTag.splice, tClassTag.splice, ctx.splice, cmfg.splice) }
 
     reify {
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       import scala.collection.par.workstealing.Hashes._
       grv.splice
       cv.splice
@@ -439,7 +467,7 @@ object ReducablesMacros {
   }
 
 
-  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => S](func)
@@ -452,11 +480,16 @@ object ReducablesMacros {
     val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[S, That], elem: T) => merger += f.splice(elem) })
 
     val operation = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.collection.par._
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.workstealing.Reducables
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -476,7 +509,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -489,10 +522,15 @@ object ReducablesMacros {
     val tkernel = transformerKernel(c)(callee, mergerExpr, c.optimise(applyer))
 
     val operation = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.collection.par._
       import scala.collection.par.workstealing.Reducables
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -506,7 +544,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Repr, T, That]], ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[That] = {
+  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Repr, T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[T => Boolean](pred)
@@ -516,10 +554,15 @@ object ReducablesMacros {
     val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[T, That], elem: T) => if (p.splice(elem)) merger += elem })
 
     val operation = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
       import scala.collection.par._
       import scala.collection.par.workstealing.{ Arrays, Reducables }
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice

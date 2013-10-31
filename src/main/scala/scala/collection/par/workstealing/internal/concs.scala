@@ -18,18 +18,21 @@ object ConcsMacros {
 
   /* macro implementations */
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[U] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(U, U) => U](operator)
     val calleeExpression = c.Expr[Concs.Ops[T]](c.applyPrefix)
     val result = reify {
-      import scala.collection.par.workstealing._
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
       lv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.par.workstealing.Concs.ConcKernel[T, ResultCell[U]] {
-        override def beforeWorkOn(tree: WorkstealingTreeScheduler.Ref[T, ResultCell[U]], node: WorkstealingTreeScheduler.Node[T, ResultCell[U]]) {
+        override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[U]], node: Scheduler.Node[T, ResultCell[U]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[U])
         }
         def zero = new ResultCell[U]
@@ -94,13 +97,16 @@ object ConcsMacros {
     c.inlineAndReset(operation)
   }
 
-  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[WorkstealingTreeScheduler]): c.Expr[Unit] = {
+  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Concs.Ops[T]](c.applyPrefix)
     reify {
-      import scala.collection.par.workstealing._
-      import scala.collection.par.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+      import scala.collection.par.workstealing.Scheduler.{Ref, Node}
       val callee = calleeExpression.splice
       val array = arr.splice
       val startIndex = start.splice
@@ -162,7 +168,7 @@ object ConcsMacros {
 
 object ConcsMethods {
   import scala.collection.par.workstealing._
-  import scala.collection.par.workstealing.WorkstealingTreeScheduler.{Ref, Node}
+  import scala.collection.par.workstealing.Scheduler.{Ref, Node}
 
   class CopyToArrayKernel[T, U >: T](array: Array[U], startIndex: Int, length: Int) extends scala.collection.par.workstealing.Concs.ConcKernel[T, ProgressStatus] {
     override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {
@@ -210,7 +216,7 @@ object ConcsMethods {
     }
   }
 
-  def copyToArray[T, U >: T](c: Conc[T], array: Array[U], startIndex: Int, len: Int)(ctx: WorkstealingTreeScheduler): Unit = {
+  def copyToArray[T, U >: T](c: Conc[T], array: Array[U], startIndex: Int, len: Int)(ctx: Scheduler): Unit = {
     val length = math.min(len, math.min(c.length, array.length - startIndex))
     val stealer = new Concs.Ops(c).stealer
 

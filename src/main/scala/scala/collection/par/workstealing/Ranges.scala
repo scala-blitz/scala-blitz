@@ -14,15 +14,15 @@ object Ranges {
 
   trait Scope {
     implicit def rangeOps(r: Par[Range]) = new Ranges.Ops(r)
-    implicit def canMergeRange(implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Range, Int, Par[Array[Int]]] = new CanMergeFrom[Range, Int, Par[Array[Int]]] {
+    implicit def canMergeRange(implicit ctx: Scheduler): CanMergeFrom[Range, Int, Par[Array[Int]]] = new CanMergeFrom[Range, Int, Par[Array[Int]]] {
       def apply(from: Range) = new Arrays.ArrayMerger[Int](ctx)
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
-    implicit def canMergeParRange(implicit ctx: WorkstealingTreeScheduler): CanMergeFrom[Par[Range], Int, Par[Array[Int]]] = new CanMergeFrom[Par[Range], Int, Par[Array[Int]]] {
+    implicit def canMergeParRange(implicit ctx: Scheduler): CanMergeFrom[Par[Range], Int, Par[Array[Int]]] = new CanMergeFrom[Par[Range], Int, Par[Array[Int]]] {
       def apply(from: Par[Range]) = new Arrays.ArrayMerger[Int](ctx)
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
-    implicit def rangeIsZippable(implicit ctx: WorkstealingTreeScheduler) = new IsZippable[Range, Int] {
+    implicit def rangeIsZippable(implicit ctx: Scheduler) = new IsZippable[Range, Int] {
       def apply(pr: Par[Range]) = new Zippable[Int]{
       def iterator = pr.seq.iterator
       def splitter =  ???
@@ -35,32 +35,32 @@ object Ranges {
   class Ops(val range: Par[collection.immutable.Range]) extends AnyVal with Zippables.OpsLike[Int, Par[collection.immutable.Range]] {
     def r = range.seq
     def stealer: PreciseStealer[Int] = new RangeStealer(r, 0, r.length)
-    override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.RangesMacros.reduce[U]
-    override def mapReduce[R](mapper: Int => R)(reducer: (R, R) => R)(implicit ctx: WorkstealingTreeScheduler): R = macro internal.RangesMacros.mapReduce[Int,R]
-    override def count[U >: Int](p: U => Boolean)(implicit ctx: WorkstealingTreeScheduler): Int = macro internal.RangesMacros.count[U]
-    override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: WorkstealingTreeScheduler): U = macro internal.RangesMacros.fold[U]
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: WorkstealingTreeScheduler): S = macro internal.RangesMacros.aggregate[S]
-    override def sum[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.RangesMacros.sum[U]
-    override def product[U >: Int](implicit num: Numeric[U], ctx: WorkstealingTreeScheduler): U = macro internal.RangesMacros.product[U]
-    override def min[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro internal.RangesMacros.min[U]
-    override def foreach[U >: Int](action: U => Unit)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.RangesMacros.foreach[U]
-    override def max[U >: Int](implicit ord: Ordering[U], ctx: WorkstealingTreeScheduler): Int = macro internal.RangesMacros.max[U]
-    override def find[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Option[Int] = macro internal.RangesMacros.find[U]
-    override def exists[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.RangesMacros.exists[U]
-    override def forall[U >: Int](p: U=> Boolean)(implicit ctx: WorkstealingTreeScheduler): Boolean = macro internal.RangesMacros.forall[U]
-    override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro internal.RangesMacros.map[Int, S, That]
-    override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:WorkstealingTreeScheduler): Unit = macro internal.RangesMacros.copyToArray[U]
-    def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.RangesMacros.copyToArray2[U]
-    def copyToArray[U >: Int](arr: Array[U])(implicit ctx: WorkstealingTreeScheduler): Unit = macro internal.RangesMacros.copyToArray3[U]
-    override def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: WorkstealingTreeScheduler) = macro internal.RangesMacros.flatMap[Int, S, That]
-    override def filter[That](pred: Int => Boolean)(implicit cmf: CanMergeFrom[Par[Range], Int, That], ctx: WorkstealingTreeScheduler) = macro internal.RangesMacros.filter[That]
+    override def reduce[U >: Int](operator: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.RangesMacros.reduce[U]
+    override def mapReduce[R](mapper: Int => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.RangesMacros.mapReduce[Int,R]
+    override def count[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.RangesMacros.count[U]
+    override def fold[U >: Int](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.RangesMacros.fold[U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, Int) => S)(implicit ctx: Scheduler): S = macro internal.RangesMacros.aggregate[S]
+    override def sum[U >: Int](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.RangesMacros.sum[U]
+    override def product[U >: Int](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.RangesMacros.product[U]
+    override def min[U >: Int](implicit ord: Ordering[U], ctx: Scheduler): Int = macro internal.RangesMacros.min[U]
+    override def foreach[U >: Int](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.foreach[U]
+    override def max[U >: Int](implicit ord: Ordering[U], ctx: Scheduler): Int = macro internal.RangesMacros.max[U]
+    override def find[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Option[Int] = macro internal.RangesMacros.find[U]
+    override def exists[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.exists[U]
+    override def forall[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.forall[U]
+    override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler) = macro internal.RangesMacros.map[Int, S, That]
+    override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:Scheduler): Unit = macro internal.RangesMacros.copyToArray[U]
+    def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.copyToArray2[U]
+    def copyToArray[U >: Int](arr: Array[U])(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.copyToArray3[U]
+    override def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler) = macro internal.RangesMacros.flatMap[Int, S, That]
+    override def filter[That](pred: Int => Boolean)(implicit cmf: CanMergeFrom[Par[Range], Int, That], ctx: Scheduler) = macro internal.RangesMacros.filter[That]
     def seq = range
     def classTag = implicitly[ClassTag[Int]]
   }
 
   /* stealer implementation */
 
-  import WorkstealingTreeScheduler.{ Kernel, Node }
+  import Scheduler.{ Kernel, Node }
 
   class RangeStealer(val range: collection.immutable.Range, start: Int, end: Int) extends IndexedStealer.Flat[Int](start, end) {
     type StealerType = RangeStealer
@@ -111,7 +111,7 @@ object Ranges {
   }
 
   abstract class CopyMapRangeKernel[@specialized S] extends IndexedStealer.IndexedKernel[Int, Unit] {
-    import scala.collection.par.workstealing.WorkstealingTreeScheduler.{ Ref, Node }
+    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]
@@ -137,7 +137,7 @@ object Ranges {
 
   val EMPTY_RESULT = new AnyRef
 
-  def newMerger(pa: Par[Range])(implicit ctx: WorkstealingTreeScheduler): Arrays.ArrayMerger[Int] = {
+  def newMerger(pa: Par[Range])(implicit ctx: Scheduler): Arrays.ArrayMerger[Int] = {
     val am = pa.seq match {
       case x: Range => new Arrays.ArrayMerger[Int](ctx)
       case null => throw new NullPointerException

@@ -16,7 +16,7 @@ object BuildSettings {
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % "2.10.2"
       , "org.scalatest" %% "scalatest" % "1.9.1" % "test"
-      , "com.github.axel22" %% "scalameter" % "0.4-M1"
+      , "com.github.axel22" %% "scalameter" % "0.4"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
     logBuffered := false
