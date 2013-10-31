@@ -8,11 +8,7 @@ import generic.IsZippable
 
 trait ParDefs {
 
-  class ops[Repr](val seq: Repr) {
-    def toPar = new Par(seq)
-  }
-
-  implicit def seq2ops[Repr](seq: Repr) = new ops(seq)
+  implicit def seq2ops[Repr](seq: Repr) = new ParDefs.ops(seq)
 
   implicit def par2zippable[T, Repr](r: Par[Repr])(implicit isZippable: IsZippable[Repr, T]): Zippable[T] = isZippable(r)
 
@@ -21,3 +17,10 @@ trait ParDefs {
 }
 
 
+object ParDefs {
+
+  class ops[Repr](val seq: Repr) extends AnyVal {
+    def toPar = new Par(seq)
+  }
+
+}
