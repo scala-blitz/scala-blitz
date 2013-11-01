@@ -153,7 +153,6 @@ object Arrays {
   type CopyProgress = ProgressStatus
 
   abstract class CopyMapArrayKernel[T, @specialized(Specializable.AllNumeric) S] extends scala.collection.par.workstealing.Arrays.ArrayKernel[T, Unit] {
-    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]
