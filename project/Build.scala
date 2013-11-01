@@ -30,8 +30,9 @@ object WorkstealingBuild extends Build {
     else s.toString
   }
 
+
   /* tasks and settings */
-  
+   
   val javaCommand = TaskKey[String](
     "java-command",
     "Creates a java vm command for launching a process."
@@ -84,15 +85,15 @@ object WorkstealingBuild extends Build {
       comm!
     }
   }
-  
-  
   /* projects */
+
+  //lazy val scalameter = RootProject(uri("git://github.com/axel22/scalameter.git"))
   
   lazy val root = Project(
     "root",
     file("."),
     settings = BuildSettings.buildSettings ++ Seq(benchTask, javaCommandSetting, benchVerboseTask)
-  )
+  ) dependsOn ()
 
 }
 
