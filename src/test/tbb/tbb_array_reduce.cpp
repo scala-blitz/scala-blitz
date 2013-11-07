@@ -47,7 +47,7 @@ int main(int,char**) {
   clock_t end = clock();
   double elapsed_msecs = double(1000*end - 1000*begin) / CLOCKS_PER_SEC/MESUREMENTS;
 
-  std::cout<< r <<' ' << elapsed_msecs<< std::endl;
+  std::cout << r << ' ' << elapsed_msecs << std::endl;
   /*  std::vector<mytask> tasks;
   for (int i=0;i<100000;++i)
     tasks.push_back(mytask(i));
