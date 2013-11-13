@@ -10,9 +10,31 @@ import java.awt.event._
 import javax.swing._
 import javax.swing.event._
 
+import org.scalameter.{ Reporter, Gen, PerformanceTest }
+import org.scalameter.persistence.SerializationPersistor
+import org.scalameter.api._
+import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporter }
 
 
-object Mandelbrot {
+
+object Mandelbrot extends PerformanceTest.Regression with Serializable {
+
+
+    private def compute(xc: Double, yc: Double, threshold: Int): Int = {
+      var i = 0
+      var x = 0.0
+      var y = 0.0
+      while (x * x + y * y < 2 && i < threshold) {
+        val xt = x * x - y * y + xc
+        val yt = 2 * x * y + yc
+  
+        x = xt
+        y = yt
+  
+        i += 1
+      }
+      i
+    }
 
   class MandelCanvas(frame: MandelFrame) extends JComponent {
     val pixels = new Array[Int](4000 * 4000)
@@ -63,25 +85,17 @@ object Mandelbrot {
       }
     })
 
-    private def compute(xc: Double, yc: Double, threshold: Int): Int = {
-      var i = 0
-      var x = 0.0
-      var y = 0.0
-      while (x * x + y * y < 2 && i < threshold) {
-        val xt = x * x - y * y + xc
-        val yt = 2 * x * y + yc
-  
-        x = xt
-        y = yt
-  
-        i += 1
-      }
-      i
-    }
-  
-
     private def fill(pixels: Array[Int], wdt: Int, hgt: Int) {
       val selected = frame.implcombo.getSelectedItem
+
+      println("xlo: " +xlo)
+      println("ylo: " +ylo)
+      println("xhi: " +xhi)
+      println("yhi: " +yhi)
+      println("wdt: " +wdt)
+      println("hgt: " +hgt)
+
+
       if (selected == "Workstealing tree") {
         fillWsTree(pixels, wdt, hgt)
       } else {
@@ -94,6 +108,12 @@ object Mandelbrot {
       val range = 0 until (wdt * hgt)
       val pr = range.par
       pr.tasksupport = fj
+      println("xlo: " +xlo)
+      println("ylo: " +ylo)
+      println("xhi: " +xhi)
+      println("yhi: " +yhi)
+      println("wdt: " +wdt)
+      println("hgt: " +hgt)
 
       for (idx <- pr) {
         val x = idx % wdt
@@ -111,6 +131,8 @@ object Mandelbrot {
 
       fj.environment.shutdown()
     }
+
+
 
     private def fillWsTree(pixels: Array[Int], wdt: Int, hgt: Int) {
       val range = 0 until (wdt * hgt)
@@ -133,6 +155,8 @@ object Mandelbrot {
 
       s.pool.shutdown()
     }
+
+
 
     override def paintComponent(g: Graphics) {
       super.paintComponent(g)
@@ -217,8 +241,92 @@ object Mandelbrot {
     setVisible(true)
   }
 
-  def main(args: Array[String]) {
+  override def main(args: Array[String]) {
     val frame = new MandelFrame
   }
+
+
+  lazy val persistor = new SerializationPersistor
+
+    @volatile var dummy: Int = Int.MinValue;
+
+    lazy val conf =  new workstealing.Scheduler.Config.Default()
+    lazy val s = new workstealing.Scheduler.ForkJoin(conf)
+
+
+  /* inputs */
+
+
+    def  benchmarkWs() {
+      val wdt = 580
+      val hgt = 570
+      val xlo = -1.0349498063694267
+      val ylo = -0.36302123503184713
+      val xhi = -0.887179105732484
+      val yhi = -0.21779830509554143
+      val threshold = 20000
+      
+      val range = 0 until (wdt * hgt)
+      implicit val s = this.s
+  
+      for (idx <- range.toPar) {
+        val x = idx % wdt
+        val y = idx / wdt
+        val xc = xlo + (xhi - xlo) * x / wdt
+        val yc = ylo + (yhi - ylo) * y / hgt
+
+        val iters = compute(xc, yc, threshold)
+        if(dummy == iters) { println("Shouldn't happen")}
+      }
+
+      dummy
+    }
+
+  def  benchmarkSequential() {
+      val wdt = 580
+      val hgt = 570
+      val xlo = -1.0349498063694267
+      val ylo = -0.36302123503184713
+      val xhi = -0.887179105732484
+      val yhi = -0.21779830509554143
+      val threshold = 20000
+      
+      val range = 0 until (wdt * hgt)
+  
+      for (idx <- range) {
+        val x = idx % wdt
+        val y = idx / wdt
+        val xc = xlo + (xhi - xlo) * x / wdt
+        val yc = ylo + (yhi - ylo) * y / hgt
+
+        val iters = compute(xc, yc, threshold)
+        if(dummy == iters) { println("Shouldn't happen")}
+      }
+
+      dummy
+    }
+
+  /* tests  */
+
+  performance of "Mandelbrot" config (exec.jvmflags -> "-server -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Xms1024M -Xmx1024M",
+    exec.minWarmupRuns -> 50,
+    exec.maxWarmupRuns -> 100,
+    exec.benchRuns -> 48,
+    exec.independentSamples -> 6,
+    exec.jvmcmd -> "java8 ") in {
+
+    measure method "time" in {
+
+      using(Gen.single("size")(580)) curve ("par") in {
+        data =>benchmarkWs()
+          
+      }
+      using(Gen.single("size")(580)) curve ("Sequential") in {
+        data =>benchmarkSequential()
+          
+      }
+    }
+  }
+
 
 }
