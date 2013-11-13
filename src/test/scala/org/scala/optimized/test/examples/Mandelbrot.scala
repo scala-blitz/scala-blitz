@@ -19,22 +19,21 @@ import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporte
 
 object Mandelbrot extends PerformanceTest.Regression with Serializable {
 
+  private def compute(xc: Double, yc: Double, threshold: Int): Int = {
+    var i = 0
+    var x = 0.0
+    var y = 0.0
+    while (x * x + y * y < 2 && i < threshold) {
+      val xt = x * x - y * y + xc
+      val yt = 2 * x * y + yc
 
-    private def compute(xc: Double, yc: Double, threshold: Int): Int = {
-      var i = 0
-      var x = 0.0
-      var y = 0.0
-      while (x * x + y * y < 2 && i < threshold) {
-        val xt = x * x - y * y + xc
-        val yt = 2 * x * y + yc
-  
-        x = xt
-        y = yt
-  
-        i += 1
-      }
-      i
+      x = xt
+      y = yt
+
+      i += 1
     }
+    i
+  }
 
   class MandelCanvas(frame: MandelFrame) extends JComponent {
     val pixels = new Array[Int](4000 * 4000)
@@ -245,76 +244,70 @@ object Mandelbrot extends PerformanceTest.Regression with Serializable {
     val frame = new MandelFrame
   }
 
-
   lazy val persistor = new SerializationPersistor
 
-    @volatile var dummy: Int = Int.MinValue;
+  @volatile var dummy: Int = Int.MinValue;
 
-    lazy val conf =  new workstealing.Scheduler.Config.Default()
-    lazy val s = new workstealing.Scheduler.ForkJoin(conf)
-
+  lazy val conf =  new workstealing.Scheduler.Config.Default()
+  lazy val s = new workstealing.Scheduler.ForkJoin(conf)
 
   /* inputs */
 
+  def benchmarkWs() {
+    val wdt = 580
+    val hgt = 570
+    val xlo = -1.0349498063694267
+    val ylo = -0.36302123503184713
+    val xhi = -0.887179105732484
+    val yhi = -0.21779830509554143
+    val threshold = 20000
+    
+    val range = 0 until (wdt * hgt)
+    implicit val s = this.s
 
-    def  benchmarkWs() {
-      val wdt = 580
-      val hgt = 570
-      val xlo = -1.0349498063694267
-      val ylo = -0.36302123503184713
-      val xhi = -0.887179105732484
-      val yhi = -0.21779830509554143
-      val threshold = 20000
-      
-      val range = 0 until (wdt * hgt)
-      implicit val s = this.s
-  
-      for (idx <- range.toPar) {
-        val x = idx % wdt
-        val y = idx / wdt
-        val xc = xlo + (xhi - xlo) * x / wdt
-        val yc = ylo + (yhi - ylo) * y / hgt
-
-        val iters = compute(xc, yc, threshold)
-        if(dummy == iters) { println("Shouldn't happen")}
-      }
-
-      dummy
+    for (idx <- range.toPar) {
+      val x = idx % wdt
+      val y = idx / wdt
+      val xc = xlo + (xhi - xlo) * x / wdt
+      val yc = ylo + (yhi - ylo) * y / hgt
+      val iters = compute(xc, yc, threshold)
+      if(dummy == iters) { println("Shouldn't happen")}
     }
+    dummy
+  }
 
-  def  benchmarkSequential() {
-      val wdt = 580
-      val hgt = 570
-      val xlo = -1.0349498063694267
-      val ylo = -0.36302123503184713
-      val xhi = -0.887179105732484
-      val yhi = -0.21779830509554143
-      val threshold = 20000
-      
-      val range = 0 until (wdt * hgt)
-  
-      for (idx <- range) {
-        val x = idx % wdt
-        val y = idx / wdt
-        val xc = xlo + (xhi - xlo) * x / wdt
-        val yc = ylo + (yhi - ylo) * y / hgt
+  def benchmarkSequential() {
+    val wdt = 580
+    val hgt = 570
+    val xlo = -1.0349498063694267
+    val ylo = -0.36302123503184713
+    val xhi = -0.887179105732484
+    val yhi = -0.21779830509554143
+    val threshold = 20000
+    
+    val range = 0 until (wdt * hgt)
 
-        val iters = compute(xc, yc, threshold)
-        if(dummy == iters) { println("Shouldn't happen")}
-      }
-
-      dummy
+    for (idx <- range) {
+      val x = idx % wdt
+      val y = idx / wdt
+      val xc = xlo + (xhi - xlo) * x / wdt
+      val yc = ylo + (yhi - ylo) * y / hgt
+      val iters = compute(xc, yc, threshold)
+      if(dummy == iters) { println("Shouldn't happen")}
     }
+    dummy
+  }
 
   /* tests  */
 
-  performance of "Mandelbrot" config (exec.jvmflags -> "-server -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Xms1024M -Xmx1024M",
+  performance of "Mandelbrot" config (
+    exec.jvmflags -> "-server -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Xms1024M -Xmx1024M",
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
     exec.independentSamples -> 6,
-    exec.jvmcmd -> "java8 ") in {
-
+    exec.jvmcmd -> "java8"
+  ) in {
     measure method "time" in {
 
       using(Gen.single("size")(580)) curve ("par") in {
