@@ -18,23 +18,11 @@ extends Stealer[T] {
   var iterator: Iterator[T] = _
 
   /* local state */
+  var initialized = false
+  var initialStack = 0L
   var localDepth = 0
   val localStack = new Array[Node](binary.depthBound(totalElems, startingDepth))
   localStack(0) = root
-
-  // go to the leftmost node
-  var initialized = false
-  var initialStack = 0L
-  
-  {
-    var pos = 2
-    var node = root
-    while (!binary.isEmptyLeaf(node)) {
-      node = binary.left(node)
-      initialStack = initialStack | (L << pos)
-      pos += 2
-    }
-  }
 
   /* atomic state */
   @volatile var stack: Long = _
@@ -52,20 +40,47 @@ extends Stealer[T] {
   def state: Stealer.State = {
     val s = READ_STACK
     val statebits = s & 0x3
-    if (statebits == AVAILABLE) Stealer.AvailableOrOwned
+    if (statebits == AVAILABLE || statebits == UNINITIALIZED) Stealer.AvailableOrOwned
     else if (statebits == COMPLETED) Stealer.Completed
     else Stealer.StolenOrExpanded
   }
 
-  final def advance(step: Int): Int = {
+  @tailrec final def advance(step: Int): Int = {
     val s = READ_STACK
     val statebits = s & 0x3
-    if (statebits != AVAILABLE) -1
+    if (statebits != AVAILABLE && statebits != UNINITIALIZED) -1
     else {
-      if (initialized) {
+      def pushLocal(stack: Long, v: Int, node: Node): Long = {
+        localStack(localDepth) = node
+        val newstack = stack | (v << (localDepth * 2 + 2))
+        localDepth += 1
+        newstack
+      }
+      def topLocal = localStack(localDepth - 1)
+      def topMask = {
+        val dep = localDepth * 2
+        (stack & (0x3 << dep)) >> dep
+      }
+
+      if (statebits == AVAILABLE) {
+        val topm = topMask
         ???
       } else {
-        ???
+        if (!initialized) {
+          initialStack = AVAILABLE
+          var node = root
+          while (!binary.isEmptyLeaf(binary.left(node))) {
+            initialStack = pushLocal(initialStack, L, node)
+            node = binary.left(node)
+          }
+          initialStack = pushLocal(initialStack, S, node)
+          initialized = true
+        }
+        if (CAS_STACK(s, initialStack)) {
+          subtreeIterator.set(localStack(localDepth))
+          iterator = subtreeIterator
+          1
+        } else advance(step)
       }
     }
   }
@@ -74,7 +89,7 @@ extends Stealer[T] {
     val s = READ_STACK
     val statebits = s & 0x3
     if (statebits == AVAILABLE) {
-      val cs = s | COMPLETED
+      val cs = (s & ~0x3) | COMPLETED
       if (CAS_STACK(s, cs)) true
       else markCompleted()
     } else false
@@ -84,7 +99,7 @@ extends Stealer[T] {
     val s = READ_STACK
     val statebits = s & 0x3
     if (statebits == AVAILABLE) {
-      val ss = s | STOLEN
+      val ss = (s & ~0x3) | STOLEN
       if (CAS_STACK(s, ss)) true
       else markStolen()
     } else false
@@ -92,7 +107,37 @@ extends Stealer[T] {
 
   def split: (Stealer[T], Stealer[T]) = ???
 
-  def elementsRemainingEstimate: Int = ???  
+  def elementsRemainingEstimate: Int = ???
+
+  override def toString = {
+    def show(s: Long) = {
+      val statebits = s & 0x3
+      val state = statebits match {
+        case UNINITIALIZED => "UN"
+        case AVAILABLE => "AV"
+        case STOLEN => "ST"
+        case COMPLETED => "CO"
+      }
+      var pos = 2
+      var stack = " "
+      while (pos < 64) {
+        stack += " " + ((s & (0x3 << pos)) >> pos match {
+          case L => "L"
+          case R => "R"
+          case S => "S"
+          case T => "T"
+        })
+        pos += 2
+      }
+      state + stack
+    }
+
+    s"BinTreeStealer(startDepth: $startingDepth, localDepth: $localDepth, #elems: $totalElems, inited: $initialized) {\n" +
+    s"  stack: ${show(READ_STACK)}\n" +
+    s"  inits: ${show(initialStack)}\n" +
+    s"  local: ${localStack.map(_ != null).mkString(", ")}\n" +
+    s"}"
+  }
 
 }
 
@@ -101,9 +146,10 @@ object BinaryTreeStealer {
 
   val STACK_OFFSET = unsafe.objectFieldOffset(classOf[BinaryTreeStealer[_, _]].getDeclaredField("stack"))
 
+  val UNINITIALIZED = 0x0
   val STOLEN = 0x1
   val COMPLETED = 0x2
-  val AVAILABLE = 0x0
+  val AVAILABLE = 0x3
 
   val L = 0x1
   val R = 0x2

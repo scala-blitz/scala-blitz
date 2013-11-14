@@ -372,7 +372,7 @@ object ReducablesMacros {
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
     val (aggrv, aggrg) = c.nonFunctionToLocal[(M, M) => M](aggr)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify { Hashes.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
+    val mergerExpr = reify { HashTables.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
 
     reify {
       import scala._
@@ -382,7 +382,7 @@ object ReducablesMacros {
 
       import scala.collection.par.workstealing.Scheduler
       import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
-      import scala.collection.par.workstealing.Hashes._
+      import scala.collection.par.workstealing.HashTables._
       grv.splice
       mpv.splice
       aggrv.splice
@@ -423,7 +423,7 @@ object ReducablesMacros {
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (cmfv, cmfg) = c.nonFunctionToLocal[CanMergeFrom[Repr, T, That]](cmf)
     val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
-    val mergerExpr = reify { Hashes.newHashMapCollectingMerger[K, T, That, Repr](kClassTag.splice, tClassTag.splice, ctx.splice, cmfg.splice) }
+    val mergerExpr = reify { HashTables.newHashMapCollectingMerger[K, T, That, Repr](kClassTag.splice, tClassTag.splice, ctx.splice, cmfg.splice) }
 
     reify {
       import scala._
@@ -433,7 +433,7 @@ object ReducablesMacros {
 
       import scala.collection.par.workstealing.Scheduler
       import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
-      import scala.collection.par.workstealing.Hashes._
+      import scala.collection.par.workstealing.HashTables._
       grv.splice
       cv.splice
       cmfv.splice
