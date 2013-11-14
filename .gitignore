@@ -19,3 +19,7 @@ project/target
 paper/auto
 tmp
 mandelbrot.png
+
+# idea crap
+*.iml
+.idea

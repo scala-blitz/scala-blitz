@@ -15,11 +15,18 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
     val tree = immutable.TreeSet(1, 2, 4, 8, 12)
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
-    println(root)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-    println(stealer)
-    stealer.advance(1)
-    println(stealer)
+    assert(stealer.advance(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 1)
+    assert(stealer.advance(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 2)
+    assert(stealer.advance(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 4)
+    assert(stealer.advance(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 8)
+    assert(stealer.advance(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 12)
+    assert(stealer.advance(1) == -1)
   }
 
 }

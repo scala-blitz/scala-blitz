@@ -18,11 +18,10 @@ extends Stealer[T] {
   var iterator: Iterator[T] = _
 
   /* local state */
-  var initialized = false
-  var initialStack = 0L
   var localDepth = 0
   val localStack = new Array[Node](binary.depthBound(totalElems, startingDepth))
-  localStack(0) = root
+
+  final def topLocal = localStack(localDepth - 1)
 
   /* atomic state */
   @volatile var stack: Long = _
@@ -32,6 +31,8 @@ extends Stealer[T] {
   final def WRITE_STACK(nv: Long) = unsafe.putLongVolatile(this, STACK_OFFSET, nv)
 
   final def CAS_STACK(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, STACK_OFFSET, ov, nv)
+
+  /* stealer api */
 
   def next(): T = iterator.next()
 
@@ -45,43 +46,89 @@ extends Stealer[T] {
     else Stealer.StolenOrExpanded
   }
 
-  @tailrec final def advance(step: Int): Int = {
+  final def advance(step: Int): Int = {
     val s = READ_STACK
     val statebits = s & 0x3
     if (statebits != AVAILABLE && statebits != UNINITIALIZED) -1
     else {
-      def pushLocal(stack: Long, v: Int, node: Node): Long = {
+      def pushLocal(stack: Long, v: Long, node: Node): Long = {
         localStack(localDepth) = node
         val newstack = stack | (v << (localDepth * 2 + 2))
         localDepth += 1
         newstack
       }
       def topLocal = localStack(localDepth - 1)
-      def topMask = {
+      def topMask(stack: Long) = {
         val dep = localDepth * 2
         (stack & (0x3 << dep)) >> dep
       }
+      def popLocal(stack: Long): Long = {
+        localDepth -= 1
+        localStack(localDepth) = null
+        stack & ~(0x3 << (localDepth * 2 + 2))
+      }
+      def switchLocal(stack: Long, v: Long): Long = {
+        val dep = localDepth * 2
+        (stack & ~(0x3 << dep)) | (v << dep)
+      }
+
+      var estimatedChunkSize = -1
+      var nextstack = s
 
       if (statebits == AVAILABLE) {
-        val topm = topMask
-        ???
-      } else {
-        if (!initialized) {
-          initialStack = AVAILABLE
-          var node = root
-          while (!binary.isEmptyLeaf(binary.left(node))) {
-            initialStack = pushLocal(initialStack, L, node)
-            node = binary.left(node)
+        var tm = topMask(nextstack)
+
+        if (tm == S || (tm == T && binary.isEmptyLeaf(binary.right(topLocal)))) {
+          nextstack = popLocal(nextstack)
+          while (topMask(nextstack) == R && localDepth > 0) nextstack = popLocal(nextstack)
+          if (localDepth == 0) {
+            estimatedChunkSize = -1
+            nextstack = (nextstack & ~0x3) | COMPLETED
+          } else {
+            estimatedChunkSize = 1
+            nextstack = switchLocal(nextstack, T)
+            onceIterator.set(binary.value(topLocal))
+            iterator = onceIterator
           }
-          initialStack = pushLocal(initialStack, S, node)
-          initialized = true
+        } else if (tm == T) {
+          nextstack = switchLocal(nextstack, R)
+          var node = binary.right(topLocal)
+          var bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+          while (!binary.isEmptyLeaf(binary.left(node)) && step < bound) {
+            nextstack = pushLocal(nextstack, L, node)
+            node = binary.left(node)
+            bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+          }
+          if (step < bound) {
+            nextstack = pushLocal(nextstack, S, node)
+            subtreeIterator.set(node)
+            iterator = subtreeIterator
+          } else {
+            nextstack = pushLocal(nextstack, T, node)
+            onceIterator.set(binary.value(node))
+            iterator = onceIterator
+          }
+          estimatedChunkSize = bound
+        } else throw new IllegalStateException(this.toString)
+      } else {
+        nextstack = AVAILABLE
+        var node = root
+        while (!binary.isEmptyLeaf(binary.left(node))) {
+          nextstack = pushLocal(nextstack, L, node)
+          node = binary.left(node)
         }
-        if (CAS_STACK(s, initialStack)) {
-          subtreeIterator.set(localStack(localDepth))
-          iterator = subtreeIterator
-          1
-        } else advance(step)
+        nextstack = pushLocal(nextstack, T, node)
+        onceIterator.set(binary.value(node))
+        iterator = onceIterator
+        estimatedChunkSize = 1
       }
+
+      while (!CAS_STACK(s, nextstack)) {
+        val nstatebits = READ_STACK & 0x3
+        if (nstatebits == STOLEN || nstatebits == COMPLETED) return -1
+      }
+
+      estimatedChunkSize
     }
   }
 
@@ -132,9 +179,8 @@ extends Stealer[T] {
       state + stack
     }
 
-    s"BinTreeStealer(startDepth: $startingDepth, localDepth: $localDepth, #elems: $totalElems, inited: $initialized) {\n" +
+    s"BinTreeStealer(startDepth: $startingDepth, localDepth: $localDepth, #elems: $totalElems) {\n" +
     s"  stack: ${show(READ_STACK)}\n" +
-    s"  inits: ${show(initialStack)}\n" +
     s"  local: ${localStack.map(_ != null).mkString(", ")}\n" +
     s"}"
   }
