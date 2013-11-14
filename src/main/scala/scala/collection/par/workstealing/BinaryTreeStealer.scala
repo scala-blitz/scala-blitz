@@ -60,7 +60,7 @@ extends Stealer[T] {
       def topLocal = localStack(localDepth - 1)
       def topMask(stack: Long) = {
         val dep = localDepth * 2
-        (stack & (0x3 << dep)) >> dep
+        (stack & (0x3 << dep)) >>> dep
       }
       def popLocal(stack: Long): Long = {
         localDepth -= 1
@@ -111,16 +111,21 @@ extends Stealer[T] {
           estimatedChunkSize = bound
         } else throw new IllegalStateException(this.toString)
       } else {
-        nextstack = AVAILABLE
-        var node = root
-        while (!binary.isEmptyLeaf(binary.left(node))) {
-          nextstack = pushLocal(nextstack, L, node)
-          node = binary.left(node)
+        if (root == null) {
+          estimatedChunkSize = -1
+          nextstack = COMPLETED
+        } else {
+          nextstack = AVAILABLE
+          var node = root
+          while (!binary.isEmptyLeaf(binary.left(node))) {
+            nextstack = pushLocal(nextstack, L, node)
+            node = binary.left(node)
+          }
+          nextstack = pushLocal(nextstack, T, node)
+          onceIterator.set(binary.value(node))
+          iterator = onceIterator
+          estimatedChunkSize = 1
         }
-        nextstack = pushLocal(nextstack, T, node)
-        onceIterator.set(binary.value(node))
-        iterator = onceIterator
-        estimatedChunkSize = 1
       }
 
       while (!CAS_STACK(s, nextstack)) {
@@ -152,35 +157,84 @@ extends Stealer[T] {
     } else false
   }
 
-  def split: (Stealer[T], Stealer[T]) = ???
+  def split: (Stealer[T], Stealer[T]) = {
+    var node = root
+    var depth = 0
+    val origstack = READ_STACK
+    var stack = origstack
+    stack = stack >>> 2
+
+    while ((stack & 0x3) == R) {
+      node = binary.right(node)
+      depth += 1
+      stack = stack >>> 2
+    }
+
+    // R*S
+    if ((stack & 0x3) == S || ((stack & 0x3) == T && binary.isEmptyLeaf(binary.right(node)))) {
+      return (
+        new Stealer.Empty[T],
+        new Stealer.Empty[T]
+      )
+    }
+
+    // R*T
+    if ((stack & 0x3) == T) {
+      return (
+        new Stealer.Empty[T],
+        new BinaryTreeStealer(binary.right(node), startingDepth + depth + 1, totalElems, binary)
+      )
+    }
+
+    if ((stack & 0x3) == L) {
+      val nextstack = stack >>> 2
+
+      // R*LS
+      if ((nextstack & 0x3) == S) {
+        return (
+          new Stealer.Single[T](binary.value(node)),
+          new BinaryTreeStealer(binary.right(node), startingDepth + depth + 1, totalElems, binary)
+        )
+      }
+
+      // R*LT
+      if ((nextstack & 0x3) == T) {
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (T << (2 + depth * 2))
+        return (
+          new BinaryTreeStealer(binary.right(binary.left(node)), startingDepth + depth + 2, totalElems, binary),
+          BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
+        )
+      }
+
+      // R*LR
+      if ((nextstack & 0x3) == R) {
+        val lstack = (origstack >>> (6 + depth * 2)) << 2
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (T << (2 + depth * 2))
+        return (
+          BinaryTreeStealer(binary.right(binary.left(node)), startingDepth + depth + 2, totalElems, binary, lstack),
+          BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
+        )
+      }
+
+      // R*LL...
+      if ((nextstack & 0x3) == L) {
+        val lstack = (origstack >>> (4 + depth * 2)) << 2
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (T << (2 + depth * 2))
+        return (
+          BinaryTreeStealer(binary.left(node), startingDepth + depth + 2, totalElems, binary, lstack),
+          BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
+        )
+      }
+    }
+
+    throw new IllegalStateException(this.toString)
+  }
 
   def elementsRemainingEstimate: Int = ???
 
   override def toString = {
-    def show(s: Long) = {
-      val statebits = s & 0x3
-      val state = statebits match {
-        case UNINITIALIZED => "UN"
-        case AVAILABLE => "AV"
-        case STOLEN => "ST"
-        case COMPLETED => "CO"
-      }
-      var pos = 2
-      var stack = " "
-      while (pos < 64) {
-        stack += " " + ((s & (0x3 << pos)) >> pos match {
-          case L => "L"
-          case R => "R"
-          case S => "S"
-          case T => "T"
-        })
-        pos += 2
-      }
-      state + stack
-    }
-
     s"BinTreeStealer(startDepth: $startingDepth, localDepth: $localDepth, #elems: $totalElems) {\n" +
-    s"  stack: ${show(READ_STACK)}\n" +
+    s"  stack: ${showStack(READ_STACK)}\n" +
     s"  local: ${localStack.map(_ != null).mkString(", ")}\n" +
     s"}"
   }
@@ -190,17 +244,60 @@ extends Stealer[T] {
 
 object BinaryTreeStealer {
 
+  def showStack(s: Long) = {
+    val statebits = s & 0x3
+    val state = statebits match {
+      case UNINITIALIZED => "UN"
+      case AVAILABLE => "AV"
+      case STOLEN => "ST"
+      case COMPLETED => "CO"
+    }
+    var pos = 2
+    var stack = " "
+    while (pos < 64) {
+      stack += " " + ((s & (0x3 << pos)) >>> pos match {
+        case L => "L"
+        case R => "R"
+        case S => "S"
+        case T => "T"
+      })
+      pos += 2
+    }
+    state + stack
+  }
+
+  def apply[T, Node >: Null <: AnyRef: ClassTag](root: Node, startingDepth: Int, totalElems: Int, binary: BinaryTreeStealer.Binary[T, Node], guide: Long) = {
+    val stealer = new BinaryTreeStealer(root, startingDepth, totalElems, binary)
+
+    var node = root
+    var stack = guide >>> 2
+    var top = stack & 0x3
+    while (top != T && top != S) {
+      stealer.localStack(stealer.localDepth) = node
+      stealer.localDepth += 1
+      if (top == L) node = binary.left(node)
+      else node = binary.right(node)
+      stack = stack >>> 2
+      top = stack & 0x3
+    }
+    stealer.localStack(stealer.localDepth) = node
+    stealer.localDepth += 1
+    stealer.WRITE_STACK(AVAILABLE | ((guide >>> 2) << 2))
+
+    stealer
+  }
+
   val STACK_OFFSET = unsafe.objectFieldOffset(classOf[BinaryTreeStealer[_, _]].getDeclaredField("stack"))
 
-  val UNINITIALIZED = 0x0
-  val STOLEN = 0x1
-  val COMPLETED = 0x2
-  val AVAILABLE = 0x3
+  val UNINITIALIZED = 0x0L
+  val STOLEN = 0x1L
+  val COMPLETED = 0x2L
+  val AVAILABLE = 0x3L
 
-  val L = 0x1
-  val R = 0x2
-  val T = 0x0
-  val S = 0x3
+  val L = 0x1L
+  val R = 0x2L
+  val T = 0x0L
+  val S = 0x3L
 
   trait Binary[T, Node >: Null <: AnyRef] {
     def sizeBound(total: Int, depth: Int): Int

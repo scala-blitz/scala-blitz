@@ -29,6 +29,15 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(stealer.advance(1) == -1)
   }
 
+  test("advance empty") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet[Int]()
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    assert(stealer.state == Stealer.AvailableOrOwned)
+    assert(stealer.advance(1) == -1)
+  }
+
 }
 
 
