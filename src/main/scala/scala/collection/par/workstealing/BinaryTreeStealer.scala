@@ -55,6 +55,18 @@ extends Stealer[T] {
 
   final def CAS_STACK(ov: Long, nv: Long) = unsafe.compareAndSwapLong(this, STACK_OFFSET, ov, nv)
 
+  override def duplicated: BinaryTreeStealer[T, Node] = {
+    val d = new BinaryTreeStealer(root, startingDepth, totalElems, binary)
+
+    val (a, b) = this.iterator.duplicate
+    d.iterator = b
+    d.localDepth = this.localDepth
+    Array.copy(this.localStack, 0, d.localStack, 0, this.localStack.length)
+    d.stack = this.stack
+
+    d
+  }
+
   /* stealer api */
 
   def next(): T = iterator.next()
@@ -231,7 +243,7 @@ extends Stealer[T] {
         val lroot = binary.right(binary.left(node))
         val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
-          if (binary.isEmptyLeaf(lroot)) new Stealer.Empty[T] else new BinaryTreeStealer(lroot, startingDepth + depth + 2, totalElems, binary),
+          if (binary.isEmptyLeaf(lroot)) new Stealer.Empty[T] else new BinaryTreeStealer(lroot, startingDepth + depth + 1, totalElems, binary),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
         )
       }
@@ -251,7 +263,7 @@ extends Stealer[T] {
         val lstack = (origstack >>> (4 + depth * 2)) << 2
         val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
-          BinaryTreeStealer(binary.left(node), startingDepth + depth + 2, totalElems, binary, lstack),
+          BinaryTreeStealer(binary.left(node), startingDepth + depth + 1, totalElems, binary, lstack),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
         )
       }
@@ -275,7 +287,7 @@ extends Stealer[T] {
 object BinaryTreeStealer {
 
   def showStack(s: Long) = {
-    val statebits = s & 0x3
+    val statebits = s & 0x3L
     val state = statebits match {
       case UNINITIALIZED => "UN"
       case AVAILABLE => "AV"
@@ -285,7 +297,7 @@ object BinaryTreeStealer {
     var pos = 2
     var stack = " "
     while (pos < 64) {
-      stack += " " + ((s & (0x3 << pos)) >>> pos match {
+      stack += " " + (((s & (0x3L << pos)) >>> pos) match {
         case L => "L"
         case R => "R"
         case S => "S"

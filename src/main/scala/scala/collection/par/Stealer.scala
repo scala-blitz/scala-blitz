@@ -69,6 +69,10 @@ trait Stealer[@specialized +T] {
    */
   def asPrecise: PreciseStealer[T] = this.asInstanceOf[PreciseStealer[T]]
 
+  /** Optional.
+   */
+  def duplicated: Stealer[T] = ???
+
 }
 
 
@@ -98,6 +102,7 @@ object Stealer {
     def state = Completed
     def split = throw new IllegalStateException
     override def toString = s"Stealer.Empty"
+    override def duplicated = this
   }
 
   class Single[@specialized T](val elem: T) extends Stealer[T] {
@@ -121,6 +126,12 @@ object Stealer {
     def markStolen(): Boolean = throw new IllegalStateException
     def state = if (completed) Completed else AvailableOrOwned
     def split = throw new IllegalStateException
+    override def duplicated = {
+      val s = new Single(elem)
+      s.completed = this.completed
+      s.traversed = this.traversed
+      s
+    }
     override def toString = s"Stealer.Single($elem, completed: $completed, traversed: $traversed)"
   }
 

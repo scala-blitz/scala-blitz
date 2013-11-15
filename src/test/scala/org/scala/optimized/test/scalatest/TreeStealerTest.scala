@@ -323,8 +323,8 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         if (iTookEstimate >= 0) {
           while (head.hasNext) {
             val nxt = head.next()
-              if(nxt!=last + 1) {
-                println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
+            if (nxt != last + 1) {
+              println("failed on level " + level + " got " + nxt + " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
             }
             elementsCollected += nxt
             lst = nxt
@@ -344,7 +344,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
             val aText = splitA.toString
             val bText = splitB.toString
             val message = "was " + beforeSplit + "\nbecame " + afterSplit + "\nleft: " + aText + "\nright:" + bText
-            hugeRandomFun(testId, (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail, elementsCollected, lst)
+            hugeRandomFun(testId, (splitA, level + 1, message :: messages) :: (splitB, level + 1, message :: messages) :: tail, elementsCollected, lst)
           }
         } else hugeRandomFun(testId, tail, elementsCollected, lst)
       } else elementsCollected.toList
