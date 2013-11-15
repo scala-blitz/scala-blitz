@@ -212,11 +212,73 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   }
 
   test("split R*S") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 16, 1, 24, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(512) > 0)
+    while (stealer.hasNext) {
+      orig += stealer.next()
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
+    assert(lelems.isEmpty)
+    assert(relems.isEmpty)
   }
 
   test("split R*T") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 16, 1, 24, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.advance(1) > 0)
+    while (stealer.hasNext) {
+      orig += stealer.next()
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
   test("split uninitialized stolen") {
