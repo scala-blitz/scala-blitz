@@ -212,12 +212,69 @@ object BinaryTreeStealer {
   }
 
   class SubtreeIterator[T, Node >: Null <: AnyRef](val binary: Binary[T, Node]) extends Iterator[T] {
-    private var root: Node = _
+    import binary._
+
+    private val stack: Array[Node] = new Array[AnyRef](32).asInstanceOf[Array[Node]]
+    private var stackPos = 0
     def set(n: Node) {
-      root = n
+      var i = 1;
+      while(i<8) stack(i) = null;
+      stack(0) = n
+      stackPos = 0
     }
-    def next() = ???
-    def hasNext = ???
+
+    // posible stack states are encoded by 2 last entries of stack, ***** (current) (next)
+    // if next != null - we're returning
+    // if next = current.left - than from left, else 
+    // if next = current - that from 'current'
+    def next() = {
+      val current = stack(stackPos)
+      val next = stack(stackPos + 1)
+      if(next!=null) {// we're returning
+           if(left(current) eq next) { //we're returning from leftSubree, return self and clean return flag(next stack entry)
+             stack(stackPos + 1) = current
+             value(current)
+           } else if((left(current) eq current) && (right(current) ne null)) { // we've done with this node, go to right sibling
+             stack(stackPos + 1) = right(current)
+             stackPos = stackPos + 1
+             this.next()
+           }
+
+           else { // we're returning from the right subree, rollup
+             stack(stackPos + 1) = null
+             stackPos = stackPos - 1
+             this.next()
+           }
+      } else { //we're diging into new subtree
+        if(left(current) ne null) {
+          stack(stackPos + 1) = left(current)
+          stackPos = stackPos + 1
+          this.next()
+        }
+        else { //there's no left sibling, return self
+          stack(stackPos + 1) = current
+          value(current)
+        }
+    
+      }
+    
+    }
+
+    def hasNext = {
+      var i = stackPos
+      var result = false
+      var resultSet = false
+      while((i>=0) && !resultSet){
+      val current = stack(i)
+      val next = stack(i + 1)
+        if((next eq left(current)) || //we need to traverse current
+          (next eq current) && (right(current) ne null)){ //we need to traverse right subtree of current
+          resultSet = true
+          result = true
+        }
+      }
+      result
+    }
   }
 
   class OnceIterator[T] extends Iterator[T] {
