@@ -65,7 +65,7 @@ object BarnesHut {
         var netforcex = 0.0f
         var netforcey = 0.0f
 
-        def traverse(quad: Quad): Unit = quad match {
+        def traverse(quad: Quad): Unit = (quad: Quad) match {
           case Empty =>
             // no force
           case _ =>
