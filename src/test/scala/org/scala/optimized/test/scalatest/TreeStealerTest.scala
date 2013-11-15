@@ -192,10 +192,6 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
-    println(stealer)
-    val (l, r) = stealer.split
-    println(l)
-    println(r)
   }
 
   test("split R*S") {
@@ -212,10 +208,17 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
     assert(stealer.markStolen() == true)
     val (l, r) = stealer.split
-    println(l)
-    println(r)
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
 

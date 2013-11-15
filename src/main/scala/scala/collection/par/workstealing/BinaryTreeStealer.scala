@@ -146,6 +146,10 @@ extends Stealer[T] {
       val cs = (s & ~0x3) | COMPLETED
       if (CAS_STACK(s, cs)) true
       else markCompleted()
+    } else if (statebits == UNINITIALIZED) {
+      val cs = COMPLETED
+      if (CAS_STACK(s, cs)) true
+      else markCompleted()
     } else false
   }
 
@@ -154,6 +158,10 @@ extends Stealer[T] {
     val statebits = s & 0x3
     if (statebits == AVAILABLE) {
       val ss = (s & ~0x3) | STOLEN
+      if (CAS_STACK(s, ss)) true
+      else markStolen()
+    } else if (statebits == UNINITIALIZED) {
+      val ss = STOLEN | (S << 2) | (S << 4)
       if (CAS_STACK(s, ss)) true
       else markStolen()
     } else false
@@ -170,6 +178,15 @@ extends Stealer[T] {
       node = binary.right(node)
       depth += 1
       stack = stack >>> 2
+    }
+
+    // uninitialized stolen: SS
+    if ((stack & 0xf) == (S | (S << 2))) {
+      val rstack = (L << 2) | (S << 4)
+      return (
+        new BinaryTreeStealer(binary.left(node), startingDepth + 1, totalElems, binary),
+        BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
+      )
     }
 
     // R*S
