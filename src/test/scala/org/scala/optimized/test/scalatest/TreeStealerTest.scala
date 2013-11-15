@@ -5,6 +5,7 @@ package scalatest
 
 import org.scalatest._
 import scala.collection._
+import scala.annotation.tailrec
 
 
 
@@ -137,7 +138,49 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     println(relems)
   }
 
+
+  test("huge random splitting") {
+    
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until Int.MaxValue/256: _*)
+    println("build done")
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    val random = new scala.util.Random(42)
+    @tailrec
+    def hugeRandomFun(stack: List[scala.collection.par.Stealer[Int]], elementsCollected: List[Int] = Nil) : List[Int] = {
+      stack match {
+        case head::tail =>
+                val iWantToTake = random.nextInt(1024)
+
+                val iTookEstimate = head.advance(iWantToTake)
+                var collected = elementsCollected
+                var collectedCount = 0
+                while(head.hasNext) {
+                  collected = head.next():: collected
+                  collectedCount = collectedCount + 1
+                }
+                println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+                val iWantToTakeMore = random.nextBoolean()
+                if(iWantToTakeMore) hugeRandomFun(stack, collected)
+                else { // i want to split!
+                     val (splitA, splitB) = head.split
+                     hugeRandomFun(splitA::splitB::tail, collected)
+                }
+
+
+        case Nil => elementsCollected
+      }
+    }
+
+      val data = hugeRandomFun(List(stealer));
+      assert(tree.toSeq == data)
+  }
+
+  
 }
+
+
 
 
 
