@@ -22,6 +22,16 @@ package immutable {
         if (depth > avgdepth) 1
         else 1 << (avgdepth - depth)
       }
+
+      final def sizeBound(node: RedBlackTree.Tree[K, V]) = {
+        1L<<depthBound(node)
+      }
+
+      def depthBound(node: RedBlackTree.Tree[K, V], acc: Int = 0){
+          if((((acc & 1) == 1) || (node.right eq null)) && (node.left ne null)) getLenth(node.left, acc + 1)
+          else if(node.right ne null) getLength(node.right, acc + 1)
+        }
+
       def depthBound(total: Int, depth: Int): Int = {
         val depthBeneath = (2.5 * math.log(total) / math.log(2) + 2).toInt - depth
         math.min(30, math.max(2, depthBeneath))

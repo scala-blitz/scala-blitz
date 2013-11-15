@@ -12,7 +12,6 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   import par._
 
   type RBNode >: Null <: AnyRef
-
   test("simple iterator traversal") {
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
     val tree = immutable.TreeSet(1, 2, 4, 8, 12)
@@ -306,7 +305,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     import scala.collection.mutable.ListBuffer
 
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(0 until 32000: _*)
+    val tree = immutable.TreeSet(0 until 16000: _*)
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     println("-----> depth: " + isBinary.depth(root))
     println("-----> depth: " + isBinary.depthBound(tree.size, 0))
@@ -325,7 +324,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         if (iTookEstimate >= 0) {
           while (head.hasNext) {
             val nxt = head.next()
-            if (nxt != last + 1) {
+              if(nxt!=last + 1) {
               //println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
               assert(false, (nxt, last))
             }
@@ -335,7 +334,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           }
         }
 
-        // if (testId == 53) println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+//        if (testId == 53) println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
         if (head.state != Stealer.Completed) {
           val iWantToTakeMore = random.nextBoolean()
           if (iWantToTakeMore) hugeRandomFun(testId, stack, elementsCollected, lst)
@@ -371,7 +370,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
             val message = ""// "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
             hugeRandomFun(
               testId,
-              (splitA, level + 1, message :: messages) :: (splitB, level + 1, message :: messages) :: tail,
+              (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail,
               elementsCollected,
               lst)
           }

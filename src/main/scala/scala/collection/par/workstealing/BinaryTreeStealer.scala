@@ -13,7 +13,7 @@ extends Stealer[T] {
   import BinaryTreeStealer._
 
   /* chunk iteration */
-  val subtreeIterator = new SubtreeIterator(binary)
+  var subtreeIterator = new SubtreeIterator(binary) // todo: mark as val after debugging
   val onceIterator = new OnceIterator[T]
   var iterator: Iterator[T] = _
 
@@ -64,6 +64,12 @@ extends Stealer[T] {
       d.iterator = b
     }
 
+    if (this.subtreeIterator ne null) {
+      val (a, b) = this.subtreeIterator.duplicate
+      this.subtreeIterator = a
+      d.subtreeIterator = b
+    }
+
     d.localDepth = this.localDepth
     Array.copy(this.localStack, 0, d.localStack, 0, this.localStack.length)
     d.stack = this.stack
@@ -111,11 +117,11 @@ extends Stealer[T] {
         } else if (tm == T) {
           nextstack = switchLocal(nextstack, R)
           var node = binary.right(topLocal)
-          var bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+          var bound = binary.sizeBound(node) //binary.sizeBound(totalElems, startingDepth + localDepth)
           while (!binary.isEmptyLeaf(binary.left(node)) && bound >= step) {
             nextstack = pushLocal(nextstack, L, node)
             node = binary.left(node)
-            bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+            bound = binary.sizeBound(node)  //binary.sizeBound(totalElems, startingDepth + localDepth)
           }
           if (bound < step) {
             nextstack = pushLocal(nextstack, S, node)
@@ -136,11 +142,11 @@ extends Stealer[T] {
         } else {
           nextstack = AVAILABLE
           var node = root
-          var bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+          var bound = binary.sizeBound(node) //binary.sizeBound(totalElems, startingDepth + localDepth)
           while (!binary.isEmptyLeaf(binary.left(node)) && bound >= step) {
             nextstack = pushLocal(nextstack, L, node)
             node = binary.left(node)
-            bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+            bound = binary.sizeBound(node) //binary.sizeBound(totalElems, startingDepth + localDepth)
           }
           if (bound < step) {
             nextstack = pushLocal(nextstack, S, node)
@@ -351,6 +357,7 @@ object BinaryTreeStealer {
 
   trait Binary[T, Node >: Null <: AnyRef] {
     def sizeBound(total: Int, depth: Int): Int
+    def sizeBound(node: Node): Int
     def depthBound(total: Int, depth: Int): Int
     def isEmptyLeaf(n: Node): Boolean
     def left(n: Node): Node
@@ -462,6 +469,12 @@ object BinaryTreeStealer {
       hasNext = false
       elem
     }
+    override def duplicate()  = {
+      val d = new OnceIterator[T]()
+      if(this.hasNext) d.set(elem)
+      (d, this)
+    }
+
   }
 
 }
