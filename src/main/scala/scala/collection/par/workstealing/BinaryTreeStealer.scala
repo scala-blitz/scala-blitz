@@ -96,7 +96,7 @@ extends Stealer[T] {
           nextstack = switchLocal(nextstack, R)
           var node = binary.right(topLocal)
           var bound = binary.sizeBound(totalElems, startingDepth + localDepth)
-          while (!binary.isEmptyLeaf(binary.left(node)) && step < bound) {
+          while (!binary.isEmptyLeaf(binary.left(node)) && bound >= step) {
             nextstack = pushLocal(nextstack, L, node)
             node = binary.left(node)
             bound = binary.sizeBound(totalElems, startingDepth + localDepth)
@@ -105,12 +105,13 @@ extends Stealer[T] {
             nextstack = pushLocal(nextstack, S, node)
             subtreeIterator.set(node)
             iterator = subtreeIterator
+            estimatedChunkSize = bound
           } else {
             nextstack = pushLocal(nextstack, T, node)
             onceIterator.set(binary.value(node))
             iterator = onceIterator
+            estimatedChunkSize = 1
           }
-          estimatedChunkSize = bound
         } else throw new IllegalStateException(this.toString)
       } else {
         if (root == null) {
@@ -119,14 +120,23 @@ extends Stealer[T] {
         } else {
           nextstack = AVAILABLE
           var node = root
-          while (!binary.isEmptyLeaf(binary.left(node))) {
+          var bound = binary.sizeBound(totalElems, startingDepth + localDepth)
+          while (!binary.isEmptyLeaf(binary.left(node)) && bound >= step) {
             nextstack = pushLocal(nextstack, L, node)
             node = binary.left(node)
+            bound = binary.sizeBound(totalElems, startingDepth + localDepth)
           }
-          nextstack = pushLocal(nextstack, T, node)
-          onceIterator.set(binary.value(node))
-          iterator = onceIterator
-          estimatedChunkSize = 1
+          if (bound < step) {
+            nextstack = pushLocal(nextstack, S, node)
+            subtreeIterator.set(node)
+            iterator = subtreeIterator
+            estimatedChunkSize = bound
+          } else {
+            nextstack = pushLocal(nextstack, T, node)
+            onceIterator.set(binary.value(node))
+            iterator = onceIterator
+            estimatedChunkSize = 1
+          }
         }
       }
 
