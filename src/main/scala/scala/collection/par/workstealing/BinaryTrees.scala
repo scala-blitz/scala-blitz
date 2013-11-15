@@ -21,12 +21,14 @@ package immutable {
         1 << depthBound(total, depth)
       }
       def depthBound(total: Int, depth: Int): Int = {
-        math.max(2, (2.5 * math.log(total) / math.log(2) + 2).toInt - depth)
+        val depthBeneath = (2.5 * math.log(total) / math.log(2) + 2).toInt - depth
+        math.min(30, math.max(2, depthBeneath))
       }
       def isEmptyLeaf(n: RedBlackTree.Tree[K, V]): Boolean = n eq null
       def left(n: RedBlackTree.Tree[K, V]): RedBlackTree.Tree[K, V] = n.left
       def right(n: RedBlackTree.Tree[K, V]): RedBlackTree.Tree[K, V] = n.right
       def value(n: RedBlackTree.Tree[K, V]): T
+      def depth(n: RedBlackTree.Tree[K, V]): Int = if (n == null) 0 else 1 + math.max(depth(n.left), depth(n.right))
     }
 
     def redBlackTreeSetIsBinary[K] = new RedBlackTreeIsBinary[K, K, Unit] {

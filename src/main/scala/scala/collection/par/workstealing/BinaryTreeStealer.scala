@@ -19,7 +19,7 @@ extends Stealer[T] {
 
   /* local state */
   var localDepth = 0
-  val localStack = new Array[Node](binary.depthBound(totalElems, startingDepth))
+  val localStack = new Array[Node](MAX_TREE_DEPTH)
 
   final def pushLocal(stack: Long, v: Long, node: Node): Long = {
     localStack(localDepth) = node
@@ -339,15 +339,19 @@ object BinaryTreeStealer {
   }
 
   final val MAX_TREE_DEPTH = 31
+
   class SubtreeIterator[T, Node >: Null <: AnyRef](val binary: Binary[T, Node]) extends Iterator[T] {
     import binary._
 
     private val stack: Array[Node] = new Array[AnyRef](MAX_TREE_DEPTH + 1).asInstanceOf[Array[Node]]
-    private var stackPos = 0 //can be removed but no need as we'll have same object size
+    private var stackPos = 0 // can be removed but no need as we'll have same object size
     def set(n: Node) {
-      //println("set " + n)
+      // println("set " + n)
       var i = 1;
-      while(i < MAX_TREE_DEPTH + 1) {stack(i) = null; i = i + 1}
+      while (i < MAX_TREE_DEPTH + 1) {
+        stack(i) = null
+        i = i + 1
+      }
       stack(0) = n
       stackPos = 0
     }
@@ -372,37 +376,31 @@ object BinaryTreeStealer {
       val next = stack(stackPos + 1)
       if(next!=null) {// we're returning
         //println("we are returning")
-           if(left(current) eq next) { // we're returning from leftSubree, return self and clean return flag(next stack entry)
-             stack(stackPos + 1) = current
-             //println(" returning from left subtree")
-             value(current)
-
-           } else if((next eq current) && (right(current) ne null)) { // we've done with this node, go to right sibling
-             stack(stackPos + 1) = right(current)
-             //println(" going into right sibling")
-             stackPos = stackPos + 1
-             this.next()
-           }
-
-           else { // we're returning from the right subree, rollup
-             stack(stackPos + 1) = null
-             stackPos = stackPos - 1
-             //println(" rollup")
-             this.next()
-           }
+        if(left(current) eq next) { // we're returning from leftSubree, return self and clean return flag(next stack entry)
+          stack(stackPos + 1) = current
+          //println(" returning from left subtree")
+          value(current)
+        } else if((next eq current) && (right(current) ne null)) { // we've done with this node, go to right sibling
+          stack(stackPos + 1) = right(current)
+          //println(" going into right sibling")
+          stackPos = stackPos + 1
+          this.next()
+        } else { // we're returning from the right subree, rollup
+          stack(stackPos + 1) = null
+          stackPos = stackPos - 1
+          //println(" rollup")
+          this.next()
+        }
       } else { // we're diging into new subtree
-        if(left(current) ne null) {
+        if (left(current) ne null) {
           stack(stackPos + 1) = left(current)
           stackPos = stackPos + 1
           this.next()
-        }
-        else { // there's no left sibling, return self
+        } else { // there's no left sibling, return self
           stack(stackPos + 1) = current
           value(current)
         }
-    
       }
-    
     }
 
     def hasNext = {
