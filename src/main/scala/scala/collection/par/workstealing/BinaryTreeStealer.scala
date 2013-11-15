@@ -310,30 +310,41 @@ object BinaryTreeStealer {
     def value(n: Node): T
   }
 
+  final val MAX_TREE_DEPTH = 31
   class SubtreeIterator[T, Node >: Null <: AnyRef](val binary: Binary[T, Node]) extends Iterator[T] {
     import binary._
 
-    private val stack: Array[Node] = new Array[AnyRef](32).asInstanceOf[Array[Node]]
+    private val stack: Array[Node] = new Array[AnyRef](MAX_TREE_DEPTH + 1).asInstanceOf[Array[Node]]
     private var stackPos = 0 //can be removed but no need as we'll have same object size
     def set(n: Node) {
       //println("set " + n)
       var i = 1;
-      while(i<32) {stack(i) = null; i = i + 1}
+      while(i < MAX_TREE_DEPTH + 1) {stack(i) = null; i = i + 1}
       stack(0) = n
       stackPos = 0
     }
 
-    // posible stack states are encoded by 2 last entries of stack, ***** (current) (next)
-    // if next != null - we're returning
-    // if next = current.left - than from left, else 
-    // if next = current - that from 'current'
-    def next() = {
+    override def duplicate = {
+      val that = new SubtreeIterator(binary)
+      java.lang.System.arraycopy(this.stack, 0, that.stack, 0, MAX_TREE_DEPTH + 1)
+      that.stackPos = this.stackPos
+      (this, that)
+    }
+
+    /*  posible stack states are encoded by 2 last entries of stack, ***** (current) (next)
+     *  if next != null - we're returning
+     *  if next = current.left - than from left, else 
+     *  if next = current - that from 'current'
+     *  relies on uniqueness of 'node' refferences
+     */
+    @tailrec
+    final def next() = {
       //println("next " + stackPos + " " + stack.mkString("{", " | ", "}"))
       val current = stack(stackPos)
       val next = stack(stackPos + 1)
       if(next!=null) {// we're returning
         //println("we are returning")
-           if(left(current) eq next) { //we're returning from leftSubree, return self and clean return flag(next stack entry)
+           if(left(current) eq next) { // we're returning from leftSubree, return self and clean return flag(next stack entry)
              stack(stackPos + 1) = current
              //println(" returning from left subtree")
              value(current)
@@ -351,13 +362,13 @@ object BinaryTreeStealer {
              //println(" rollup")
              this.next()
            }
-      } else { //we're diging into new subtree
+      } else { // we're diging into new subtree
         if(left(current) ne null) {
           stack(stackPos + 1) = left(current)
           stackPos = stackPos + 1
           this.next()
         }
-        else { //there's no left sibling, return self
+        else { // there's no left sibling, return self
           stack(stackPos + 1) = current
           value(current)
         }
@@ -368,7 +379,6 @@ object BinaryTreeStealer {
 
     def hasNext = {
       //println("hasNext " + stackPos + "" + stack.mkString("{", " | ", "}"))
-
       var i = stackPos
       var result = false
       var resultSet = false
@@ -376,8 +386,8 @@ object BinaryTreeStealer {
         val current = stack(i)
         val next = stack(i + 1)
         if((next eq null)||  // we need to traverse subtree rooted at current
-          (next eq left(current)) || //we need to traverse current
-          (next eq current) && (right(current) ne null)){ //we need to traverse right subtree of current
+          (next eq left(current)) || // we need to traverse current
+          (next eq current) && (right(current) ne null)){ // we need to traverse right subtree of current
           resultSet = true
           result = true
         }
@@ -385,6 +395,13 @@ object BinaryTreeStealer {
       }
       result
     }
+
+    override def toString = {
+    s"SubtreeIterator {\n" +
+    s"  stack: ${stack.mkString("{", " | ", "}")}\n" +
+    s"  stackPos: ${stackPos}\n" +
+    s"}"
+  }
   }
 
   class OnceIterator[T] extends Iterator[T] {
