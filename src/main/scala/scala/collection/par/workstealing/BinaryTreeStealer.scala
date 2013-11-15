@@ -314,10 +314,11 @@ object BinaryTreeStealer {
     import binary._
 
     private val stack: Array[Node] = new Array[AnyRef](32).asInstanceOf[Array[Node]]
-    private var stackPos = 0
+    private var stackPos = 0 //can be removed but no need as we'll have same object size
     def set(n: Node) {
+      //println("set " + n)
       var i = 1;
-      while(i<8) stack(i) = null;
+      while(i<32) {stack(i) = null; i = i + 1}
       stack(0) = n
       stackPos = 0
     }
@@ -327,14 +328,19 @@ object BinaryTreeStealer {
     // if next = current.left - than from left, else 
     // if next = current - that from 'current'
     def next() = {
+      //println("next " + stackPos + " " + stack.mkString("{", " | ", "}"))
       val current = stack(stackPos)
       val next = stack(stackPos + 1)
       if(next!=null) {// we're returning
+        //println("we are returning")
            if(left(current) eq next) { //we're returning from leftSubree, return self and clean return flag(next stack entry)
              stack(stackPos + 1) = current
+             //println(" returning from left subtree")
              value(current)
-           } else if((left(current) eq current) && (right(current) ne null)) { // we've done with this node, go to right sibling
+
+           } else if((next eq current) && (right(current) ne null)) { // we've done with this node, go to right sibling
              stack(stackPos + 1) = right(current)
+             //println(" going into right sibling")
              stackPos = stackPos + 1
              this.next()
            }
@@ -342,6 +348,7 @@ object BinaryTreeStealer {
            else { // we're returning from the right subree, rollup
              stack(stackPos + 1) = null
              stackPos = stackPos - 1
+             //println(" rollup")
              this.next()
            }
       } else { //we're diging into new subtree
@@ -360,17 +367,21 @@ object BinaryTreeStealer {
     }
 
     def hasNext = {
+      //println("hasNext " + stackPos + "" + stack.mkString("{", " | ", "}"))
+
       var i = stackPos
       var result = false
       var resultSet = false
       while((i>=0) && !resultSet){
-      val current = stack(i)
-      val next = stack(i + 1)
-        if((next eq left(current)) || //we need to traverse current
+        val current = stack(i)
+        val next = stack(i + 1)
+        if((next eq null)||  // we need to traverse subtree rooted at current
+          (next eq left(current)) || //we need to traverse current
           (next eq current) && (right(current) ne null)){ //we need to traverse right subtree of current
           resultSet = true
           result = true
         }
+        i = i - 1
       }
       result
     }

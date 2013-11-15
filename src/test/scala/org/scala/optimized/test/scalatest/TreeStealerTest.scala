@@ -29,6 +29,19 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(stealer.advance(1) == -1)
   }
 
+  test("simple iterator traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(1, 2, 4, 8, 12)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
   test("advance empty") {
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
     val tree = immutable.TreeSet[Int]()
@@ -53,6 +66,33 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       i += 1
     }
     assert(i == 100)
+  }
+
+  test("longer traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 100: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
+  test("huge traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until Int.MaxValue/256: _*)
+    println("build done")
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
   }
 
   def extract(stealer: Stealer[Int], top: Stealer[Int] => Int): Seq[Int] = {
