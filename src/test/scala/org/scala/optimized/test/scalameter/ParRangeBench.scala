@@ -57,15 +57,6 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "reduce(step)" in {
       def workOnElement(e: Int, size: Int) = {
-        // var until = 1
-        // if (e > size * 0.9995) until = 2000000
-        // var acc = 1
-        // var i = 0
-        // while (i < until) {
-        //   acc = (acc * i) * 3
-        //   i = i + 1
-        // }
-        // acc
         var until = 1
         if (e > size * 0.9995) until = 2000000
         var acc = 1
