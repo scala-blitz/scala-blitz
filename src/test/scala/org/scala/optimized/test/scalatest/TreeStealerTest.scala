@@ -302,6 +302,29 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(observed == tree.toList, observed)
   }
 
+  test("bounds") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 16000: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    println(stealer.advance(64))
+    println(stealer.advance(128))
+    println(stealer.advance(256))
+    println(stealer.advance(512))
+    println(stealer.advance(1024))
+    println(stealer.advance(2048))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+    println(stealer.advance(4096))
+  }
+
   test("huge random splitting") {
     import scala.collection.mutable.ListBuffer
 
@@ -314,7 +337,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     //println("build done")
 
     @tailrec
-    def hugeRandomFun(testId: Int, stack: List[(Stealer[Int], Int, List[String])], elementsCollected: ListBuffer[Int] = new ListBuffer[Int], last : Int = -1): List[Int] = {
+    def hugeRandomFun(testId: Int, stack: List[(Stealer[Int], Int, List[String])], elementsCollected: ListBuffer[Int] = new ListBuffer[Int], last: Int = -1): List[Int] = {
       if (!stack.isEmpty)  {
         var lst = last
         val (head, level, messages) = stack.head
@@ -323,11 +346,13 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         val iTookEstimate = head.advance(iWantToTake)
         var collectedCount = 0
         if (iTookEstimate >= 0) {
+          //println(elementsCollected)
           while (head.hasNext) {
+            //println(elementsCollected)
             val nxt = head.next()
-            if (nxt != last + 1) {
+            if (nxt != lst + 1) {
               //println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
-              assert(false, (nxt, last))
+              assert(false, (nxt, last, elementsCollected))
             }
             elementsCollected += nxt
             lst = nxt
@@ -335,7 +360,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           }
         }
 
-        // if (testId == 53) println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+        // println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
         if (head.state != Stealer.Completed) {
           val iWantToTakeMore = random.nextBoolean()
           if (iWantToTakeMore) hugeRandomFun(testId, stack, elementsCollected, lst)
