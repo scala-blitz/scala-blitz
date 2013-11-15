@@ -365,7 +365,7 @@ object BinaryTreeStealer {
 
     private val stack: Array[Node] = new Array[AnyRef](MAX_TREE_DEPTH + 1).asInstanceOf[Array[Node]]
     private var stackPos = 0 // can be removed but no need as we'll have same object size
-    
+
     def set(n: Node) {
       // println("set " + n)
       var i = 1;
