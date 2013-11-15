@@ -306,7 +306,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     import scala.collection.mutable.ListBuffer
 
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(0 until 16000: _*)
+    val tree = immutable.TreeSet(0 until 32000: _*)
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     println("-----> depth: " + isBinary.depth(root))
     println("-----> depth: " + isBinary.depthBound(tree.size, 0))
@@ -326,7 +326,8 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           while (head.hasNext) {
             val nxt = head.next()
             if (nxt != last + 1) {
-              println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
+              //println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
+              assert(false, (nxt, last))
             }
             elementsCollected += nxt
             lst = nxt
@@ -341,36 +342,36 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           else {
             val beforeSplit = head.toString
             // i want to split!
-            val archive = head.duplicated
+            // val archive = head.duplicated
             val (splitA, splitB) = head.split
-            val splitAD = splitA.duplicated
-            val afterSplit = head.toString
-            val aText = splitA.toString
-            val bText = splitB.toString
-            val elLeftA = splitAD.advance(1)
-            val elRightA = archive.advance(1)
-            if ((elLeftA > 0) && (elRightA > 0)) {
-              val elGot = splitAD.next()
-              val elExp = archive.next()
-              if (elGot != elExp) {
-                def toBs[T](s: Stealer[T]) = s.asInstanceOf[workstealing.BinaryTreeStealer[_, RBNode]]
-                head.advance(1)
-                println("lst:     " + lst)
-                println("left:    " + elGot)
-                println("archive: " + elExp)
-                println("orig:    " + head.hasNext + " -> " + head.next() + " -> " + head.hasNext)
-                println(toBs(head).iterator.getClass)
-                println(List(head, splitA, splitB).mkString("\n"))
-                println("and head before split was: " + beforeSplit)
-                println("and head after split was: " + afterSplit)
-                assert(false)
-              }
-            }
+            // val splitAD = splitA.duplicated
+            // val afterSplit = head.toString
+            // val aText = splitA.toString
+            // val bText = splitB.toString
+            // val elLeftA = splitAD.advance(1)
+            // val elRightA = archive.advance(1)
+            // if ((elLeftA > 0) && (elRightA > 0)) {
+            //   val elGot = splitAD.next()
+            //   val elExp = archive.next()
+            //   if (elGot != elExp) {
+            //     def toBs[T](s: Stealer[T]) = s.asInstanceOf[workstealing.BinaryTreeStealer[_, RBNode]]
+            //     head.advance(1)
+            //     println("lst:     " + lst)
+            //     println("left:    " + elGot)
+            //     println("archive: " + elExp)
+            //     println("orig:    " + head.hasNext + " -> " + head.next() + " -> " + head.hasNext)
+            //     println(toBs(head).iterator.getClass)
+            //     println(List(head, splitA, splitB).mkString("\n"))
+            //     println("and head before split was: " + beforeSplit)
+            //     println("and head after split was: " + afterSplit)
+            //     assert(false)
+            //   }
+            // }
 
-            val message = "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
+            val message = ""// "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
             hugeRandomFun(
               testId,
-              (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail,
+              (splitA, level + 1, message :: messages) :: (splitB, level + 1, message :: messages) :: tail,
               elementsCollected,
               lst)
           }
@@ -378,7 +379,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       } else elementsCollected.toList
     }
 
-    for (testId <- 1 to 1000) {
+    for (testId <- 1 to 100) {
       val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
       val data = hugeRandomFun(testId, List((stealer,0, Nil)))
       if (tree.size != data.size) {

@@ -18,7 +18,9 @@ package immutable {
     
     abstract class RedBlackTreeIsBinary[T, K, V] extends BinaryTreeStealer.Binary[T, RedBlackTree.Tree[K, V]] {
       def sizeBound(total: Int, depth: Int): Int = {
-        1 << depthBound(total, depth)
+        val avgdepth = (math.log(total) / math.log(2)).toInt + 1
+        if (depth > avgdepth) 1
+        else 1 << (avgdepth - depth)
       }
       def depthBound(total: Int, depth: Int): Int = {
         val depthBeneath = (2.5 * math.log(total) / math.log(2) + 2).toInt - depth
