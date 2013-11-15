@@ -5,7 +5,7 @@ package scalatest
 
 import org.scalatest._
 import scala.collection._
-
+import scala.annotation.tailrec
 
 
 class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpers {
