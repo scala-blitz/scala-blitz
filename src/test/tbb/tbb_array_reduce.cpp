@@ -5,9 +5,12 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
+#include <cstdlib>
+#include <cstdio>
+#include <sys/time.h>
 
-#define N 50000000
-#define MESUREMENTS 30
+#define N 1000000000
+#define MESUREMENTS 300
 
 using namespace tbb;
 
@@ -35,19 +38,24 @@ int ParallelSum( int array[], size_t n ) {
 int main(int,char**) {
 
   tbb::task_scheduler_init init(tbb::task_scheduler_init::automatic);
-  std::vector<int> data;
   int sz = N;
-  for (int i=0;i<sz;++i)
-    data.push_back(i);
-  clock_t begin = clock();
+  int*  data; 
+ 
+  data = (int *)std::malloc(N*sizeof(int));
+  
+ struct timeval time;
+  gettimeofday(&time, NULL);  
+  double totalTime = (time.tv_sec * 1000) + (time.tv_usec / 1000.0);
+
   int r;
   for(int i = 0 ; i< MESUREMENTS; i++) {
   r += ParallelSum(&data[0], sz);
   }
-  clock_t end = clock();
-  double elapsed_msecs = double(1000*end - 1000*begin) / CLOCKS_PER_SEC/MESUREMENTS;
+ gettimeofday(&time, NULL);  //END-TIME
+ totalTime = (((time.tv_sec * 1000) + (time.tv_usec / 1000.0)) - totalTime);
 
-  std::cout << r << ' ' << elapsed_msecs << std::endl;
+ printf("%i, %lf, %lf\n", 0, totalTime/MESUREMENTS, totalTime);
+
   /*  std::vector<mytask> tasks;
   for (int i=0;i<100000;++i)
     tasks.push_back(mytask(i));
