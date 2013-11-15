@@ -120,7 +120,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
           var acc = 1;
           var i = 0;
           val until = math.pow(2, e / 250000.0)
-          while(i<until) {
+          while(i < until) {
             acc = (acc * i) / 3;
             i = i + 1
           }

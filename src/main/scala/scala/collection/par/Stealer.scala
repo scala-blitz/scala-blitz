@@ -106,33 +106,34 @@ object Stealer {
   }
 
   class Single[@specialized T](val elem: T) extends Stealer[T] {
-    @volatile var completed = false
-    var traversed = false
-    def advance(step: Int): Int = {
-      completed = true
+    @volatile var advanced = false
+    var traversed = true
+    def advance(step: Int): Int = if (advanced) -1 else {
+      advanced = true
+      traversed = false
       1
     }
-    def elementsRemainingEstimate: Int = if (completed) 0 else 1
-    final def hasNext: Boolean = completed && !traversed
+    def elementsRemainingEstimate: Int = if (advanced) 0 else 1
+    final def hasNext: Boolean = advanced && !traversed
     def next(): T = if (hasNext) {
       traversed = true
       elem
     } else throw new IllegalStateException
     def markCompleted(): Boolean = {
-      completed = true
+      advanced = true
       traversed = true
       true
     }
     def markStolen(): Boolean = throw new IllegalStateException
-    def state = if (completed) Completed else AvailableOrOwned
+    def state = if (advanced) Completed else AvailableOrOwned
     def split = throw new IllegalStateException
     override def duplicated = {
       val s = new Single(elem)
-      s.completed = this.completed
+      s.advanced = this.advanced
       s.traversed = this.traversed
       s
     }
-    override def toString = s"Stealer.Single($elem, completed: $completed, traversed: $traversed)"
+    override def toString = s"Stealer.Single($elem, advanced: $advanced, traversed: $traversed)"
   }
 
 }

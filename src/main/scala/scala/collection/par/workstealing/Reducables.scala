@@ -79,7 +79,6 @@ object Reducables {
         if (elementsToGet > 0) {
           intermediate = combine(intermediate, apply(node, elementsToGet))
           node.WRITE_STEP(math.min(ms, currstep * 2))
-
         } else looping = false
       }
 

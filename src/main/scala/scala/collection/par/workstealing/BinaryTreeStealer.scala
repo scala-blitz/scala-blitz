@@ -210,8 +210,10 @@ extends Stealer[T] {
     if ((stack & 0xf) == (S | (S << 2))) {
       val rstack = (L << 2) | (S << 4)
       return (
-        new BinaryTreeStealer(binary.left(node), startingDepth + 1, totalElems, binary),
-        BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
+        if (binary.isEmptyLeaf(node)) new Stealer.Empty[T]
+        else new BinaryTreeStealer(binary.left(node), startingDepth + 1, totalElems, binary),
+        if (binary.isEmptyLeaf(node)) new Stealer.Empty[T]
+        else BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
       )
     }
 
@@ -247,7 +249,8 @@ extends Stealer[T] {
         val lroot = binary.right(binary.left(node))
         val rstack = (origstack & ((1L << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
-          if (binary.isEmptyLeaf(lroot)) new Stealer.Empty[T] else new BinaryTreeStealer(lroot, startingDepth + depth + 1, totalElems, binary),
+          if (binary.isEmptyLeaf(lroot)) new Stealer.Empty[T]
+          else new BinaryTreeStealer(lroot, startingDepth + depth + 1, totalElems, binary),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
         )
       }
@@ -276,9 +279,11 @@ extends Stealer[T] {
     throw new IllegalStateException(this.toString)
   }
 
-  def elementsRemainingEstimate: Int = ???
+  def elementsRemainingEstimate: Int = binary.sizeBound(totalElems, startingDepth)
 
-  override def toString = {
+  override def toString = s"BinaryTreeStealer($localDepth)"
+
+  def toString0 = {
     val formattedStack = localStack.map {
       x => if (binary.isEmptyLeaf(x)) "( )" else s" ${binary.value(x)} "
     } mkString(", ")

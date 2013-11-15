@@ -61,6 +61,8 @@ abstract class Scheduler {
     // about to complete work
     joinWork(root, kernel)
 
+    println(stealer, root.toString(0))
+
     val c = root.READ
     val r = c.READ_RESULT
     kernel.validateResult(r.asInstanceOf[R])
