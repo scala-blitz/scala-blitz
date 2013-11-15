@@ -11,6 +11,45 @@ import scala.collection._
 class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpers {
   import par._
 
+  test("simple iterator traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(1, 2, 4, 8, 12)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
+  test("longer traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 100: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
+  test("huge traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until Int.MaxValue / 2048: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
   test("simple advance") {
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
     val tree = immutable.TreeSet(1, 2, 4, 8, 12)
@@ -27,19 +66,6 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(stealer.advance(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 12)
     assert(stealer.advance(1) == -1)
-  }
-
-  test("simple iterator traversal") {
-    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(1, 2, 4, 8, 12)
-    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
-    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-    
-    val iterator = stealer.subtreeIterator
-    iterator.set(root)
-    val data = iterator.toList
-
-    assert(tree.toSeq == data)
   }
 
   test("advance empty") {
@@ -62,37 +88,10 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       val chunk = stealer.advance(1)
       if (chunk > 0) {
         assert(isBinary.value(stealer.topLocal) == i)
+        i += 1
       }
-      i += 1
     }
-    assert(i == 100)
-  }
-
-  test("longer traversal") {
-    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(0 until 100: _*)
-    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
-    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-
-    val iterator = stealer.subtreeIterator
-    iterator.set(root)
-    val data = iterator.toList
-
-    assert(tree.toSeq == data)
-  }
-
-  test("huge traversal") {
-    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(0 until Int.MaxValue/256: _*)
-    println("build done")
-    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
-    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-
-    val iterator = stealer.subtreeIterator
-    iterator.set(root)
-    val data = iterator.toList
-
-    assert(tree.toSeq == data)
+    assert(i == 100, i)
   }
 
   def extract(stealer: Stealer[Int], top: Stealer[Int] => Int): Seq[Int] = {
@@ -121,23 +120,28 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       case s: Stealer.Single[Int] => s.elem
     }
 
-    println(root)
-    println(stealer.advance(1))
-    println(stealer)
-    println(stealer.markStolen())
-    println(stealer)
+    assert(stealer.advance(1) > 0)
+    assert(stealer.markStolen() == true)
+    val nextelem = nextSingleElem(stealer)
+    assert(nextelem == 2)
     val (l, r) = stealer.split
-    printRoot(l)
-    println(l)
     val lelems = extract(l, nextSingleElem)
-    println(lelems)
-    printRoot(r)
-    println(r)
     val relems = extract(r, nextSingleElem)
-    println(relems)
+    val observed = Seq(nextelem) ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
+  }
+
+  test("split R*LT") {
+
   }
 
 }
+
+
+
+
+
+
 
 
 

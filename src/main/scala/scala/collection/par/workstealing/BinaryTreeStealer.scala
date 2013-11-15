@@ -101,7 +101,7 @@ extends Stealer[T] {
             node = binary.left(node)
             bound = binary.sizeBound(totalElems, startingDepth + localDepth)
           }
-          if (step < bound) {
+          if (bound < step) {
             nextstack = pushLocal(nextstack, S, node)
             subtreeIterator.set(node)
             iterator = subtreeIterator
