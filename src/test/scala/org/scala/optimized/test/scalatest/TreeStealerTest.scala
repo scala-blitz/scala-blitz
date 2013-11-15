@@ -186,6 +186,38 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(observed == tree.toList, observed)
   }
 
+  test("split R*LS") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 8, 1, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    println(stealer)
+    val (l, r) = stealer.split
+    println(l)
+    println(r)
+  }
+
+  test("split R*S") {
+
+  }
+
+  test("split R*T") {
+
+  }
+
+  test("split uninitialized stolen") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 8, 1, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    println(l)
+    println(r)
+  }
+
 }
 
 
