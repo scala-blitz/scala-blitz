@@ -202,7 +202,7 @@ extends Stealer[T] {
       // R*LT
       if ((nextstack & 0x3) == T) {
         val lroot = binary.right(binary.left(node))
-        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4  + depth * 2))
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
           if (binary.isEmptyLeaf(lroot)) new Stealer.Empty[T] else new BinaryTreeStealer(lroot, startingDepth + depth + 2, totalElems, binary),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
@@ -212,7 +212,7 @@ extends Stealer[T] {
       // R*LR
       if ((nextstack & 0x3) == R) {
         val lstack = (origstack >>> (6 + depth * 2)) << 2
-        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (T << (2 + depth * 2))
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
           BinaryTreeStealer(binary.right(binary.left(node)), startingDepth + depth + 2, totalElems, binary, lstack),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
