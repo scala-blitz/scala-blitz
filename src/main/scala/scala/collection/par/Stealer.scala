@@ -97,6 +97,7 @@ object Stealer {
     def markStolen(): Boolean = false
     def state = Completed
     def split = throw new IllegalStateException
+    override def toString = s"Stealer.Empty"
   }
 
   class Single[@specialized T](val elem: T) extends Stealer[T] {
@@ -120,6 +121,7 @@ object Stealer {
     def markStolen(): Boolean = throw new IllegalStateException
     def state = if (completed) Completed else AvailableOrOwned
     def split = throw new IllegalStateException
+    override def toString = s"Stealer.Single($elem, completed: $completed, traversed: $traversed)"
   }
 
 }

@@ -21,7 +21,30 @@ extends Stealer[T] {
   var localDepth = 0
   val localStack = new Array[Node](binary.depthBound(totalElems, startingDepth))
 
+  final def pushLocal(stack: Long, v: Long, node: Node): Long = {
+    localStack(localDepth) = node
+    val newstack = stack | (v << (localDepth * 2 + 2))
+    localDepth += 1
+    newstack
+  }
+
   final def topLocal = localStack(localDepth - 1)
+
+  final def topMask(stack: Long) = {
+    val dep = localDepth * 2
+    (stack & (0x3 << dep)) >>> dep
+  }
+
+  final def popLocal(stack: Long): Long = {
+    localDepth -= 1
+    localStack(localDepth) = null
+    stack & ~(0x3 << (localDepth * 2 + 2))
+  }
+
+  final def switchLocal(stack: Long, v: Long): Long = {
+    val dep = localDepth * 2
+    (stack & ~(0x3 << dep)) | (v << dep)
+  }
 
   /* atomic state */
   @volatile var stack: Long = _
@@ -51,27 +74,6 @@ extends Stealer[T] {
     val statebits = s & 0x3
     if (statebits != AVAILABLE && statebits != UNINITIALIZED) -1
     else {
-      def pushLocal(stack: Long, v: Long, node: Node): Long = {
-        localStack(localDepth) = node
-        val newstack = stack | (v << (localDepth * 2 + 2))
-        localDepth += 1
-        newstack
-      }
-      def topLocal = localStack(localDepth - 1)
-      def topMask(stack: Long) = {
-        val dep = localDepth * 2
-        (stack & (0x3 << dep)) >>> dep
-      }
-      def popLocal(stack: Long): Long = {
-        localDepth -= 1
-        localStack(localDepth) = null
-        stack & ~(0x3 << (localDepth * 2 + 2))
-      }
-      def switchLocal(stack: Long, v: Long): Long = {
-        val dep = localDepth * 2
-        (stack & ~(0x3 << dep)) | (v << dep)
-      }
-
       var estimatedChunkSize = -1
       var nextstack = s
 
@@ -219,7 +221,7 @@ extends Stealer[T] {
       // R*LL...
       if ((nextstack & 0x3) == L) {
         val lstack = (origstack >>> (4 + depth * 2)) << 2
-        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (T << (2 + depth * 2))
+        val rstack = (origstack & ((1 << (2 + depth * 2)) - 1)) | (L << (2 + depth * 2)) | (S << (4 + depth * 2))
         return (
           BinaryTreeStealer(binary.left(node), startingDepth + depth + 2, totalElems, binary, lstack),
           BinaryTreeStealer(root, startingDepth, totalElems, binary, rstack)
