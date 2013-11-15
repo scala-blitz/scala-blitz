@@ -57,11 +57,13 @@ extends Stealer[T] {
 
   override def duplicated: BinaryTreeStealer[T, Node] = {
     val d = new BinaryTreeStealer(root, startingDepth, totalElems, binary)
-    if(this.iterator ne null) {
+
+    if (this.iterator ne null) {
       val (a, b) = this.iterator.duplicate
       this.iterator = a
       d.iterator = b
     }
+
     d.localDepth = this.localDepth
     Array.copy(this.localStack, 0, d.localStack, 0, this.localStack.length)
     d.stack = this.stack
@@ -277,9 +279,13 @@ extends Stealer[T] {
   def elementsRemainingEstimate: Int = ???
 
   override def toString = {
+    val formattedStack = localStack.map {
+      x => if (binary.isEmptyLeaf(x)) "( )" else s" ${binary.value(x)} "
+    } mkString(", ")
+
     s"BinTreeStealer(startDepth: $startingDepth, localDepth: $localDepth, #elems: $totalElems) {\n" +
     s"  stack: ${showStack(READ_STACK)}\n" +
-    s"  local: ${localStack.map(_ != null).mkString(", ")}\n" +
+    s"  local: $formattedStack\n" +
     s"}"
   }
 
@@ -359,6 +365,7 @@ object BinaryTreeStealer {
 
     private val stack: Array[Node] = new Array[AnyRef](MAX_TREE_DEPTH + 1).asInstanceOf[Array[Node]]
     private var stackPos = 0 // can be removed but no need as we'll have same object size
+    
     def set(n: Node) {
       // println("set " + n)
       var i = 1;

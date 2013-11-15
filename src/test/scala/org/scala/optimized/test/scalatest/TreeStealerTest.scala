@@ -345,18 +345,20 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
             val afterSplit = head.toString
             val aText = splitA.toString
             val bText = splitB.toString
-            
-              val elLeftA=splitAD.advance(1)
-              val elRightA= archive.advance(1)
+            val elLeftA=splitAD.advance(1)
+            val elRightA= archive.advance(1)
             if ((elLeftA > 0) && (elRightA > 0)) {
               val elGot = splitAD.next
               val elExp = archive.next
-              assert(elGot == elExp)
+              assert(elGot == elExp, List(head, splitA, splitB).mkString("\n"))
             }
-          
-            
+
             val message = "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
-            hugeRandomFun(testId, (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail, elementsCollected, lst)
+            hugeRandomFun(
+              testId,
+              (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail,
+              elementsCollected,
+              lst)
           }
         } else hugeRandomFun(testId, tail, elementsCollected, lst)
       } else elementsCollected.toList
