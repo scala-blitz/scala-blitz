@@ -17,6 +17,8 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   val small = 3000000
   val large = 30000000
 
+  val single = Gen.single("sizes")(3000000)
+
   val opts = Seq(
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
@@ -50,6 +52,98 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
       using(withSchedulers(ranges(large))) curve ("Par") in { t => mapReduceParallel(t._1)(t._2) }
       using(withSchedulers(ranges(small))) curve ("ParNotFused") in { t => mapReduceParallelNotFused(t._1)(t._2) }
     }
+
+    measure method "reduce(step)" in {
+      def workOnElement(e:Int, size:Int) = {
+        if(e>size*0.9995){    
+          println("big")
+          var acc = 1;
+          var i = 0;
+          while(i<2000000) {
+            acc = (acc * i) * 3;
+            i = i + 1
+          }
+          acc
+        }
+        else 0
+      }
+      using(ranges(single)) curve ("Sequential") in { r =>
+        var i = r.head
+        val end = r.last
+        var sum = 0
+        while(i!= end) {
+          sum = sum + workOnElement(i, end)
+          i = i + 1
+        }
+     }
+
+      using(withSchedulers(ranges(single))) curve ("Par") in { t => 
+        implicit val scheduler = t._2
+        val sz = t._1.length
+        t._1.toPar.mapReduce(x=>workOnElement(x,sz))(_+_)
+      }
+
+    }
+
+    measure method "reduce(sqrt)" in {
+      def workOnElement(e:Int, size:Int) = {
+          var acc = 1;
+          var i = 0;
+          val until = math.sqrt(e)
+          while(i<until) {
+            acc = (acc * i) / 3;
+            i = i + 1
+          }
+          acc
+      }
+      using(ranges(single)) curve ("Sequential") in { r =>
+
+        var i = r.head
+        val end = r.last
+        var sum = 0
+        while(i!= end) {
+          sum = sum + workOnElement(i, end)
+          i = i + 1
+        }
+     }
+
+      using(withSchedulers(ranges(single))) curve ("Par") in { t => 
+        implicit val scheduler = t._2
+        val sz = t._1.length
+        t._1.toPar.mapReduce(x=>workOnElement(x,sz))(_+_)
+      }
+
+    }
+
+    measure method "reduce(exp)" in {
+      def workOnElement(e:Int, size:Int) = {
+          var acc = 1;
+          var i = 0;
+          val until = math.pow(2, e / 250000.0)
+          while(i<until) {
+            acc = (acc * i) / 3;
+            i = i + 1
+          }
+          acc
+      }
+      using(ranges(small)) curve ("Sequential") in { r =>
+        var i = r.head
+        val end = r.last
+        var sum = 0
+        while(i!= end) {
+          sum = sum + workOnElement(i, end)
+          i = i + 1
+        }
+     }
+
+      using(withSchedulers(ranges(small))) curve ("Par") in { t => 
+        implicit val scheduler = t._2
+        val sz = t._1.length
+        t._1.toPar.mapReduce(x=>workOnElement(x,sz))(_+_)
+      }
+
+    }
+
 
     measure method "for3Generators" in {
       val list = List(2, 3, 5)

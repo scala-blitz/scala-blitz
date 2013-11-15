@@ -6,10 +6,9 @@ package workstealing
 import scala.annotation.tailrec
 
 
-/**
-  * Base class for all stealers operating on index-based collections.
-  * can be not-precise in sence that can return different amount of elements for different indeces.
-  */
+/** Base class for all stealers operating on index-based collections.
+ *  Can be imprecise in the sense that it can return different amount of elements for different indices.
+ */
 abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 

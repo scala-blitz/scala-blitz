@@ -88,4 +88,41 @@ object Stealer {
     override def toString = "AvailableOrOwned"
   }
 
+  class Empty[@specialized T] extends Stealer[T] {
+    def advance(step: Int): Int = -1
+    def elementsRemainingEstimate: Int = 0
+    def hasNext: Boolean = false
+    def next(): T = throw new IllegalStateException
+    def markCompleted(): Boolean = true
+    def markStolen(): Boolean = false
+    def state = Completed
+    def split = throw new IllegalStateException
+    override def toString = s"Stealer.Empty"
+  }
+
+  class Single[@specialized T](val elem: T) extends Stealer[T] {
+    @volatile var completed = false
+    var traversed = false
+    def advance(step: Int): Int = {
+      completed = true
+      1
+    }
+    def elementsRemainingEstimate: Int = if (completed) 0 else 1
+    final def hasNext: Boolean = completed && !traversed
+    def next(): T = if (hasNext) {
+      traversed = true
+      elem
+    } else throw new IllegalStateException
+    def markCompleted(): Boolean = {
+      completed = true
+      traversed = true
+      true
+    }
+    def markStolen(): Boolean = throw new IllegalStateException
+    def state = if (completed) Completed else AvailableOrOwned
+    def split = throw new IllegalStateException
+    override def toString = s"Stealer.Single($elem, completed: $completed, traversed: $traversed)"
+  }
+
 }
+

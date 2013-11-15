@@ -10,7 +10,7 @@ import scala.collection.immutable.HashMap
 import scala.collection.immutable.TrieIterator
 import scala.annotation.unchecked.{ uncheckedVariance => uV }
 
-object Trees {
+object HashTries {
 
   import Scheduler.{ Kernel, Node }
 
@@ -39,7 +39,12 @@ object Trees {
     else kv.asInstanceOf[(K, V)]
   }
 
-  abstract class TrieChunkIterator[T, Repr] extends TrieIterator[T](null) with TreeStealer.ChunkIterator[T] {
+  trait ChunkIterator[@specialized(Int, Long, Float, Double) T] {
+    def hasNext: Boolean
+    def next(): T
+  }
+
+  abstract class TrieChunkIterator[T, Repr] extends TrieIterator[T](null) with HashTries.ChunkIterator[T] {
     final def setDepth(d: Int) = unsafe.putInt(this, OFFSET_DEPTH, d)
     final def setPosD(p: Int) = unsafe.putInt(this, OFFSET_POS_D, p)
     final def setArrayD(a: Array[collection.immutable.Iterable[T]]) = unsafe.putObject(this, OFFSET_ARRAY_D, a)
@@ -70,12 +75,12 @@ object Trees {
   }
 
   trait Scope {
-    implicit def hashTrieSetOps[T](a: Par[HashSet[T]]) = new Trees.HashSetOps(a)
+    implicit def hashTrieSetOps[T](a: Par[HashSet[T]]) = new HashTries.HashSetOps(a)
     implicit def canMergeHashTrieSet[T: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](ctx)
       def apply() = new HashSetMerger[T](ctx)
     }
-    implicit def hashTrieMapOps[K, V](a: Par[HashMap[K, V]]) = new Trees.HashMapOps(a)
+    implicit def hashTrieMapOps[K, V](a: Par[HashMap[K, V]]) = new HashTries.HashMapOps(a)
     implicit def canMergeHashTrieMap[K: ClassTag, V: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
       def apply(from: Par[HashMap[_, _]]) = new HashMapMerger[K, V](ctx)
       def apply() = new HashMapMerger[K, V](ctx)
@@ -167,7 +172,7 @@ object Trees {
     val chunkIterator = new TrieChunkIterator[T, HashSet[T]] {
       final def getElem(x: AnyRef): T = {
         val hs1 = x.asInstanceOf[HashSet.HashSet1[T]]
-        Trees.key(hs1)
+        HashTries.key(hs1)
       }
     }
 
@@ -270,7 +275,7 @@ object Trees {
     val chunkIterator = new TrieChunkIterator[(K, V), HashMap[K, V]] {
       final def getElem(x: AnyRef): (K, V) = {
         val hm1 = x.asInstanceOf[HashMap.HashMap1[K, V]]
-        Trees.kv(hm1)
+        HashTries.kv(hm1)
       }
     }
     def next(): (K, V) = { nextProgress += 1; chunkIterator.next }
@@ -360,60 +365,6 @@ object Trees {
         val len = n.elems.length
         //        if (len == 1) 2 else len // WHY? 
         len
-      case _ =>
-        0
-    }
-  }
-
-  class HashSetStealer[T](val root: HashSet[T]) extends {
-    val classTag = implicitly[ClassTag[HashSet[T]]]
-    val totalSize = root.size
-  } with TreeStealer.External[T, HashSet[T]] {
-    val chunkIterator = new TrieChunkIterator[T, HashSet[T]] {
-      final def getElem(x: AnyRef): T = {
-        val hs1 = x.asInstanceOf[HashSet.HashSet1[T]]
-        Trees.key(hs1)
-      }
-    }
-    val leafArray = new Array[collection.immutable.Iterable[T]](1)
-
-    var padding10: Int = 0
-    var padding11: Int = 0
-    var padding12: Int = 0
-    var padding13: Int = 0
-    var padding14: Int = 0
-    var padding15: Int = 0
-
-    final def newStealer = new HashSetStealer(root)
-    final def resetIterator(n: HashSet[T]): Unit = if (n.nonEmpty) {
-      chunkIterator.setDepth(0)
-      chunkIterator.setPosD(0)
-      chunkIterator.clearArrayStack()
-      chunkIterator.clearPosStack()
-      chunkIterator.clearSubIter()
-      leafArray(0) = n
-      chunkIterator.setArrayD(leafArray)
-    } else {
-      chunkIterator.clearSubIter()
-      chunkIterator.setDepth(-1)
-    }
-    final def child(n: HashSet[T], idx: Int) = {
-      val trie = n.asInstanceOf[HashSet.HashTrieSet[T]]
-      if (trie.elems.length > 1 || idx == 1) trie.elems(idx - 1)
-      else if (idx == 2) HashSet.empty
-      else sys.error("error state")
-    }
-    final def elementAt(n: HashSet[T], idx: Int): T = ???
-    final def depthBound(totalSize: Int): Int = 6
-    final def isLeaf(n: HashSet[T]) = n match {
-      case _: HashSet.HashTrieSet[_] => false
-      case _ => true
-    }
-    final def estimateSubtree(n: HashSet[T], depth: Int, totalSize: Int) = n.size
-    final def totalChildren(n: HashSet[T]) = n match {
-      case n: HashSet.HashTrieSet[_] =>
-        val len = n.elems.length
-        if (len == 1) 2 else len
       case _ =>
         0
     }
@@ -540,60 +491,6 @@ object Trees {
       apply(node, stealer, chunkSize)
     }
     def apply(node: Node[T, R], ci: HashSetIndexedStealer[T], chunkSize: Int): R
-  }
-
-  class HashMapStealer[K, V](val root: HashMap[K, V]) extends {
-    val classTag = implicitly[ClassTag[HashMap[K, V]]]
-    val totalSize = root.size
-  } with TreeStealer.External[(K, V), HashMap[K, V]] {
-    val chunkIterator = new TrieChunkIterator[(K, V), HashMap[K, V]] {
-      final def getElem(x: AnyRef): (K, V) = {
-        val hm1 = x.asInstanceOf[HashMap.HashMap1[K, V]]
-        Trees.kv(hm1)
-      }
-    }
-    val leafArray = new Array[collection.immutable.Iterable[(K, V)]](1)
-
-    var padding10: Int = 0
-    var padding11: Int = 0
-    var padding12: Int = 0
-    var padding13: Int = 0
-    var padding14: Int = 0
-    var padding15: Int = 0
-
-    final def newStealer = new HashMapStealer(root)
-    final def resetIterator(n: HashMap[K, V]): Unit = if (n.nonEmpty) {
-      chunkIterator.setDepth(0)
-      chunkIterator.setPosD(0)
-      chunkIterator.clearArrayStack()
-      chunkIterator.clearPosStack()
-      chunkIterator.clearSubIter()
-      leafArray(0) = n
-      chunkIterator.setArrayD(leafArray)
-    } else {
-      chunkIterator.clearSubIter()
-      chunkIterator.setDepth(-1)
-    }
-    final def child(n: HashMap[K, V], idx: Int) = {
-      val trie = n.asInstanceOf[HashMap.HashTrieMap[K, V]]
-      if (trie.elems.length > 1 || idx == 1) trie.elems(idx - 1)
-      else if (idx == 2) HashMap.empty
-      else sys.error("error state")
-    }
-    final def elementAt(n: HashMap[K, V], idx: Int): (K, V) = ???
-    final def depthBound(totalSize: Int): Int = 6
-    final def isLeaf(n: HashMap[K, V]) = n match {
-      case _: HashMap.HashTrieMap[_, _] => false
-      case _ => true
-    }
-    final def estimateSubtree(n: HashMap[K, V], depth: Int, totalSize: Int) = n.size
-    final def totalChildren(n: HashMap[K, V]) = n match {
-      case n: HashMap.HashTrieMap[_, _] =>
-        val len = n.elems.length
-        if (len == 1) 2 else len
-      case _ =>
-        0
-    }
   }
 
   class HashMapMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long) V: ClassTag](
