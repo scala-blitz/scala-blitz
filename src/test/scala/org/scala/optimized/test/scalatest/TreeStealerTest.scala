@@ -324,7 +324,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         if (iTookEstimate >= 0) {
           while (head.hasNext) {
             val nxt = head.next()
-              if(nxt!=last + 1) {
+              if(nxt!=lst + 1) {
               //println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
               assert(false, (nxt, last))
             }
@@ -334,7 +334,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           }
         }
 
-//        if (testId == 53) println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+        println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
         if (head.state != Stealer.Completed) {
           val iWantToTakeMore = random.nextBoolean()
           if (iWantToTakeMore) hugeRandomFun(testId, stack, elementsCollected, lst)

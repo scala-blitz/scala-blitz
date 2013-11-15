@@ -23,13 +23,14 @@ package immutable {
         else 1 << (avgdepth - depth)
       }
 
-      final def sizeBound(node: RedBlackTree.Tree[K, V]) = {
-        1L<<depthBound(node)
+      final def sizeBound(node: RedBlackTree.Tree[K, V]): Int = {
+        1 << depthBound(node)
       }
 
-      def depthBound(node: RedBlackTree.Tree[K, V], acc: Int = 0){
-          if((((acc & 1) == 1) || (node.right eq null)) && (node.left ne null)) getLenth(node.left, acc + 1)
-          else if(node.right ne null) getLength(node.right, acc + 1)
+      def depthBound(node: RedBlackTree.Tree[K, V], acc: Int = 0): Int = {
+          if((((acc & 1) == 1) || (node.right eq null)) && (node.left ne null)) depthBound(node.left, acc + 1)
+          else if(node.right ne null) depthBound(node.right, acc + 1)
+          else acc
         }
 
       def depthBound(total: Int, depth: Int): Int = {
