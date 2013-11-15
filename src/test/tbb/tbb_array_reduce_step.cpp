@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <sys/time.h>
 #define N 3000000
-#define MESUREMENTS 10
+#define MEASUREMENTS 10
 
 using namespace tbb;
 
@@ -67,7 +67,7 @@ int main(int,char**) {
       gettimeofday(&time, NULL); // Start Time
       long totalTime = (time.tv_sec * 1000) + (time.tv_usec / 1000);
 
-  for(int i = 0 ; i< MESUREMENTS; i++) {
+  for(int i = 0 ; i< MEASUREMENTS; i++) {
   r += ParallelSum(sz);
   std::printf("%i\n", i);
   }
@@ -79,7 +79,7 @@ int main(int,char**) {
        printf("1");
        }*/
 
-  printf("%i, %li\n",0, totalTime/MESUREMENTS);
+  printf("%i, %li\n",0, totalTime/MEASUREMENTS);
 
   return 0;
 }
