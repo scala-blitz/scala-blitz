@@ -189,45 +189,46 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
 
   test("huge random splitting") {
     val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
-    val tree = immutable.TreeSet(0 until 1024: _*)
+    val tree = immutable.TreeSet(0 until 4096: _*)
     println("build done")
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
-    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-    val random = new scala.util.Random(42)
-    @tailrec
-    def hugeRandomFun(stack: List[Stealer[Int]], elementsCollected: List[Int] = Nil) : List[Int] = {
-      stack match {
-        case head::tail =>
-                val iWantToTake = random.nextInt(1024)
 
-                val iTookEstimate = head.advance(iWantToTake)
-                var collected = elementsCollected
-                var collectedCount = 0
-                if(iTookEstimate >= 0) {
-                  while(head.hasNext) {
-                    collected = head.next():: collected
-                    collectedCount = collectedCount + 1
-                  }
-                }
-                println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
-                if(head.state != Stealer.Completed) {
-                  val iWantToTakeMore = random.nextBoolean()
-                  if(iWantToTakeMore) hugeRandomFun(stack, collected)
-                  else { // i want to split!
-                    val (splitA, splitB) = head.split
-                    hugeRandomFun(splitA::splitB::tail, collected)
-                  }
-                } else hugeRandomFun(tail, collected)
+    val random = new scala.util.Random(44)
+    for(testId <- 1 to 1000) {
+      val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+      import scala.collection.mutable.ListBuffer
+      @tailrec
+      def hugeRandomFun(stack: List[Stealer[Int]], elementsCollected: ListBuffer[Int] = new ListBuffer[Int]()) : List[Int] = {
+        if(!stack.isEmpty)  {
+          val head = stack.head
+          val tail = stack.tail
+            val iWantToTake = random.nextInt(1024)
 
-
-        case Nil => elementsCollected
+            val iTookEstimate = head.advance(iWantToTake)
+            var collectedCount = 0
+            if(iTookEstimate >= 0) {
+              while(head.hasNext) {
+                elementsCollected += head.next()
+                collectedCount = collectedCount + 1
+              }
+            }
+        //    println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+            if(head.state != Stealer.Completed) {
+              val iWantToTakeMore = random.nextBoolean()
+              if(iWantToTakeMore) hugeRandomFun(stack, elementsCollected)
+              else { // i want to split!
+                val (splitA, splitB) = head.split
+                hugeRandomFun(splitA::splitB::tail, elementsCollected)
+              }
+            } else hugeRandomFun(tail, elementsCollected)
+        }
+        else elementsCollected.toList
       }
+    
+    val data = hugeRandomFun(List(stealer))
+    if(tree.size != data.size) assert(tree.size == data.size, "test "+ testId + "tree size: "+ tree.size + " data size: " + data.size + "\n values " + data)
     }
-
-      val data = hugeRandomFun(List(stealer)).reverse;
-      assert(tree.toSeq == data, "data size: " + data.size + "\n values " + data)
   }
-
 }
 
 
