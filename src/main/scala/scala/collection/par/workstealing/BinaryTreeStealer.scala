@@ -57,9 +57,11 @@ extends Stealer[T] {
 
   override def duplicated: BinaryTreeStealer[T, Node] = {
     val d = new BinaryTreeStealer(root, startingDepth, totalElems, binary)
-
-    val (a, b) = this.iterator.duplicate
-    d.iterator = b
+    if(this.iterator ne null) {
+      val (a, b) = this.iterator.duplicate
+      this.iterator = a
+      d.iterator = b
+    }
     d.localDepth = this.localDepth
     Array.copy(this.localStack, 0, d.localStack, 0, this.localStack.length)
     d.stack = this.stack

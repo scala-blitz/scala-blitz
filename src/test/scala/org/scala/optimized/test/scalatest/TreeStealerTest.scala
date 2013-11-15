@@ -323,8 +323,8 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         if (iTookEstimate >= 0) {
           while (head.hasNext) {
             val nxt = head.next()
-            if (nxt != last + 1) {
-              println("failed on level " + level + " got " + nxt + " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
+              if(nxt!=last + 1) {
+                println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
             }
             elementsCollected += nxt
             lst = nxt
@@ -339,12 +339,24 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           else {
             val beforeSplit = head.toString
             // i want to split!
+            val archive = head.duplicated
             val (splitA, splitB) = head.split
+            val splitAD = splitA.duplicated
             val afterSplit = head.toString
             val aText = splitA.toString
             val bText = splitB.toString
-            val message = "was " + beforeSplit + "\nbecame " + afterSplit + "\nleft: " + aText + "\nright:" + bText
-            hugeRandomFun(testId, (splitA, level + 1, message :: messages) :: (splitB, level + 1, message :: messages) :: tail, elementsCollected, lst)
+            
+              val elLeftA=splitAD.advance(1)
+              val elRightA= archive.advance(1)
+            if ((elLeftA > 0) && (elRightA > 0)) {
+              val elGot = splitAD.next
+              val elExp = archive.next
+              assert(elGot == elExp)
+            }
+          
+            
+            val message = "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
+            hugeRandomFun(testId, (splitA, level + 1, message::messages) :: (splitB, level + 1, message::messages) :: tail, elementsCollected, lst)
           }
         } else hugeRandomFun(testId, tail, elementsCollected, lst)
       } else elementsCollected.toList
