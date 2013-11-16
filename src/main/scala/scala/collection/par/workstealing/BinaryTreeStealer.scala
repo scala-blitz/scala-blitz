@@ -94,7 +94,7 @@ extends Stealer[T] {
       var nextstack = s
 
       if (statebits == AVAILABLE) {
-        var tm = topMask(nextstack)
+        val tm = topMask(nextstack)
 
         if (tm == S || (tm == T && binary.isEmptyLeaf(binary.right(topLocal)))) {
           nextstack = popLocal(nextstack)
