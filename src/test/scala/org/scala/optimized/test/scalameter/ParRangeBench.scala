@@ -20,9 +20,9 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   val single = Gen.single("sizes")(500000)
 
   val opts = Seq(
-    exec.minWarmupRuns -> 30,
-    exec.maxWarmupRuns -> 60,
-    exec.benchRuns -> 15,
+    exec.minWarmupRuns -> 5,
+    exec.maxWarmupRuns -> 10,
+    exec.benchRuns -> 30,
     exec.independentSamples -> 3,
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
@@ -67,7 +67,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         // }
         // acc
         var until = 1
-        if (e > size * 0.9995) until = 2000000
+        if (e > size * 0.97) until = 200000
         var acc = 1
         var i = 1
         while (i < until) {
@@ -128,14 +128,14 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "reduce(exp)" in {
       def workOnElement(e:Int, size:Int) = {
-          var acc = 1;
-          var i = 0;
-          val until = math.pow(2, e / 250000.0)
-          while(i<until) {
-            acc = (acc * i) / 3;
-            i = i + 1
-          }
-          acc
+        val until: Int = 1<< (e/30000);
+        var acc = 1
+        var i = 1
+        while (i < until) {
+          acc *= i
+          i += 1
+        }
+        acc
       }
       using(ranges(single)) curve ("Sequential") in { r =>
         var i = r.head

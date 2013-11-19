@@ -9,8 +9,8 @@
 #include <cstdio>
 #include <sys/time.h>
 
-#define N 1000000000
-#define MESUREMENTS 300
+#define N 50000000
+#define MESUREMENTS 30
 
 using namespace tbb;
 
@@ -37,7 +37,7 @@ int ParallelSum( int array[], size_t n ) {
 
 int main(int,char**) {
 
-  tbb::task_scheduler_init init(tbb::task_scheduler_init::automatic);
+  tbb::task_scheduler_init init(8);
   int sz = N;
   int*  data; 
  

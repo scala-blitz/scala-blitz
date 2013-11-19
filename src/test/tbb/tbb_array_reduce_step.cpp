@@ -1,7 +1,7 @@
-// #include "tbb/blocked_range.h"
-// #include "tbb/parallel_for.h"
-// #include "tbb/task_scheduler_init.h"
-// #include "tbb/parallel_reduce.h"
+#include "tbb/blocked_range.h"
+#include "tbb/parallel_for.h"
+#include "tbb/task_scheduler_init.h"
+#include "tbb/parallel_reduce.h"
 #include <iostream>
 #include <vector>
 #include <ctime>
@@ -11,26 +11,27 @@
 #define N 500000
 #define MEASUREMENTS 10
 
-//using namespace tbb;
+using namespace tbb;
 
 int op(int, int);
 
 struct Sum {
   int value;
   Sum(): value(0) {}
-  //Sum(Sum& s, split) { value = 0; }
+  Sum(Sum& s, split) { value = 0; }
 
-  //void operator()( const blocked_range<int>& r ) {
-  void operator()(int begin, int end) {
+  void operator()( const blocked_range<int>& r ) {
+  //void operator()(int begin, i0nt end) {
     int temp = 0;
-    // int init = r.begin();
-    // int end = r.end();
+     int begin = r.begin();
+     int end = r.end();
 		//if (end<init) std::printf("AAAAAAAAAAAAworking on %d %d size %d. pos %lf\n", init , end ,  end-init, init * 1.0/N);
-		//else std::printf("working on %d %d size %d. pos %lf\n", init , end ,  end-init, init * 1.0/N);
+		//else 
+//     std::printf("working on %d %d size %d. pos %lf\n", begin , end ,  end-begin, begin * 1.0/N);
 
     //for(int a = r.begin(); a != r.end(); ++a) {
     for (int a = begin; a != end; ++a) {
-	    temp += op(a, end);
+	    temp += op(a, N);
       asm("");
 	    // std::cout<<std::endl;
     }
@@ -45,15 +46,16 @@ struct Sum {
 
 int ParallelSum(size_t n) {
     Sum total;
-    //parallel_reduce(blocked_range<int>( 0, n ), total);
+      tbb::task_scheduler_init init(8);
+    parallel_reduce(blocked_range<int>( 0, n ), total);
     //total(blocked_range<int>(0, n));
-    total(0, n);
+    //total(0, n);
     return total.value;
 }
 
 int op(int e, int size) {
   int until = 1;
-  if (e > size * 0.9995) until = 2000000;
+  if (e > size * 0.97) until = 200000;
   int acc = 1;
   int i = 1;
   while (i < until) {
