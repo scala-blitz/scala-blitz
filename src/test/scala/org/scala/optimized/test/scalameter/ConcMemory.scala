@@ -8,8 +8,7 @@ import org.scalameter.api._
 
 
 class ConcMemory extends PerformanceTest.Regression with Serializable {
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
+  import Scheduler.Config
 
   /* config */
 

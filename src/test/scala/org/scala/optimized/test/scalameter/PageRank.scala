@@ -5,8 +5,7 @@ package scalameter
 
 import scala.collection.par._
 import scala.reflect.ClassTag
-import workstealing.Scheduler
-import workstealing.Scheduler.Config
+import Scheduler.Config
 import org.scalameter.{ Reporter, Gen, PerformanceTest }
 import org.scalameter.persistence.SerializationPersistor
 import org.scalameter.api._
