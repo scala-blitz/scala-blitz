@@ -160,7 +160,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
           b ++= c.elems.drop(from).take(remaining)
         }
       }
-      val node = new par.workstealing.Scheduler.Node[Int, Unit](null, null)(stealer)
+      val node = new par.Scheduler.Node[Int, Unit](null, null)(stealer)
 
       val sizes = Array(c.size / 8, c.size / 8, c.size / 4, c.size - c.size / 8 * 2 - c.size / 4)
       for (s <- sizes) {

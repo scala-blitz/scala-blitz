@@ -4,8 +4,7 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
-import workstealing.Scheduler
-import workstealing.Scheduler.Config
+import Scheduler.Config
 import scala.collection._
 import scala.collection.parallel.ForkJoinTaskSupport
 

@@ -6,7 +6,9 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.collection.par.generic._
 import collection.par.Par
+import collection.par.Scheduler
 import collection.par.workstealing._
+import scala.collection.par.Scheduler
 import collection.par.Configuration
 import scala.collection.par.Conc
 import scala.math
@@ -106,7 +108,7 @@ object ConcsMacros {
       import collection.par
       import par._
       import workstealing._
-      import scala.collection.par.workstealing.Scheduler.{Ref, Node}
+      import scala.collection.par.Scheduler.{Ref, Node}
       val callee = calleeExpression.splice
       val array = arr.splice
       val startIndex = start.splice
@@ -168,7 +170,7 @@ object ConcsMacros {
 
 object ConcsMethods {
   import scala.collection.par.workstealing._
-  import scala.collection.par.workstealing.Scheduler.{Ref, Node}
+  import scala.collection.par.Scheduler.{Ref, Node}
 
   class CopyToArrayKernel[T, U >: T](array: Array[U], startIndex: Int, length: Int) extends scala.collection.par.workstealing.Concs.ConcKernel[T, ProgressStatus] {
     override def beforeWorkOn(tree: Ref[T, ProgressStatus], node: Node[T, ProgressStatus]) {

@@ -8,8 +8,7 @@ import org.scalameter.api._
 
 
 class ConcBench extends PerformanceTest.Regression with Serializable {
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
+  import Scheduler.Config
 
   /* config */
 
@@ -177,7 +176,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
 
       def sum(c: Conc[Int]) {
         val stealer = new scala.collection.par.workstealing.Concs.ConcStealer[Int](c, 0, c.size)
-        val node = new scala.collection.par.workstealing.Scheduler.Node[Int, Int](null, null)(stealer)
+        val node = new scala.collection.par.Scheduler.Node[Int, Int](null, null)(stealer)
 
         while (stealer.isAvailable) {
           stealer.advance(4096)

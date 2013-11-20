@@ -116,7 +116,7 @@ object IndexedStealer {
   }
 
   trait IndexedKernel[@specialized T, @specialized R] extends Kernel[T, R] {
-    override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {
+    override def workOn(tree: Ref[T, R], config: Config, worker: WorkerTask): Boolean = {
       import Stealer._
 
       // atomically read the current node and initialize
