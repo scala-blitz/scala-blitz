@@ -37,11 +37,11 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
     exec.independentSamples -> 1,
     reports.regression.noiseMagnitude -> 0.75)
 
-  implicit def range2Reducable(r: Range)(implicit ctx: workstealing.Scheduler): Reducable[Int] = par2zippable(r.toPar)
-  implicit def array2Reducable(a: Array[Int])(implicit ctx: workstealing.Scheduler): Reducable[Int] = par2zippable(a.toPar)
+  implicit def range2Reducable(r: Range)(implicit ctx: Scheduler): Reducable[Int] = par2zippable(r.toPar)
+  implicit def array2Reducable(a: Array[Int])(implicit ctx: Scheduler): Reducable[Int] = par2zippable(a.toPar)
 
-  implicit def hashTrieSet2Reducable(a: collection.immutable.HashSet[Int])(implicit ctx: workstealing.Scheduler): Reducable[Int] = hashTrieSetIsReducable(a.toPar)
-  implicit def hashSet2Reducable(a: collection.mutable.HashSet[Int])(implicit ctx: workstealing.Scheduler): Reducable[Int] = hashSetIsReducable(a.toPar)
+  implicit def hashTrieSet2Reducable(a: collection.immutable.HashSet[Int])(implicit ctx: Scheduler): Reducable[Int] = hashTrieSetIsReducable(a.toPar)
+  implicit def hashSet2Reducable(a: collection.mutable.HashSet[Int])(implicit ctx: Scheduler): Reducable[Int] = hashSetIsReducable(a.toPar)
 
   /* benchmarks */
 

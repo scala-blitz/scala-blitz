@@ -61,7 +61,7 @@ object Reducables {
   import Scheduler._
 
   trait ReducableKernel[@specialized T, @specialized R] extends Kernel[T, R] {
-    override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {
+    override def workOn(tree: Ref[T, R], config: Config, worker: WorkerTask): Boolean = {
       // atomically read the current node and initialize
       val node = tree.READ
       val stealer = node.stealer
@@ -91,7 +91,7 @@ object Reducables {
   }
 
   abstract class CopyMapReducableKernel[T, @specialized(Specializable.AllNumeric) S] extends ReducableKernel[T, Unit] {
-    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+    import scala.collection.par.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]

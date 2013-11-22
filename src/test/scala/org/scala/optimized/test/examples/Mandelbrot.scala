@@ -114,8 +114,8 @@ object Mandelbrot {
 
     private def fillWsTree(pixels: Array[Int], wdt: Int, hgt: Int) {
       val range = 0 until (wdt * hgt)
-      val conf = new workstealing.Scheduler.Config.Default(parallelism)
-      implicit val s = new workstealing.Scheduler.ForkJoin(conf)
+      val conf = new Scheduler.Config.Default(parallelism)
+      implicit val s = new Scheduler.ForkJoin(conf)
   
       for (idx <- range.toPar) {
         val x = idx % wdt

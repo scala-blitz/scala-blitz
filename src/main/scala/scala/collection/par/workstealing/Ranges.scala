@@ -111,7 +111,7 @@ object Ranges {
   }
 
   abstract class CopyMapRangeKernel[@specialized S] extends IndexedStealer.IndexedKernel[Int, Unit] {
-    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+    import scala.collection.par.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]
