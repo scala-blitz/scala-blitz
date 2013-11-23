@@ -20,10 +20,6 @@ abstract class Scheduler {
 
   def config: Config
 
-  def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]): Unit
-
-  def joinWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]): Unit
-
   def invokeParallelOperation[T, R](stealer: Stealer[T], kernel: Kernel[T, R]): R
 
 }
@@ -83,6 +79,8 @@ object Scheduler {
   }
 
   abstract class WorkstealingTree extends Scheduler {
+
+    def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]): Unit
 
     def joinWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
       var r = root.READ.READ_RESULT
