@@ -11,7 +11,7 @@ import scala.collection.mutable.FlatHashTable
 
 
 trait HashBuckets[@specialized(Int, Long) K, T, Repr <: HashBuckets[K, T, Repr, To], To]
-extends Merger[T, To] with MergerLike[T, To, Repr] {
+  extends Merger[T, To] with MergerLike[T, To, Repr] {
   def width: Int
 
   def newHashBucket: Repr
@@ -44,7 +44,6 @@ extends Merger[T, To] with MergerLike[T, To, Repr] {
 
 }
 
-
 object HashBuckets {
   val DISCRIMINANT_BITS = 5
   val IRRELEVANT_BITS = 32 - DISCRIMINANT_BITS
@@ -63,13 +62,13 @@ object HashBuckets {
 
     def setSize(sz: Int) = tableSize = sz
 
-    def USE_OLD_VALUE[V](x:V,y:V)= x
-    def IDENTITY[V](x:V) = x
-    def tryInsertEntry(k: K, v: V): Boolean = tryAggregateEntry(k,v, IDENTITY[V],USE_OLD_VALUE)
+    def USE_OLD_VALUE[V](x: V, y: V) = x
+    def IDENTITY[V](x: V) = x
+    def tryInsertEntry(k: K, v: V): Boolean = tryAggregateEntry(k, v, IDENTITY[V], USE_OLD_VALUE)
 
-    def tryCombineEntry(k: K, v: V, combiner: (V,V)=>V): Boolean = tryAggregateEntry[V](k, v, IDENTITY[V], combiner)
+    def tryCombineEntry(k: K, v: V, combiner: (V, V) => V): Boolean = tryAggregateEntry[V](k, v, IDENTITY[V], combiner)
 
-    def tryAggregateEntry[T](k: K, v: T, zero : T=> V, combiner: (V,T)=>V): Boolean = {
+    def tryAggregateEntry[T](k: K, v: T, zero: T => V, combiner: (V, T) => V): Boolean = {
       var h = index(elemHashCode(k))
       val olde = table(h).asInstanceOf[DefaultEntry[K, V]]
 
@@ -85,13 +84,13 @@ object HashBuckets {
 
       // if key does not already exist
       if (h != -1) {
-        val e = new DefaultEntry(k,  zero(v))
+        val e = new DefaultEntry(k, zero(v))
         e.next = olde
         table(h) = e
         true
       } else false
     }
-    
+
     protected def createNewEntry[X](key: K, x: X) = ???
   }
 
@@ -129,7 +128,7 @@ object HashBuckets {
       table(h) = elem.asInstanceOf[AnyRef]
 
       1
-    }    
+    }
   }
 
 }

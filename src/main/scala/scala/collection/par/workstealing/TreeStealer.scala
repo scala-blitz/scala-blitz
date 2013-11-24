@@ -47,10 +47,10 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
 
   final def encodeStolen(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
-    STOLEN_MASK |
-    ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
-    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
-    ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
+      STOLEN_MASK |
+      ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+      ((total << TOTAL_SHIFT) & TOTAL_MASK) |
+      ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
   final def toStolen(code: Int) = code | STOLEN_MASK
@@ -59,17 +59,17 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
 
   final def encodeCompleted(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
-    COMPLETED_MASK |
-    ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
-    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
-    ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
+      COMPLETED_MASK |
+      ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+      ((total << TOTAL_SHIFT) & TOTAL_MASK) |
+      ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
   final def encode(origin: Int, total: Int, progress: Int): Int = {
     SPECIAL_MASK |
-    ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
-    ((total << TOTAL_SHIFT) & TOTAL_MASK) |
-    ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
+      ((origin << ORIGIN_SHIFT) & ORIGIN_MASK) |
+      ((total << TOTAL_SHIFT) & TOTAL_MASK) |
+      ((progress << PROGRESS_SHIFT) & PROGRESS_MASK)
   }
 
   final def completed(code: Int): Boolean = ((code & COMPLETED_MASK) >>> COMPLETED_SHIFT) != 0
@@ -78,7 +78,7 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
 
   final def origin(code: Int): Int = ((code & ORIGIN_MASK) >>> ORIGIN_SHIFT)
 
-  final def total(code: Int): Int =  ((code & TOTAL_MASK) >>> TOTAL_SHIFT)
+  final def total(code: Int): Int = ((code & TOTAL_MASK) >>> TOTAL_SHIFT)
 
   final def progress(code: Int): Int = ((code & PROGRESS_MASK) >>> PROGRESS_SHIFT)
 
@@ -122,7 +122,6 @@ trait TreeStealer[T, N >: Null <: AnyRef] extends Stealer[T] {
 
 }
 
-
 object TreeStealer {
 
   val STACK_BASE_OFFSET = unsafe.arrayBaseOffset(classOf[Array[Int]])
@@ -165,7 +164,8 @@ object TreeStealer {
 
     def hasNext = chunkIterator.hasNext
 
-    def next() = { val n = chunkIterator.next()
+    def next() = {
+      val n = chunkIterator.next()
       debug("returning el " + n + " \n")
       n
     }
@@ -177,7 +177,7 @@ object TreeStealer {
       else Stealer.AvailableOrOwned
     }
 
-    @tailrec final def advance(step: Int): Int = if (depth < 0) {
+    @tailrec final def nextBatch(step: Int): Int = if (depth < 0) {
       markCompleted()
       -1
     } else {
@@ -213,13 +213,13 @@ object TreeStealer {
               if (pop(curr, ncurr)) {
                 resetIterator(currnode)
                 estimate
-              } else advance(step)
+              } else nextBatch(step)
             } else {
               // or not to batch - push
               val nextnode = child(currnode, currprogress)
               val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
-              advance(step)
+              nextBatch(step)
             }
           } else {
             if (currprogress == origin(next)) {
@@ -233,7 +233,7 @@ object TreeStealer {
               val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
             }
-            advance(step)
+            nextBatch(step)
           }
         } else {
           if (next == 0) {
@@ -252,7 +252,7 @@ object TreeStealer {
               val ncurr = encode(origin(curr), totalch, 0)
               pop(curr, ncurr)
             }
-            advance(step)
+            nextBatch(step)
           } else {
             if (currprogress == origin(next)) {
               // next origin identical - error!
@@ -264,7 +264,7 @@ object TreeStealer {
               val nnext = encode(currprogress, totalChildren(nextnode), 1)
               push(next, nnext)
             }
-            advance(step)
+            nextBatch(step)
           }
         }
       }
@@ -490,7 +490,7 @@ object TreeStealer {
         case x => x.getClass.getSimpleName.takeRight(4) + "@" + System.identityHashCode(x).toString.takeRight(4)
       } map {
         case s => "%1$12s".format(s)
-      } mkString(", ")
+      } mkString (", ")
     )
 
   }
@@ -499,7 +499,7 @@ object TreeStealer {
     val DEBUG_ENABLED = false
     val log = new java.util.concurrent.ConcurrentLinkedQueue[AnyRef]
 
-    def apply(x: AnyRef) = if(DEBUG_ENABLED) log.add(x)
+    def apply(x: AnyRef) = if (DEBUG_ENABLED) log.add(x)
 
     def clear() {
       log.clear()
@@ -511,7 +511,4 @@ object TreeStealer {
   }
 
 }
-
-
-
 
