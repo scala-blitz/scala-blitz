@@ -93,7 +93,7 @@ object Scheduler {
 
   object Implicits {
     implicit val global = new ExecutionContext()
-    implicit val sequential = Dummy
+    implicit val sequential = Sequential
 
   }
 
@@ -199,7 +199,7 @@ object Scheduler {
     }
   }
 
-  object Dummy extends WorkstealingTree {
+  object Sequential extends WorkstealingTree {
     import scala.concurrent.forkjoin._
 
     val config = new Config.Default(1)
@@ -211,7 +211,9 @@ object Scheduler {
     }
 
     def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
-      new DummyTask(this, root, kernel).workstealingTreeScheduling()
+      val task = new DummyTask(this, root, kernel)
+      root.child.owner = task
+      task.workstealingTreeScheduling()
     }
   }
 

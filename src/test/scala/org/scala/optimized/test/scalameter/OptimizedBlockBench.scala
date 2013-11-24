@@ -113,6 +113,30 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
         optimize{x.fold(0)(_+_)}
       }
     }
+
+    measure method "aggregate(tinyCollections)" in {
+      using(ranges(tiny/100)) curve ("collections") in { x =>
+        var sum = 0
+        var i = x.head
+        val until = x.end
+        while(i < until) {
+          sum = sum + (1 to 100).aggregate(0)(_+_, _+_)
+          i = i + 1
+        }
+      }
+      using(ranges(tiny/100)) curve ("optimized") in { x => 
+        optimize{
+          var sum = 0
+          var i = x.head
+          val until = x.end
+          while(i < until) {
+            sum = sum + (1 to 100).aggregate(0)(_+_, _+_)
+            i = i + 1
+          }
+        }
+      }
+    }
+
     measure method "min" in {
       using(ranges(large)) curve ("collections") in { x =>
         x.min
