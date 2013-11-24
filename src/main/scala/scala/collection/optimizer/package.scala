@@ -1,15 +1,13 @@
-package scala.collection.par
+package scala.collection
+
+
 
 import scala.language.experimental.macros
 import scala.reflect.macros._
 
-object SequentialOptimizeBlock {
-
-  implicit def extender[T](t:T) = new {
-    def toList2 = List(t)
-  }
 
 
+package object optimizer {
   def optimize[T](exp: T) = macro optimize_impl[T]
 
   def optimize_impl[T: c.WeakTypeTag](c: WhiteboxContext)(exp: c.Expr[T]) = {
@@ -17,23 +15,17 @@ object SequentialOptimizeBlock {
     import Flag._
     object CastingTransformer extends Transformer {
 
-    
-
       override def transform(tree: Tree): Tree = {
-
         def unPar(tree: Tree) = {
            println("typechecking " + tree)
           val typeChecked = c.typeCheck(q"""
-import scala.collection.par._
-implicit val dummy = Scheduler.Implicits.dummy
-$tree
-""")
-
+            import scala.collection.par._
+            implicit val dummy$$0 = Scheduler.Implicits.sequential
+            $tree""")
           val result = if(typeOf[scala.collection.par.Par[_]].typeSymbol == typeChecked.tpe.typeSymbol) q"$tree.seq" else tree
           result
-      }
+        }
        
-
         val typesWhiteList = Set(typeOf[List[_]].typeSymbol,
           typeOf[Range].typeSymbol,
           typeOf[scala.collection.immutable.Range.Inclusive].typeSymbol,
@@ -90,7 +82,7 @@ $tree
             // println("method is in whiteList: " + methodListed)
             val rewrite: Tree = if(whiteListed && methodListed) 
               if(append2ArgumentList.contains(method))
-                  unPar(q"$seq.toPar.$method($bla, dummy)")
+                  unPar(q"$seq.toPar.$method($bla, dummy$$0)")
               else unPar(q"$seq.toPar.$method($bla)") // q"$seq.foreach[..$targs]($bla)"
                else tree
 
@@ -105,14 +97,12 @@ $tree
 
     val t = CastingTransformer.transform(exp.tree)
     
-    val resultWithImports = q"""
-import scala.collection.par._
-implicit val dummy = Scheduler.Implicits.dummy
-$t
-"""
+    val resultWithImports = q"""import scala.collection.par._
+      implicit val dummy$$0 = Scheduler.Implicits.sequential
+      $t
+      """
     // println("\n\n\nresult: " + resultWithImports)
 
     (c.resetAllAttrs(resultWithImports))
-
   }
 }

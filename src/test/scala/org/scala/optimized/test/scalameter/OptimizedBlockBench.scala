@@ -2,7 +2,7 @@ package org.scala.optimized.test.par
 package scalameter
 
 
-import scala.collection.par.SequentialOptimizeBlock._
+import scala.collection.optimizer._
 import org.scalameter.api._
 
 

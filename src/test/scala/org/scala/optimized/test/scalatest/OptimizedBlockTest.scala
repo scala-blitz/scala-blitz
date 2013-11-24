@@ -6,7 +6,7 @@ package scalatest
 import org.scalatest._
 import org.scalatest.concurrent.Timeouts
 import org.scalatest.time.SpanSugar._
-import scala.collection.par.SequentialOptimizeBlock._
+import scala.collection.optimizer._
 
 
 

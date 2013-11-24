@@ -93,11 +93,11 @@ object Scheduler {
 
   object Implicits {
     implicit val global = new ExecutionContext()
-    implicit val dummy = Dummy
+    implicit val sequential = Dummy
 
   }
 
-  abstract class WorkstealingTreeScheduler extends Scheduler {
+  abstract class WorkstealingTree extends Scheduler {
 
     def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]): Unit
 
@@ -155,12 +155,12 @@ object Scheduler {
 
   }
 
-  class ExecutionContext(val config: Config.FromExecutionContext) extends WorkstealingTreeScheduler {
+  class ExecutionContext(val config: Config.FromExecutionContext) extends WorkstealingTree {
     def this() = this(new Config.FromExecutionContext(Runtime.getRuntime.availableProcessors, scala.concurrent.ExecutionContext.Implicits.global))
 
     val pool = config.ctx
 
-    class ExecutionContextWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTreeScheduler, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
+    class ExecutionContextWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
       extends Runnable with WorkstealingTreeTask[T, R] {
       def run() = workstealingTreeScheduling()
     }
@@ -176,14 +176,14 @@ object Scheduler {
     }
   }
 
-  class ForkJoin(val config: Config) extends WorkstealingTreeScheduler {
+  class ForkJoin(val config: Config) extends WorkstealingTree {
     import scala.concurrent.forkjoin._
 
     def this() = this(new Config.Default())
 
     val pool = new ForkJoinPool(config.parallelismLevel)
 
-    class ForkJoinWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTreeScheduler, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
+    class ForkJoinWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
       extends RecursiveAction with WorkstealingTreeTask[T, R] {
       def compute() = workstealingTreeScheduling()
     }
@@ -199,12 +199,12 @@ object Scheduler {
     }
   }
 
-  object Dummy extends WorkstealingTreeScheduler {
+  object Dummy extends WorkstealingTree {
     import scala.concurrent.forkjoin._
 
     val config = new Config.Default(1)
 
-    class DummyTask[T, R](val scheduler: Scheduler.WorkstealingTreeScheduler, val root: Ref[T, R], val kernel: Kernel[T, R])
+    class DummyTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R])
       extends WorkstealingTreeTask[T, R] {
       val index = 1
       val total = 1
@@ -218,7 +218,7 @@ object Scheduler {
   /* internals */
 
   trait WorkstealingTreeTask[T, R] extends WorkerTask {
-    val scheduler: WorkstealingTreeScheduler
+    val scheduler: WorkstealingTree
     val root: Ref[T, R]
     val kernel: Kernel[T, R]
 
@@ -403,7 +403,7 @@ object Scheduler {
         true
       } else if (state_t1 eq StolenOrExpanded) {
         // help expansion if necessary
-        if (tree.READ.isLeaf) tree.markExpanded(this, worker)
+        if (tree.READ.isLeaf) tree.markStolenAndExpand(this, worker)
 
         val node_t2 = tree.READ
         storeIntermediateResult(node_t2, intermediate)
@@ -422,13 +422,12 @@ object Scheduler {
      *
      * After completing node worker tryes to push the result up the tree, as far as he could
      */
-
     @tailrec protected final def pushUp(tree: Ref[T, R], worker: WorkerTask): Unit = {
       val node_t0 = tree.READ
       val r_t1 = node_t0.READ_RESULT
       r_t1 match {
         case NO_RESULT =>
-        // we're done, owner did not finish his work yet
+          // we're done, owner did not finish his work yet
         case INTERMEDIATE_READY =>
           val combinedResult = try {
             if (node_t0.isLeaf) node_t0.READ_INTERMEDIATE.asInstanceOf[AnyRef]
@@ -454,11 +453,15 @@ object Scheduler {
               if (tree.up == null) tree.synchronized {
                 tree.notifyAll()
               }
-              else pushUp(tree.up, worker)
-            } else pushUp(tree, worker) // retry
+              else {
+                pushUp(tree.up, worker)
+              }
+            } else {
+              pushUp(tree, worker) // retry
+            }
           } // one of the children is not ready yet
         case _ =>
-        // we're done, somebody else already pushed up
+          // we're done, somebody else already pushed up
       }
     }
 
@@ -487,7 +490,7 @@ object Scheduler {
      * Try to mark the node as stolen, expand the node and return `true` if node was expanded.
      *  Return `false` if node was completed.
      */
-    @tailrec def markExpanded(kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
+    @tailrec def markStolenAndExpand(kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
       import Stealer._
       val child_t0 = READ
       val stealer_t0 = child_t0.stealer
@@ -496,14 +499,14 @@ object Scheduler {
         if (state_t1 eq Completed) false // already completed
         else {
           if (state_t1 ne StolenOrExpanded) { // mark it stolen
-            if (stealer_t0.markStolen()) markExpanded(kernel, worker) // marked stolen - now move on to node creation
-            else markExpanded(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
+            if (stealer_t0.markStolen()) markStolenAndExpand(kernel, worker) // marked stolen - now move on to node creation
+            else markStolenAndExpand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen - expand
             // node effectively immutable (except for `intermediateResult` and `result`) - expand it
             val expanded = child_t0.newExpanded(this, worker)
             kernel.afterExpand(child_t0, expanded)
             if (CAS(child_t0, expanded)) true // try to replace with expansion
-            else markExpanded(kernel, worker) // failure (spurious or due to another expand) - retry
+            else markStolenAndExpand(kernel, worker) // failure (spurious or due to another expand) - retry
           }
         }
       }
@@ -544,7 +547,7 @@ object Scheduler {
     }
 
     final def trySteal(parent: Ref[T, R], kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
-      parent.markExpanded(kernel, worker)
+      parent.markStolenAndExpand(kernel, worker)
     }
 
     final def newExpanded(parent: Ref[T, R], worker: WorkerTask): Node[T, R] = {

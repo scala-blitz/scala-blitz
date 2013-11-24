@@ -114,7 +114,7 @@ object HashBuckets {
 
     def tryInsertEntry(insertAt: Int, comesBefore: Int, elem: T): Int = {
       var h = insertAt
-      if (h == -1) ??? //h = index(elemHashCode(elem))
+      if (h == -1) h = index(elem.hashCode)
       var entry = table(h)
       while (null != entry) {
         if (entry == elem) return 0
