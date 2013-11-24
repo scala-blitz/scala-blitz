@@ -22,11 +22,6 @@ using namespace tbb;
 int* image;
 
 struct Sum {
-  /*    int value;
-    Sum() : value(0) {}
-    Sum( Sum& s, split ) {value = 0;}*/
-
-//   int size;
    int wdt;
    int hgt;
    double xlo;
@@ -40,8 +35,6 @@ struct Sum {
       volatile int value; 
       int idx = r.begin();
       int until = r.end();
-//      int t_id = std::this_thread::get_id();
-//      printf("  working on %d %d size %d\n " , idx, until, until - idx);
       for (; idx != until; idx++) {
         int x = idx % wdt;
         int y = idx / wdt;
@@ -113,10 +106,6 @@ for(int i = 1 ; i< gran; i = std::ceil(i * 1.25)) {
     }
       gettimeofday(&time, NULL);  //END-TIME
        totalTime = (((time.tv_sec * 1000) + (time.tv_usec / 1000)) - totalTime);
-
-/*     for(int j = 0; j < i * 10000000; j++) {
-       printf("1");
-       }*/
 
   printf("%i, %li\n",i, totalTime/MESUREMENTS);
   }

@@ -21,19 +21,13 @@ struct Sum {
   Sum(Sum& s, split) { value = 0; }
 
   void operator()( const blocked_range<int>& r ) {
-  //void operator()(int begin, i0nt end) {
+  //void operator()(int begin, int end) {
     int temp = 0;
      int begin = r.begin();
      int end = r.end();
-		//if (end<init) std::printf("AAAAAAAAAAAAworking on %d %d size %d. pos %lf\n", init , end ,  end-init, init * 1.0/N);
-		//else 
-//     std::printf("working on %d %d size %d. pos %lf\n", begin , end ,  end-begin, begin * 1.0/N);
-
-    //for(int a = r.begin(); a != r.end(); ++a) {
     for (int a = begin; a != end; ++a) {
 	    temp += op(a, N);
       asm("");
-	    // std::cout<<std::endl;
     }
     value = temp;
   }
@@ -49,7 +43,6 @@ int ParallelSum(size_t n) {
       tbb::task_scheduler_init init(8);
     parallel_reduce(blocked_range<int>( 0, n ), total);
     //total(blocked_range<int>(0, n));
-    //total(0, n);
     return total.value;
 }
 
@@ -66,18 +59,6 @@ int op(int e, int size) {
   return acc;
 }
 
-int ourloop(int begin, int end) {
-  int temp = 0;
-  //for (int a = begin; a != end; ++a) {
-  int i = begin;
-  while (i < end) {
-    temp += op(i, end);
-    i += 1;
-    asm("");
-  }
-  //value = temp;
-  return temp;
-}
 
 int main(int,char**) {
   int r;
@@ -88,8 +69,7 @@ int main(int,char**) {
 
   for(int i = 0 ; i < MEASUREMENTS; i++) {
     r += ParallelSum(N);
-    //r += ourloop(0, N);
-    std::printf("%i\n", i);
+    //    std::printf("%i\n", i);
   }
 
   gettimeofday(&time, NULL);  //END-TIME

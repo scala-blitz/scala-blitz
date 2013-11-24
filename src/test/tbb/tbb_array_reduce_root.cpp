@@ -31,13 +31,10 @@ struct Sum {
         int temp = value;
 	int init = r.begin();
 	int end = r.end();
-	//		if(end<init) std::printf("AAAAAAAAAAAAworking on %d %d size %d. pos %lf\n", init , end ,  end-init, init * 1.0/N);
-	//		else std::printf("working on %d %d size %d. pos %lf\n", init , end ,  end-init, init * 1.0/N);
-	
+
         for( int a=r.begin(); a!=r.end(); ++a ) {
 
 	    temp += consumeTime(a);
-	    //	    std::cout<<std::endl;
 
         }
         value = temp;
@@ -69,13 +66,6 @@ int main(int,char**) {
   double elapsed_msecs = double(1000*end - 1000*begin) / CLOCKS_PER_SEC/MESUREMENTS;
 
   std::cout << r << ' ' << elapsed_msecs << std::endl;
-  /*  std::vector<mytask> tasks;
-  for (int i=0;i<100000;++i)
-    tasks.push_back(mytask(i));
-
-  executor exec(tasks);
-  tbb::parallel_for(tbb::blocked_range<size_t>(0,tasks.size()),exec);
-  std::cerr << std::endl;*/
 
   return 0;
 }

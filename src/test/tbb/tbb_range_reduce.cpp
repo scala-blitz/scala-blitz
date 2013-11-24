@@ -9,8 +9,8 @@
 #include <cstdio>
 #include <sys/time.h>
 
-#define N 50000000
-#define MESUREMENTS 30
+#define N 150000000
+#define MESUREMENTS 50
 
 using namespace tbb;
 
@@ -18,30 +18,30 @@ struct Sum {
     int value;
     Sum() : value(0) {}
     Sum( Sum& s, split ) {value = 0;}
-    void operator()( const blocked_range<int*>& r ) {
-        int temp = value;
-        for( int* a=r.begin(); a!=r.end(); ++a ) {
-            temp += *a;
+  void operator()( const blocked_range<int>& r ) {
+  //void operator()(int begin, i0nt end) {
+     int temp = 0;
+     int begin = r.begin();
+     int end = r.end();
+        for( int a=begin; a!= end; ++a ) {
+            temp += a;
         }
         value = temp;
     }
     void join( Sum& rhs ) {value += rhs.value;}
 };
 
-int ParallelSum( int array[], size_t n ) {
+int ParallelSum(size_t n ) {
     Sum total;
-    parallel_reduce( blocked_range<int*>( array, array+n ), 
+    parallel_reduce( blocked_range<int>( 0, n), 
                      total );
     return total.value;
 }
 
 int main(int,char**) {
 
-  tbb::task_scheduler_init init(8);
+  tbb::task_scheduler_init init(1);
   int sz = N;
-  int*  data; 
- 
-  data = (int *)std::malloc(N*sizeof(int));
   
  struct timeval time;
   gettimeofday(&time, NULL);  
@@ -49,12 +49,12 @@ int main(int,char**) {
 
   int r;
   for(int i = 0 ; i< MESUREMENTS; i++) {
-  r += ParallelSum(&data[0], sz);
+    r += ParallelSum(sz);
+    //printf("%i\n", i);
   }
  gettimeofday(&time, NULL);  //END-TIME
  totalTime = (((time.tv_sec * 1000) + (time.tv_usec / 1000.0)) - totalTime);
 
  printf("%i, %lf, %lf\n", 0, totalTime/MESUREMENTS, totalTime);
-
   return 0;
 }
