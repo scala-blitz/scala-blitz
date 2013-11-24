@@ -17,33 +17,33 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     hs
   }
 
-  test("HashTrieStealer(1).advance(1)") {
+  test("HashTrieStealer(1).nextBatch(1)") {
     val hs = createHashSet(1)
     val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 0)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
-  test("HashTrieStealer(2).advance(1)") {
+  test("HashTrieStealer(2).nextBatch(1)") {
     val hs = createHashSet(2)
     val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(hs contains stealer.next())
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(hs contains stealer.next())
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
-  test("HashTrieStealer(5).advance(1)") {
+  test("HashTrieStealer(5).nextBatch(1)") {
     import immutable.HashSet._
     val hs = {
       val h2a = new HashTrieSet(3, Array[immutable.HashSet[Int]](new HashSet1(0, 0), new HashSet1(1, 0)), 2)
@@ -54,42 +54,42 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     }
     val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 0)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 1)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 2)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 3)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == 1)
+    assert(stealer.nextBatch(1) == 1)
     assert(stealer.hasNext)
     assert(stealer.next() == 4)
     assert(!stealer.hasNext)
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
-  def testAdvance(sz: Int, step: Int => Int) {
+  def testNextBatch(sz: Int, step: Int => Int) {
     val hs = createHashSet(sz)
-    testAdvanceGeneric(hs, step)
+    testNextBatchGeneric(hs, step)
   }
 
-  def testAdvanceGeneric[T](hs: immutable.HashSet[T], step: Int => Int) {
+  def testNextBatchGeneric[T](hs: immutable.HashSet[T], step: Int => Int) {
     val seen = mutable.Set[T]()
     val iterator = hs.iterator
     val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     var iter = 0
     var i = 0
-    while (stealer.advance(step(iter)) != -1) {
+    while (stealer.nextBatch(step(iter)) != -1) {
       while (stealer.hasNext) {
         val expected = iterator.next()
         val observed = stealer.next()
@@ -102,56 +102,56 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     assert(seen == hs, seen.size + ", " + hs.size)
   }
 
-  test("HashTrieStealer(64).advance(1)") {
-    testAdvance(64, x => 1)
+  test("HashTrieStealer(64).nextBatch(1)") {
+    testNextBatch(64, x => 1)
   }
 
-  test("HashTrieStealer(64).advance(2)") {
-    testAdvance(64, x => 2)
+  test("HashTrieStealer(64).nextBatch(2)") {
+    testNextBatch(64, x => 2)
   }
 
-  test("HashTrieStealer(64).advance(4)") {
-    testAdvance(64, x => 4)
+  test("HashTrieStealer(64).nextBatch(4)") {
+    testNextBatch(64, x => 4)
   }
 
-  test("HashTrieStealer(64).advance(8)") {
-    testAdvance(64, x => 8)
+  test("HashTrieStealer(64).nextBatch(8)") {
+    testNextBatch(64, x => 8)
   }
 
-  test("HashTrieStealer(128).advance(29)") {
-    testAdvance(128, x => 29)
+  test("HashTrieStealer(128).nextBatch(29)") {
+    testNextBatch(128, x => 29)
   }
 
-  test("HashTrieStealer(256).advance(11)") {
-    testAdvance(256, x => 37)
+  test("HashTrieStealer(256).nextBatch(11)") {
+    testNextBatch(256, x => 37)
   }
 
-  test("HashTrieStealer(256).advance(16)") {
-    testAdvance(256, x => 16)
+  test("HashTrieStealer(256).nextBatch(16)") {
+    testNextBatch(256, x => 16)
   }
 
-  test("HashTrieStealer(256).advance(63)") {
-    testAdvance(256, x => 16)
+  test("HashTrieStealer(256).nextBatch(63)") {
+    testNextBatch(256, x => 16)
   }
 
-  test("HashTrieStealer(1024).advance(64)") {
-    testAdvance(1024, x => 64)
+  test("HashTrieStealer(1024).nextBatch(64)") {
+    testNextBatch(1024, x => 64)
   }
 
-  test("HashTrieStealer(4096).advance(512)") {
-    testAdvance(4096, x => 512)
+  test("HashTrieStealer(4096).nextBatch(512)") {
+    testNextBatch(4096, x => 512)
   }
 
-  test("HashTrieStealer(1024).advance(8 << _)") {
-    testAdvance(2048, 8 << _)
+  test("HashTrieStealer(1024).nextBatch(8 << _)") {
+    testNextBatch(2048, 8 << _)
   }
 
-  test("HashTrieStealer(256).advance(1 << _)") {
-    testAdvance(256, 1 << _)
+  test("HashTrieStealer(256).nextBatch(1 << _)") {
+    testNextBatch(256, 1 << _)
   }
 
-  test("HashTrieStealer(1024).advance(1 << _)") {
-    testAdvance(1024, 1 << _)
+  test("HashTrieStealer(1024).nextBatch(1 << _)") {
+    testNextBatch(1024, 1 << _)
   }
 
   def testRecursiveStealing(sz: Int, step: Int) {
@@ -164,7 +164,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       def advanceSteal(s: Stealer[Int], level: Int): Unit = {
         var left = i
         var added = false
-        while (left > 0 && s.advance(step) != -1) {
+        while (left > 0 && s.nextBatch(step) != -1) {
           while (s.hasNext) {
             seen += s.next()
             added = true
@@ -198,7 +198,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       val seen = mutable.Set[Int]()
       def consume(s: Stealer[Int]) {
         var it = 0
-        while (s.advance(step(it)) != -1) {
+        while (s.nextBatch(step(it)) != -1) {
           while (s.hasNext) seen += s.next()
           it += 1
         }
@@ -282,7 +282,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     }
   }
 
-  test("HashTrieStealer(...).advance(1 << ...)") {
+  test("HashTrieStealer(...).nextBatch(1 << ...)") {
     val sizes = Seq(
       1, 2, 5, 10, 20, 50, 100, 155, 200, 500, 1000,
       2000, 5000, 10000, 20000, 50000, 100000,
@@ -292,17 +292,17 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       sz <- sizes
       step <- Seq(2, 4, 8, 16)
     } {
-      testAdvance(sz, it => 1 << (step * it))
+      testNextBatch(sz, it => 1 << (step * it))
     }
   }
 
-  test("HashTrieStealer(collisions).advance(5)") {
+  test("HashTrieStealer(collisions).nextBatch(5)") {
     class Dummy(val x: Int) {
       override def hashCode = x % 10
     }
 
     val hs = for (i <- 0 until 100) yield new Dummy(i)
-    testAdvanceGeneric(hs.to[immutable.HashSet], x => 5)
+    testNextBatchGeneric(hs.to[immutable.HashSet], x => 5)
   }
 
   test("HashTrieStealer(1).markStolen()") {
@@ -310,19 +310,19 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val stealer = new workstealing.Trees.HashSetStealer(hs)
     stealer.rootInit()
     stealer.markStolen()
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
-  def testAdvanceStealSplit(sz: Int, initialStep: Int, step: Int => Int) {
+  def testNextBatchStealSplit(sz: Int, initialStep: Int, step: Int => Int) {
     def addOnce(s: Stealer[Int], set: mutable.Set[Int]) {
-      if (s.advance(initialStep) != -1) {
+      if (s.nextBatch(initialStep) != -1) {
         while (s.hasNext) set += s.next()
       }
     }
 
     def addAll(s: Stealer[Int], set: mutable.Set[Int]) {
       var it = 0
-      while (s.advance(step(it)) != -1) {
+      while (s.nextBatch(step(it)) != -1) {
         while (s.hasNext) set += s.next()
         it += 1
       }
@@ -346,7 +346,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     }
   }
 
-  test("HashTrieStealer(...).advance(...).markStolen().split") {
+  test("HashTrieStealer(...).nextBatch(...).markStolen().split") {
     val sizes = Seq(
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
       2000, 5000, 10000, 20000, 50000, 100000
@@ -356,7 +356,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       initialStep <- Seq(1, 2, 4, 8, 16, 32, 64, 128, 1024)
       step <- Seq(2, 4, 8, 16)
     } {
-      testAdvanceStealSplit(sz, initialStep, it => 1 << (step * it))
+      testNextBatchStealSplit(sz, initialStep, it => 1 << (step * it))
     }
   }
 
