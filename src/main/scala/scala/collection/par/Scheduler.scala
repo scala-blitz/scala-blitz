@@ -70,10 +70,8 @@ object Scheduler {
 
       val isConditionalCardMarkingUsed = runtimeParameters.contains("-XX:+UseCondCardMark")
 
-      def maximumStep = {
-        /* see https://blogs.oracle.com/dave/entry/false_sharing_induced_by_card for details */
-        if (scala.util.Properties.isJavaAtLeast("1.7") && isConditionalCardMarkingUsed) 4096 else 1000000
-      }
+      /* see https://blogs.oracle.com/dave/entry/false_sharing_induced_by_card for details */
+      val maximumStep = if (scala.util.Properties.isJavaAtLeast("1.7") && isConditionalCardMarkingUsed) 4096 else 1000000
 
       def stealingStrategy = FindMax
     }
@@ -136,6 +134,7 @@ object Scheduler {
       val root = new Ref[T, R](null, 0)(node)
       val work = root.child
       kernel.afterCreateRoot(root)
+
       work.tryOwn(invoker)
 
       // let other workers know there's something to do
@@ -204,16 +203,7 @@ object Scheduler {
 
     val config = new Config.Default(1)
 
-    class DummyTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R])
-      extends WorkstealingTreeTask[T, R] {
-      val index = 1
-      val total = 1
-    }
-
     def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
-      val task = new DummyTask(this, root, kernel)
-      root.child.owner = task
-      task.workstealingTreeScheduling()
     }
   }
 
