@@ -120,7 +120,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
         var i = x.head
         val until = x.end
         while(i < until) {
-          sum = sum + (1 to 35).aggregate(0)(_+_, _+_)
+          sum = sum + (1 to 20).aggregate(0)(_+_, _+_)
           i = i + 1
         }
       }
@@ -130,7 +130,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
           var i = x.head
           val until = x.end
           while(i < until) {
-            sum = sum + (1 to 35).aggregate(0)(_+_, _+_)
+            sum = sum + (1 to 20).aggregate(0)(_+_, _+_)
             i = i + 1
           }
         }

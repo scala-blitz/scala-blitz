@@ -204,6 +204,7 @@ object Scheduler {
     val config = new Config.Default(1)
 
     def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
+      root.child.step = 32 // tweaking equilibrium
     }
   }
 
