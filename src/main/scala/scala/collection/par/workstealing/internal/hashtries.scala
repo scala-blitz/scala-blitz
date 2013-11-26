@@ -6,7 +6,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing._
-import scala.collection.par.workstealing.Scheduler.Node
+import scala.collection.par.Scheduler
+import scala.collection.par.Scheduler.Node
 import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Merger
@@ -261,8 +262,8 @@ object HashTrieSetMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new HashTries.HashSetKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -303,8 +304,8 @@ object HashTrieSetMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -333,8 +334,8 @@ object HashTrieSetMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -363,8 +364,8 @@ object HashTrieSetMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -530,8 +531,8 @@ object HashTrieMapMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new HashTries.HashMapKernel[K, V, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -572,8 +573,8 @@ object HashTrieMapMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -683,8 +684,8 @@ object HashTrieMapMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -713,8 +714,8 @@ object HashTrieMapMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.HashTries
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer

@@ -8,6 +8,7 @@ import scala.collection._
 import scala.annotation.tailrec
 
 
+
 class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpers {
   import par._
 
@@ -57,17 +58,17 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val tree = immutable.TreeSet(1, 2, 4, 8, 12)
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 1)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 2)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 4)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 8)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(isBinary.value(stealer.topLocal) == 12)
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
   test("advance empty") {
@@ -76,7 +77,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
     assert(stealer.state == Stealer.AvailableOrOwned)
-    assert(stealer.advance(1) == -1)
+    assert(stealer.nextBatch(1) == -1)
   }
 
   test("longer advance") {
@@ -87,7 +88,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
 
     var i = 0
     while (stealer.state == Stealer.AvailableOrOwned) {
-      val chunk = stealer.advance(1)
+      val chunk = stealer.nextBatch(1)
       if (chunk > 0) {
         assert(isBinary.value(stealer.topLocal) == i)
         i += 1
@@ -99,7 +100,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   def extract(stealer: Stealer[Int], top: Stealer[Int] => Int): Seq[Int] = {
     val b = mutable.Buffer[Int]()
     while (stealer.state == Stealer.AvailableOrOwned) {
-      if (stealer.advance(1) > 0) {
+      if (stealer.nextBatch(1) > 0) {
         b += top(stealer)
       }
     }
@@ -122,7 +123,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       case s: Stealer.Single[Int] => s.elem
     }
 
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     assert(stealer.markStolen() == true)
 
     val nextelem = nextSingleElem(stealer)
@@ -147,9 +148,9 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
 
     val orig = mutable.Buffer[Int]()
 
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
     assert(stealer.markStolen() == true)
 
@@ -173,11 +174,11 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
 
     val orig = mutable.Buffer[Int]()
 
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
     assert(stealer.markStolen() == true)
 
@@ -199,7 +200,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       case s: Stealer.Single[Int] => s.elem
     }
 
-    assert(stealer.advance(512) > 0)
+    assert(stealer.nextBatch(512) > 0)
     val orig = mutable.Buffer[Int]()
     while (stealer.hasNext) {
       orig += stealer.next()
@@ -225,15 +226,15 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     }
 
     val orig = mutable.Buffer[Int]()
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(512) > 0)
+    assert(stealer.nextBatch(512) > 0)
     while (stealer.hasNext) {
       orig += stealer.next()
     }
@@ -260,17 +261,17 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     }
 
     val orig = mutable.Buffer[Int]()
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     orig += nextSingleElem(stealer)
-    assert(stealer.advance(1) > 0)
+    assert(stealer.nextBatch(1) > 0)
     while (stealer.hasNext) {
       orig += stealer.next()
     }
@@ -308,21 +309,21 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
     val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
-    println(stealer.advance(64))
-    println(stealer.advance(128))
-    println(stealer.advance(256))
-    println(stealer.advance(512))
-    println(stealer.advance(1024))
-    println(stealer.advance(2048))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
-    println(stealer.advance(4096))
+    println(stealer.nextBatch(64))
+    println(stealer.nextBatch(128))
+    println(stealer.nextBatch(256))
+    println(stealer.nextBatch(512))
+    println(stealer.nextBatch(1024))
+    println(stealer.nextBatch(2048))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
   }
 
   test("huge random splitting") {
@@ -343,7 +344,7 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
         val (head, level, messages) = stack.head
         val tail = stack.tail
         val iWantToTake = random.nextInt(1024)
-        val iTookEstimate = head.advance(iWantToTake)
+        val iTookEstimate = head.nextBatch(iWantToTake)
         var collectedCount = 0
         if (iTookEstimate >= 0) {
           //println(elementsCollected)
@@ -373,14 +374,14 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
             // val afterSplit = head.toString
             // val aText = splitA.toString
             // val bText = splitB.toString
-            // val elLeftA = splitAD.advance(1)
-            // val elRightA = archive.advance(1)
+            // val elLeftA = splitAD.nextBatch(1)
+            // val elRightA = archive.nextBatch(1)
             // if ((elLeftA > 0) && (elRightA > 0)) {
             //   val elGot = splitAD.next()
             //   val elExp = archive.next()
             //   if (elGot != elExp) {
             //     def toBs[T](s: Stealer[T]) = s.asInstanceOf[workstealing.BinaryTreeStealer[_, RBNode]]
-            //     head.advance(1)
+            //     head.nextBatch(1)
             //     println("lst:     " + lst)
             //     println("left:    " + elGot)
             //     println("archive: " + elExp)
@@ -414,4 +415,8 @@ class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   }
 
 }
+
+
+
+
 

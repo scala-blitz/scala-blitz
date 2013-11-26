@@ -85,7 +85,7 @@ extends Stealer[T] {
     else Stealer.StolenOrExpanded
   }
 
-  final def advance(step: Int): Int = {
+  final def nextBatch(step: Int): Int = {
     val s = READ_STACK
     val statebits = s & 0x3L
     if (statebits != AVAILABLE && statebits != UNINITIALIZED) -1

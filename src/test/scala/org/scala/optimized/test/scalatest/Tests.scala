@@ -13,8 +13,8 @@ import scala.collection.par._
 
 trait Tests[Repr] extends Timeouts with scala.collection.par.scalatest.Helpers {
 
-  implicit val scheduler = new workstealing.Scheduler.ForkJoin(
-    //new workstealing.Scheduler.Config.Default(1)
+  implicit val scheduler = new Scheduler.ForkJoin(
+    //new Scheduler.Config.Default(1)
   )
 
   def testForSizes(method: Range => Unit): Unit

@@ -6,9 +6,10 @@ package workstealing
 import scala.annotation.tailrec
 
 
-/** Base class for all stealers operating on index-based collections.
- *  Can be imprecise in the sense that it can return different amount of elements for different indices.
- */
+/**
+  * Base class for all stealers operating on index-based collections.
+  * can be not-precise in sence that can return different amount of elements for different indeces.
+  */
 abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 
@@ -29,7 +30,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
     else Stealer.AvailableOrOwned
   }
 
-  @tailrec final def advance(step: Int): Int = {
+  @tailrec final def nextBatch(step: Int): Int = {
     val p_t0 = READ_PROGRESS
     if (p_t0 == untilIndex || p_t0 < 0) -1
     else {
@@ -38,7 +39,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
         nextProgress = p_t0
         nextUntil = np
         np - p_t0
-      } else advance(step)
+      } else nextBatch(step)
     }
   }
 
@@ -115,7 +116,7 @@ object IndexedStealer {
   }
 
   trait IndexedKernel[@specialized T, @specialized R] extends Kernel[T, R] {
-    override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {
+    override def workOn(tree: Ref[T, R], config: Config, worker: WorkerTask): Boolean = {
       import Stealer._
 
       // atomically read the current node and initialize

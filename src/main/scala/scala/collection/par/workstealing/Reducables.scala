@@ -49,8 +49,8 @@ object Reducables {
     def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: Scheduler): That = macro internal.ReducablesMacros.map[T, S, That, Repr]
     def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: Scheduler) = macro internal.ReducablesMacros.flatMap[T, S, That, Repr]
     def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: Scheduler) = macro internal.ReducablesMacros.filter[T, That, Repr]
-    def groupMapAggregate[K, M](gr:T => K)(mp:T => M)(aggr:(M,M) => M)(implicit kClassTag:ClassTag[K], mClassTag:ClassTag[M],  ctx: Scheduler) = macro internal.ReducablesMacros.groupMapAggregate[T, K, M, Repr]
-    def groupBy[K, That <: AnyRef](gr:T => K)(implicit kClassTag:ClassTag[K], tClassTag:ClassTag[T],  ctx: Scheduler, cmf: CanMergeFrom[Repr, T, That]) = macro internal.ReducablesMacros.groupBy[T, K, Repr,That]
+    def groupMapAggregate[K, M](gr: T => K)(mp: T => M)(aggr: (M, M) => M)(implicit kClassTag: ClassTag[K], mClassTag: ClassTag[M], ctx: Scheduler) = macro internal.ReducablesMacros.groupMapAggregate[T, K, M, Repr]
+    def groupBy[K, That <: AnyRef](gr: T => K)(implicit kClassTag: ClassTag[K], tClassTag: ClassTag[T], ctx: Scheduler, cmf: CanMergeFrom[Repr, T, That]) = macro internal.ReducablesMacros.groupBy[T, K, Repr, That]
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]] {
@@ -61,7 +61,7 @@ object Reducables {
   import Scheduler._
 
   trait ReducableKernel[@specialized T, @specialized R] extends Kernel[T, R] {
-    override def workOn(tree: Ref[T, R], config: Config, worker: Worker): Boolean = {
+    override def workOn(tree: Ref[T, R], config: Config, worker: WorkerTask): Boolean = {
       // atomically read the current node and initialize
       val node = tree.READ
       val stealer = node.stealer
@@ -74,7 +74,7 @@ object Reducables {
       while (looping && notTerminated) {
         val currstep = node.READ_STEP
 
-        val elementsToGet = stealer.advance(currstep)
+        val elementsToGet = stealer.nextBatch(currstep)
 
         if (elementsToGet > 0) {
           intermediate = combine(intermediate, apply(node, elementsToGet))
@@ -90,7 +90,7 @@ object Reducables {
   }
 
   abstract class CopyMapReducableKernel[T, @specialized(Specializable.AllNumeric) S] extends ReducableKernel[T, Unit] {
-    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+    import scala.collection.par.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]

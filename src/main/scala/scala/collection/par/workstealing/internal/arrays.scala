@@ -6,7 +6,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing._
-import scala.collection.par.workstealing.Scheduler.Node
+import scala.collection.par.Scheduler
+import scala.collection.par.Scheduler.Node
 import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Merger
@@ -312,13 +313,13 @@ object ArraysMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
       val sTag = getTagForS.splice
       val len = until.splice - from.splice
       val sarray = sTag.newArray(len)
       new Arrays.CopyMapArrayKernel[T, S] {
-        import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+        import scala.collection.par.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
         def resultArray = sarray
         def apply(node: Node[T, Unit], from: Int, until: Int) = {
@@ -345,8 +346,8 @@ object ArraysMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new Arrays.ArrayKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -386,8 +387,8 @@ object ArraysMacros {
       import par._
       import workstealing._
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       cv.splice
       val stealer = callee.splice.stealer
       val kernel = tkernel.splice
@@ -417,8 +418,8 @@ object ArraysMacros {
       import par._
       import workstealing._
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -454,8 +455,8 @@ object ArraysMacros {
       import par._
       import workstealing._
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice
@@ -486,8 +487,8 @@ object ArraysMacros {
       import par._
       import workstealing._
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{Ref, Node}
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{Ref, Node}
       import scala.reflect.ClassTag
       lv.splice
       cv.splice

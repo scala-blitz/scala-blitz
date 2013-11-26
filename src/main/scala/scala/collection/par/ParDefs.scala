@@ -17,7 +17,6 @@ trait ParDefs {
 
 }
 
-
 object ParDefs {
 
   class ops[Repr](val seq: Repr) extends AnyVal {

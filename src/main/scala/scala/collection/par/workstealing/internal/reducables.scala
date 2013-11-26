@@ -8,13 +8,14 @@ import scala.reflect.ClassTag
 import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Reducable
+import scala.collection.par.Scheduler
 import scala.collection.par.workstealing._
 import scala.collection.par.Configuration
 import scala.collection.par.Merger
 import scala.collection.par.PreciseStealer
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing.internal.Optimizer._
-import scala.collection.par.workstealing.Scheduler.Node
+import scala.collection.par.Scheduler.Node
 
 
 
@@ -306,14 +307,14 @@ object ReducablesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
       val sTag = getTagForS.splice
       val rootStealer = callee.splice.stealer.asInstanceOf[PreciseStealer[T]]
       val len = rootStealer.totalElements
       val sarray = sTag.newArray(len)
       val kernel = new Reducables.CopyMapReducableKernel[T, S] {
-        import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+        import scala.collection.par.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
         def resultArray = sarray
         def apply(node: Node[T, Unit], elementsToGet: Int) = {
@@ -340,8 +341,8 @@ object ReducablesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new Reducables.ReducableKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -380,8 +381,8 @@ object ReducablesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.collection.par.workstealing.HashTables._
       grv.splice
       mpv.splice
@@ -431,8 +432,8 @@ object ReducablesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.collection.par.workstealing.HashTables._
       grv.splice
       cv.splice
@@ -488,8 +489,8 @@ object ReducablesMacros {
       import scala.collection.par._
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.workstealing.Reducables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -529,8 +530,8 @@ object ReducablesMacros {
 
       import scala.collection.par._
       import scala.collection.par.workstealing.Reducables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -561,8 +562,8 @@ object ReducablesMacros {
 
       import scala.collection.par._
       import scala.collection.par.workstealing.{ Arrays, Reducables }
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice

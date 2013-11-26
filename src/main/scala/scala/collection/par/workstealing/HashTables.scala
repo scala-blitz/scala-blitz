@@ -14,7 +14,7 @@ import scala.collection.mutable.FlatHashTable
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashEntry
 import scala.collection.mutable.DefaultEntry
-import scala.collection.parallel.Splitter
+
 
 
 
@@ -32,7 +32,6 @@ object HashTables {
       def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)] {
         def iterator: Iterator[(K, V)] = pa.seq.iterator
 
-        def splitter: Splitter[(K, V)] = ???
 
         def stealer: Stealer[(K, V)] = pa.stealer
       }
@@ -50,7 +49,6 @@ object HashTables {
       def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
         def iterator: Iterator[T] = pa.seq.iterator
 
-        def splitter: Splitter[T] = ???
 
         def stealer: Stealer[T] = pa.stealer
       }
@@ -235,7 +233,8 @@ object HashTables {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
   }
 
-    def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <:AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
+  def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <: AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler, cmf: CanMergeFrom[Repr, V, That]) = {
+    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
   }
 
     def newHashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <:AnyRef, Repr](implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {

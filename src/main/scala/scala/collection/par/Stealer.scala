@@ -21,13 +21,13 @@ trait Stealer[@specialized +T] {
 
   /** Commits to processing a block of elements by using `next` and `hasNext`.
    *
-   *  Once `hasNext` has returned `false`, `advance` can be called again.
+   *  Once `hasNext` has returned `false`, `nextBatch` can be called again.
    *
    *  @param step   approximate number of elements to commit to processing
    *  @return       `-1` if the stealer is not in the `AvailableOrOwned` state, otherwise
    *                an approximation on the number of elements that calls to `next` will return.
    */
-  def advance(step: Int): Int
+  def nextBatch(step: Int): Int
 
   /** Attempts to push the stealer to the `Completed` state.
    *  Only changes the state if the stealer was in the `AvailableOrOwned` state, otherwise does nothing.
@@ -93,7 +93,7 @@ object Stealer {
   }
 
   class Empty[@specialized T] extends Stealer[T] {
-    def advance(step: Int): Int = -1
+    def nextBatch(step: Int): Int = -1
     def elementsRemainingEstimate: Int = 0
     def hasNext: Boolean = false
     def next(): T = throw new IllegalStateException
@@ -108,7 +108,7 @@ object Stealer {
   class Single[@specialized T](val elem: T) extends Stealer[T] {
     @volatile var advanced = false
     var traversed = true
-    def advance(step: Int): Int = if (advanced) -1 else {
+    def nextBatch(step: Int): Int = if (advanced) -1 else {
       advanced = true
       traversed = false
       1

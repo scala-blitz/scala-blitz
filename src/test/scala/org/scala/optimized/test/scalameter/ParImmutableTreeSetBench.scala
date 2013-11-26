@@ -5,12 +5,12 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import Scheduler.Config
 
 
 
 class ParImmutableTreeSetBench extends PerformanceTest.Regression with Serializable with ParImmutableTreeSetSnippets with Generators {
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
+
 
   /* config */
 

@@ -3,8 +3,7 @@ package org.scala.optimized.test.par
 
 import scala.reflect.ClassTag
 import scala.collection.par._
-import workstealing.Scheduler
-import workstealing.Scheduler.Config
+import Scheduler.Config
 import collection.immutable.HashSet
 
 
