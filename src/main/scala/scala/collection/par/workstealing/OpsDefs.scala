@@ -8,7 +8,8 @@ extends Zippables.Scope
 with Arrays.Scope
 with Ranges.Scope
 with Concs.Scope
-with Hashes.Scope 
-with Trees.Scope
+with HashTables.Scope 
+with HashTries.Scope
+with BinaryTrees.Scope
 with Reducables.Scope {
 }

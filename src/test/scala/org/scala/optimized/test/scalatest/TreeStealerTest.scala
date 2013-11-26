@@ -5,358 +5,412 @@ package scalatest
 
 import org.scalatest._
 import scala.collection._
+import scala.annotation.tailrec
 
 
 
 class TreeStealerTest extends FunSuite with scala.collection.par.scalatest.Helpers {
   import par._
 
-  def createHashSet(sz: Int) = {
-    var hs = new immutable.HashSet[Int]
-    for (i <- 0 until sz) hs = hs + i
-    hs
+  type RBNode >: Null <: AnyRef
+
+  test("simple iterator traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(1, 2, 4, 8, 12)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
   }
 
-  test("HashTrieStealer(1).nextBatch(1)") {
-    val hs = createHashSet(1)
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 0)
-    assert(!stealer.hasNext)
+  test("longer traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 100: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
+  test("huge traversal") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until Int.MaxValue / 2048: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    val iterator = stealer.subtreeIterator
+    iterator.set(root)
+    val data = iterator.toList
+
+    assert(tree.toSeq == data)
+  }
+
+  test("simple advance") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(1, 2, 4, 8, 12)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    assert(stealer.nextBatch(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 1)
+    assert(stealer.nextBatch(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 2)
+    assert(stealer.nextBatch(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 4)
+    assert(stealer.nextBatch(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 8)
+    assert(stealer.nextBatch(1) > 0)
+    assert(isBinary.value(stealer.topLocal) == 12)
     assert(stealer.nextBatch(1) == -1)
   }
 
-  test("HashTrieStealer(2).nextBatch(1)") {
-    val hs = createHashSet(2)
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(hs contains stealer.next())
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(hs contains stealer.next())
-    assert(!stealer.hasNext)
+  test("advance empty") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet[Int]()
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+    assert(stealer.state == Stealer.AvailableOrOwned)
     assert(stealer.nextBatch(1) == -1)
   }
 
-  test("HashTrieStealer(5).nextBatch(1)") {
-    import immutable.HashSet._
-    val hs = {
-      val h2a = new HashTrieSet(3, Array[immutable.HashSet[Int]](new HashSet1(0, 0), new HashSet1(1, 0)), 2)
-      val h2b = new HashSet1(2, 0)
-      val h2c = new HashTrieSet(3, Array[immutable.HashSet[Int]](new HashSet1(3, 0), new HashSet1(4, 0)), 2)
-      val h1 = new HashTrieSet(7, Array[immutable.HashSet[Int]](h2a, h2b, h2c), 5)
-      h1
-    }
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 0)
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 1)
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 2)
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 3)
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == 1)
-    assert(stealer.hasNext)
-    assert(stealer.next() == 4)
-    assert(!stealer.hasNext)
-    assert(stealer.nextBatch(1) == -1)
-  }
+  test("longer advance") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 100: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
 
-  def testNextBatch(sz: Int, step: Int => Int) {
-    val hs = createHashSet(sz)
-    testNextBatchGeneric(hs, step)
-  }
-
-  def testNextBatchGeneric[T](hs: immutable.HashSet[T], step: Int => Int) {
-    val seen = mutable.Set[T]()
-    val iterator = hs.iterator
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    var iter = 0
     var i = 0
-    while (stealer.nextBatch(step(iter)) != -1) {
-      while (stealer.hasNext) {
-        val expected = iterator.next()
-        val observed = stealer.next()
-        seen += observed
-        assert(expected == observed, "at " + i + ": " + expected + ", vs. observed: " + observed)
+    while (stealer.state == Stealer.AvailableOrOwned) {
+      val chunk = stealer.nextBatch(1)
+      if (chunk > 0) {
+        assert(isBinary.value(stealer.topLocal) == i)
         i += 1
       }
-      iter += 1
     }
-    assert(seen == hs, seen.size + ", " + hs.size)
+    assert(i == 100, i)
   }
 
-  test("HashTrieStealer(64).nextBatch(1)") {
-    testNextBatch(64, x => 1)
+  def extract(stealer: Stealer[Int], top: Stealer[Int] => Int): Seq[Int] = {
+    val b = mutable.Buffer[Int]()
+    while (stealer.state == Stealer.AvailableOrOwned) {
+      if (stealer.nextBatch(1) > 0) {
+        b += top(stealer)
+      }
+    }
+    b
   }
 
-  test("HashTrieStealer(64).nextBatch(2)") {
-    testNextBatch(64, x => 2)
+  def printRoot(t: Stealer[Int]) = t match {
+    case bts: workstealing.BinaryTreeStealer[_, _] => println(bts.root)
+    case _ =>
   }
 
-  test("HashTrieStealer(64).nextBatch(4)") {
-    testNextBatch(64, x => 4)
+  test("split R*LL") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(32, 4, 8, 12, 24, 76, 2)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    assert(stealer.nextBatch(1) > 0)
+    assert(stealer.markStolen() == true)
+
+    val nextelem = nextSingleElem(stealer)
+    assert(nextelem == 2)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = Seq(nextelem) ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(64).nextBatch(8)") {
-    testNextBatch(64, x => 8)
+  test("split R*LT") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(32, 4, 8, 12, 24, 76, 2)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.markStolen() == true)
+
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(128).nextBatch(29)") {
-    testNextBatch(128, x => 29)
+  test("split R*LR") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 8, 1, 10, 12, 24, 76, 2)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.markStolen() == true)
+
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(256).nextBatch(11)") {
-    testNextBatch(256, x => 37)
+  test("split R*LS") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 16, 1, 24, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    assert(stealer.nextBatch(512) > 0)
+    val orig = mutable.Buffer[Int]()
+    while (stealer.hasNext) {
+      orig += stealer.next()
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(256).nextBatch(16)") {
-    testNextBatch(256, x => 16)
+  test("split R*S") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 16, 1, 24, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(512) > 0)
+    while (stealer.hasNext) {
+      orig += stealer.next()
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
+    assert(lelems.isEmpty)
+    assert(relems.isEmpty)
   }
 
-  test("HashTrieStealer(256).nextBatch(63)") {
-    testNextBatch(256, x => 16)
+  test("split R*T") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 16, 1, 24, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    val orig = mutable.Buffer[Int]()
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    orig += nextSingleElem(stealer)
+    assert(stealer.nextBatch(1) > 0)
+    while (stealer.hasNext) {
+      orig += stealer.next()
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = orig ++ lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(1024).nextBatch(64)") {
-    testNextBatch(1024, x => 64)
+  test("split uninitialized stolen") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(4, 8, 1, 2, 6, 10)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    def nextSingleElem(s: Stealer[Int]): Int = s match {
+      case bts: workstealing.BinaryTreeStealer[_, _] => isBinary.value(bts.asInstanceOf[stealer.type].topLocal)
+      case s: Stealer.Single[Int] => s.elem
+    }
+
+    assert(stealer.markStolen() == true)
+    val (l, r) = stealer.split
+    val lelems = extract(l, nextSingleElem)
+    val relems = extract(r, nextSingleElem)
+    val observed = lelems ++ relems
+    assert(observed == tree.toList, observed)
   }
 
-  test("HashTrieStealer(4096).nextBatch(512)") {
-    testNextBatch(4096, x => 512)
+  test("bounds") {
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 16000: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+
+    println(stealer.nextBatch(64))
+    println(stealer.nextBatch(128))
+    println(stealer.nextBatch(256))
+    println(stealer.nextBatch(512))
+    println(stealer.nextBatch(1024))
+    println(stealer.nextBatch(2048))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
+    println(stealer.nextBatch(4096))
   }
 
-  test("HashTrieStealer(1024).nextBatch(8 << _)") {
-    testNextBatch(2048, 8 << _)
-  }
+  test("huge random splitting") {
+    import scala.collection.mutable.ListBuffer
 
-  test("HashTrieStealer(256).nextBatch(1 << _)") {
-    testNextBatch(256, 1 << _)
-  }
+    val isBinary = collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[Int]
+    val tree = immutable.TreeSet(0 until 32000: _*)
+    val root = immutable.RedBlackTreeStealer.redBlackRoot(tree)
+    println("-----> depth: " + isBinary.depth(root))
+    println("-----> depth: " + isBinary.depthBound(tree.size, 0))
+    val random = new scala.util.Random(44)
+    //println("build done")
 
-  test("HashTrieStealer(1024).nextBatch(1 << _)") {
-    testNextBatch(1024, 1 << _)
-  }
-
-  def testRecursiveStealing(sz: Int, step: Int) {
-    for (i <- 1 until sz) {
-      val hs = createHashSet(sz)
-      val stealer = new workstealing.Trees.HashSetStealer(hs)
-      val seen = mutable.HashSet[Int]()
-      stealer.rootInit()
-
-      def advanceSteal(s: Stealer[Int], level: Int): Unit = {
-        var left = i
-        var added = false
-        while (left > 0 && s.nextBatch(step) != -1) {
-          while (s.hasNext) {
-            seen += s.next()
-            added = true
+    @tailrec
+    def hugeRandomFun(testId: Int, stack: List[(Stealer[Int], Int, List[String])], elementsCollected: ListBuffer[Int] = new ListBuffer[Int], last: Int = -1): List[Int] = {
+      if (!stack.isEmpty)  {
+        var lst = last
+        val (head, level, messages) = stack.head
+        val tail = stack.tail
+        val iWantToTake = random.nextInt(1024)
+        val iTookEstimate = head.nextBatch(iWantToTake)
+        var collectedCount = 0
+        if (iTookEstimate >= 0) {
+          //println(elementsCollected)
+          while (head.hasNext) {
+            //println(elementsCollected)
+            val nxt = head.next()
+            if (nxt != lst + 1) {
+              //println("failed on level " + level + " got " + nxt+ " after " + last + messages.mkString("\nsplit messages:", "\n\n", "\n"))
+              assert(false, (nxt, last, elementsCollected))
+            }
+            elementsCollected += nxt
+            lst = nxt
+            collectedCount = collectedCount + 1
           }
-          left -= 1
         }
 
-        if (s.markStolen()) {
-          val (l, r) = s.split
-  
-          if (added) advanceSteal(l, level + 1)
-          if (added) advanceSteal(r, level + 1)
-        }
+        // println("wanted " + iWantToTake + " got estimate " + iTookEstimate + " got " + collectedCount)
+        if (head.state != Stealer.Completed) {
+          val iWantToTakeMore = random.nextBoolean()
+          if (iWantToTakeMore) hugeRandomFun(testId, stack, elementsCollected, lst)
+          else {
+            val beforeSplit = head.toString
+            // i want to split!
+            // val archive = head.duplicated
+            val (splitA, splitB) = head.split
+            // val splitAD = splitA.duplicated
+            // val afterSplit = head.toString
+            // val aText = splitA.toString
+            // val bText = splitB.toString
+            // val elLeftA = splitAD.nextBatch(1)
+            // val elRightA = archive.nextBatch(1)
+            // if ((elLeftA > 0) && (elRightA > 0)) {
+            //   val elGot = splitAD.next()
+            //   val elExp = archive.next()
+            //   if (elGot != elExp) {
+            //     def toBs[T](s: Stealer[T]) = s.asInstanceOf[workstealing.BinaryTreeStealer[_, RBNode]]
+            //     head.nextBatch(1)
+            //     println("lst:     " + lst)
+            //     println("left:    " + elGot)
+            //     println("archive: " + elExp)
+            //     println("orig:    " + head.hasNext + " -> " + head.next() + " -> " + head.hasNext)
+            //     println(toBs(head).iterator.getClass)
+            //     println(List(head, splitA, splitB).mkString("\n"))
+            //     println("and head before split was: " + beforeSplit)
+            //     println("and head after split was: " + afterSplit)
+            //     assert(false)
+            //   }
+            // }
+
+            val message = ""// "was " + beforeSplit + "\nleft: " + aText + "\nright:" + bText
+            hugeRandomFun(
+              testId,
+              (splitA, level + 1, message :: messages) :: (splitB, level + 1, message :: messages) :: tail,
+              elementsCollected,
+              lst)
+          }
+        } else hugeRandomFun(testId, tail, elementsCollected, lst)
+      } else elementsCollected.toList
+    }
+
+    for (testId <- 1 to 100) {
+      val stealer = new workstealing.BinaryTreeStealer(root, 0, tree.size, isBinary)
+      val data = hugeRandomFun(testId, List((stealer,0, Nil)))
+      if (tree.size != data.size) {
+        assert(tree.size == data.size, s"test $testId, tree size: ${tree.size}, data size: ${data.size}\n  values: $data")
       }
-
-      advanceSteal(stealer, 0)
-
-      assert(seen == hs, (seen, hs))
-    }
-  }
-
-  test("recursive stealing") {
-    for (i <- 1 until 128; step <- Seq(1, 4, 8, 16, 32)) testRecursiveStealing(i, step)
-  }
-
-  def testConcurrentStealing(sz: Int, step: Int => Int) {
-    val hs = createHashSet(sz)
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    class Base extends Thread {
-      val seen = mutable.Set[Int]()
-      def consume(s: Stealer[Int]) {
-        var it = 0
-        while (s.nextBatch(step(it)) != -1) {
-          while (s.hasNext) seen += s.next()
-          it += 1
-        }
-      }
-    }
-    class First extends Base {
-      override def run() {
-        consume(stealer)
-      }
-    }
-    val t1 = new First
-    var left: Stealer[Int] = null
-    var right: Stealer[Int] = null
-    var ls: String = null
-    var rs: String = null
-    class Second extends Base {
-      override def run() {
-        if (stealer.markStolen()) {
-          // println(stealer)
-          val (l, r) = stealer.split
-          left = l
-          right = r
-          ls = left.toString
-          rs = right.toString
-          // println(left)
-          // println(right)
-          consume(left)
-          consume(right)
-        }
-      }
-    }
-    val t2 = new Second
-    // printHashSet(hs)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-    try {
-      assert(hs == (t1.seen ++ t2.seen), ("for size: " + sz, t1.seen, t2.seen, "diff: " + (hs diff (t1.seen ++ t2.seen))))
-      assert(hs.size == t1.seen.size + t2.seen.size, ("sizes: " + t1.seen.size + ", " + t2.seen.size, "for size: " + sz, t1.seen, t2.seen))
-    } catch {
-      case e: Exception =>
-        printHashSet(hs)
-        println(stealer)
-        println(ls)
-        println(rs)
-        println(left)
-        println(right)
-        throw e
-    }
-  }
-
-  test("concurrent stealing") {
-    val problematic = Seq(
-      125,
-      126,
-      128,
-      133,
-      134,
-      143,
-      155,
-      157,
-      162,
-      164,
-      168,
-      170,
-      212
-    ).flatMap(x => Seq.fill(20)(x))
-    val specific = Seq(
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
-      2000, 5000, 10000, 20000, 50000, 100000, 200000
-    )
-    val small = (0 until 200) ++ (200 until 100 by -1) ++ (200 until 300)
-    val big = (200 until 500 by 2) ++ (500 until 5000 by 200) ++ (5000 until 50000 by 2500)
-    val sizes = problematic ++ specific ++ small ++ big
-    for {
-      sz <- sizes
-      step <- Seq(1, 2, 4, 8, 16, 32, 64)
-    } {
-      testConcurrentStealing(sz, it => 1 << (it * step))
-    }
-  }
-
-  test("HashTrieStealer(...).nextBatch(1 << ...)") {
-    val sizes = Seq(
-      1, 2, 5, 10, 20, 50, 100, 155, 200, 500, 1000,
-      2000, 5000, 10000, 20000, 50000, 100000,
-      200000, 500000
-    )
-    for {
-      sz <- sizes
-      step <- Seq(2, 4, 8, 16)
-    } {
-      testNextBatch(sz, it => 1 << (step * it))
-    }
-  }
-
-  test("HashTrieStealer(collisions).nextBatch(5)") {
-    class Dummy(val x: Int) {
-      override def hashCode = x % 10
-    }
-
-    val hs = for (i <- 0 until 100) yield new Dummy(i)
-    testNextBatchGeneric(hs.to[immutable.HashSet], x => 5)
-  }
-
-  test("HashTrieStealer(1).markStolen()") {
-    val hs = createHashSet(1)
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    stealer.markStolen()
-    assert(stealer.nextBatch(1) == -1)
-  }
-
-  def testNextBatchStealSplit(sz: Int, initialStep: Int, step: Int => Int) {
-    def addOnce(s: Stealer[Int], set: mutable.Set[Int]) {
-      if (s.nextBatch(initialStep) != -1) {
-        while (s.hasNext) set += s.next()
-      }
-    }
-
-    def addAll(s: Stealer[Int], set: mutable.Set[Int]) {
-      var it = 0
-      while (s.nextBatch(step(it)) != -1) {
-        while (s.hasNext) set += s.next()
-        it += 1
-      }
-    }
-
-    val hs = createHashSet(sz)
-    val seen = mutable.Set[Int]()
-    val lseen = mutable.Set[Int]()
-    val rseen = mutable.Set[Int]()
-
-    val stealer = new workstealing.Trees.HashSetStealer(hs)
-    stealer.rootInit()
-    addOnce(stealer, seen)
-    assert(hs.size == stealer.elementsRemainingEstimate + seen.size)
-    if (stealer.markStolen()) {
-      val (l, r) = stealer.split
-      addAll(l, lseen)
-      addAll(r, rseen)
-      assert(lseen.size + rseen.size + seen.size == sz, ("for size: " + sz, seen, lseen, rseen))
-      assert(hs == (seen ++ lseen ++ rseen), ("for size: " + sz, seen, lseen, rseen))
-    }
-  }
-
-  test("HashTrieStealer(...).nextBatch(...).markStolen().split") {
-    val sizes = Seq(
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100, 200, 500, 1000,
-      2000, 5000, 10000, 20000, 50000, 100000
-    )
-    for {
-      sz <- sizes
-      initialStep <- Seq(1, 2, 4, 8, 16, 32, 64, 128, 1024)
-      step <- Seq(2, 4, 8, 16)
-    } {
-      testNextBatchStealSplit(sz, initialStep, it => 1 << (step * it))
     }
   }
 

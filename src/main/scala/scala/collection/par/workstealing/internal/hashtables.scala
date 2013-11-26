@@ -27,7 +27,7 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, (K, V)) => S](seqop)
     val (comblv, comboper) = c.nonFunctionToLocal[(S, S) => S](combop)
     val (zv, zg) = c.nonFunctionToLocal[S](z)
-    val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -35,14 +35,14 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
       import workstealing._
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Hashes.HashMapKernel[K, V, S] {
+      val kernel = new scala.collection.par.workstealing.HashTables.HashMapKernel[K, V, S] {
         seqlv.splice
         comblv.splice
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
         def apply(node: Scheduler.Node[(K, V), S], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashMapStealer[K, V]]
           val table = stealer.table
           var i = from
           var sum = zero
@@ -80,7 +80,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[((K, V)) => R](mapper)
-    val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -93,7 +93,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
 
-      val kernel = new scala.collection.par.workstealing.Hashes.HashMapKernel[K, V, ResultCell[R]] {
+      val kernel = new scala.collection.par.workstealing.HashTables.HashMapKernel[K, V, ResultCell[R]] {
         override def beforeWorkOn(tree: Scheduler.Ref[(K, V), ResultCell[R]], node: 
 Scheduler.Node[(K, V), ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
@@ -112,7 +112,7 @@ Scheduler.Node[(K, V), ResultCell[R]]) {
         def apply(node: Scheduler.Node[(K, V), ResultCell[R]], from: Int, until: Int) = {
           val rc = node.READ_INTERMEDIATE
           if (from < until) {
-            val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
+            val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashMapStealer[K, V]]
             val table = stealer.table
 
             import collection.mutable
@@ -254,8 +254,8 @@ c.Expr[Scheduler]): c.Expr[Unit] = {
   }
 
   def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: 
-c.Expr[Hashes.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): 
-c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
+c.Expr[HashTables.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): 
+c.Expr[HashTables.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -266,7 +266,7 @@ c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      new Hashes.HashMapKernel[K, V, Merger[S, That]] {
+      new HashTables.HashMapKernel[K, V, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -277,7 +277,7 @@ c.Expr[Hashes.HashMapKernel[K, V, Merger[S, That]]] = {
           else if (a eq b) a
           else a merge b
         def apply(node: Node[(K, V), Merger[S, That]], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashMapStealer[K, V]]
           val table = stealer.table
           val merger = node.READ_INTERMEDIATE
           var i = from
@@ -304,7 +304,7 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Scheduler]
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]](cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
 
@@ -320,7 +320,7 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Scheduler]
 
 
       import scala.reflect.ClassTag
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice
@@ -340,7 +340,7 @@ T])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], T, That]], ctx: c.Expr[Schedule
     import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => T](mp)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], T, That]](cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
 
@@ -354,7 +354,7 @@ merger += mpg.splice.apply(elem) })
       import workstealing._
 
       import scala.reflect.ClassTag
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       mpv.splice
@@ -375,7 +375,7 @@ c.Expr[That] =   {
 import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => TraversableOnce[T]](mp)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Par[HashMap[K, V]], T, That]](cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.hashmap) }
 
@@ -389,7 +389,7 @@ mpg.splice.apply(elem).foreach{merger += _} })
       import workstealing._
 
       import scala.reflect.ClassTag
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       mpv.splice
@@ -411,7 +411,7 @@ c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
 
     val (lv, pred) = c.nonFunctionToLocal[((K, V)) => Boolean](p)
 
-    val calleeExpression = c.Expr[Hashes.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashMapOps[K, V]](c.applyPrefix)
     reify {
       import scala._
       import collection.par
@@ -420,12 +420,12 @@ c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      val kernel = new Hashes.HashMapKernel[K, V, Option[(K, V)]] {
+      val kernel = new HashTables.HashMapKernel[K, V, Option[(K, V)]] {
         lv.splice
         def zero = None
         def combine(a: Option[(K, V)], b: Option[(K, V)]) = if (a.isDefined) a else b
         def apply(node: Node[(K, V), Option[(K, V)]], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, V]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashMapStealer[K, V]]
           val table = stealer.table
           var i = from
           var result: (K, V) = null
@@ -485,7 +485,7 @@ T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
     val (comblv, comboper) = c.nonFunctionToLocal[(S, S) => S](combop)
     val (zv, zg) = c.nonFunctionToLocal[S](z)
-    val calleeExpression = c.Expr[Hashes.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -493,14 +493,14 @@ T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
       import workstealing._
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Hashes.HashSetKernel[T, S] {
+      val kernel = new scala.collection.par.workstealing.HashTables.HashSetKernel[T, S] {
         seqlv.splice
         comblv.splice
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
         def apply(node: Scheduler.Node[T, S], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashSetStealer[T]]
           val table = stealer.table
           var i = from
           var sum = zero
@@ -522,7 +522,7 @@ T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (predv, predg) = c.nonFunctionToLocal[T => Boolean](pred)
-    val calleeExpression = c.Expr[Hashes.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -530,12 +530,12 @@ T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
       import workstealing._
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Hashes.HashSetKernel[T, Option[T]] {
+      val kernel = new scala.collection.par.workstealing.HashTables.HashSetKernel[T, Option[T]] {
         predv.splice
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
         def apply(node: Scheduler.Node[T, Option[T]], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashSetStealer[T]]
           val table = stealer.table
           var i = from
           while (i < until && (table(i) == null|| !predg.splice(table(i).asInstanceOf[T]))) {
@@ -575,8 +575,8 @@ T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
 
 
   def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: 
-c.Expr[Hashes.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): 
-c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
+c.Expr[HashTables.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): 
+c.Expr[HashTables.HashSetKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -587,7 +587,7 @@ c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      new scala.collection.par.workstealing.Hashes.HashSetKernel[T, Merger[S, That]] {
+      new scala.collection.par.workstealing.HashTables.HashSetKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -598,7 +598,7 @@ c.Expr[Hashes.HashSetKernel[T, Merger[S, That]]] = {
           else if (a eq b) a
           else a merge b
         def apply(node: Scheduler.Node[T, Merger[S, That]], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashSetStealer[T]]
           val table = stealer.table
           val cmb = node.READ_INTERMEDIATE
           var i = from
@@ -618,7 +618,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => S](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -631,7 +631,7 @@ f.splice(elem) })
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -650,7 +650,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -663,7 +663,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -683,7 +683,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Hashes.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTables.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -697,7 +697,7 @@ f.splice(elem).foreach(x=> merger +=x) })
       import workstealing._
 
 
-      import scala.collection.par.workstealing.Hashes
+      import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -718,7 +718,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[T => R](mapper)
-    val calleeExpression = c.Expr[Hashes.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTables.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -732,7 +732,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
 
-      val kernel = new scala.collection.par.workstealing.Hashes.HashSetKernel[T, ResultCell[R]] {
+      val kernel = new scala.collection.par.workstealing.HashTables.HashSetKernel[T, ResultCell[R]] {
         override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[R]], node: 
 Scheduler.Node[T, ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
@@ -749,7 +749,7 @@ Scheduler.Node[T, ResultCell[R]]) {
           }
         }
          def apply(node: Scheduler.Node[T, ResultCell[R]], from: Int, until: Int) = {
-           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashSetStealer[T]]
+           val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashSetStealer[T]]
            val table = stealer.table
            val cmb = node.READ_INTERMEDIATE
            var i = from

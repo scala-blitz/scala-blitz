@@ -6,12 +6,10 @@ package workstealing
 import scala.annotation.tailrec
 
 
-
-
 /**
- * Base class for all stealers operating on index-based collections.
- * can be not-precise in sence that can return different amount of elements for different indeces.
- */
+  * Base class for all stealers operating on index-based collections.
+  * can be not-precise in sence that can return different amount of elements for different indeces.
+  */
 abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) extends Stealer[T] {
   import IndexedStealer._
 
@@ -86,10 +84,11 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
   override def toString = {
     val p = READ_PROGRESS
     val dp = decode(p)
-    "IndexedStealer(%d, %d, %d, %d)".format(startIndex, p, dp, untilIndex)
+    "IndexedStealer(%d, %d, %d, %d)".format(startIndex, p, dp, untilIndex) 
   }
 
 }
+
 
 object IndexedStealer {
   import Scheduler._
@@ -109,7 +108,7 @@ object IndexedStealer {
     def totalElements: Int = untilIndex - startIndex
 
     def psplit(leftsize: Int): (StealerType, StealerType) = splitAtIndex(leftsize)
-
+  
     def split: (StealerType, StealerType) = psplit(elementsRemaining / 2)
 
     def nextOffset = nextProgress
@@ -136,16 +135,16 @@ object IndexedStealer {
         while (looping && notTerminated) {
           val currstep = node.READ_STEP
           val currprog = stealer.READ_PROGRESS
-
+    
           if (currprog >= 0 && currprog < until) {
             // reserve some work
             val nprog = math.min(currprog + currstep, until)
-
+            
             if (stealer.CAS_PROGRESS(currprog, nprog)) {
               stealer.nextProgress = currprog
               stealer.nextUntil = nprog
               intermediate = combine(intermediate, apply(node, nprog - currprog))
-
+  
               // update step
               node.WRITE_STEP(math.min(ms, currstep * 2))
             }
@@ -164,4 +163,11 @@ object IndexedStealer {
   }
 
 }
+
+
+
+
+
+
+
 

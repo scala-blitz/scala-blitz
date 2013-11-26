@@ -69,6 +69,10 @@ trait Stealer[@specialized +T] {
    */
   def asPrecise: PreciseStealer[T] = this.asInstanceOf[PreciseStealer[T]]
 
+  /** Optional.
+   */
+  def duplicated: Stealer[T] = ???
+
 }
 
 
@@ -88,4 +92,49 @@ object Stealer {
     override def toString = "AvailableOrOwned"
   }
 
+  class Empty[@specialized T] extends Stealer[T] {
+    def nextBatch(step: Int): Int = -1
+    def elementsRemainingEstimate: Int = 0
+    def hasNext: Boolean = false
+    def next(): T = throw new IllegalStateException
+    def markCompleted(): Boolean = true
+    def markStolen(): Boolean = false
+    def state = Completed
+    def split = throw new IllegalStateException
+    override def toString = s"Stealer.Empty"
+    override def duplicated = this
+  }
+
+  class Single[@specialized T](val elem: T) extends Stealer[T] {
+    @volatile var advanced = false
+    var traversed = true
+    def nextBatch(step: Int): Int = if (advanced) -1 else {
+      advanced = true
+      traversed = false
+      1
+    }
+    def elementsRemainingEstimate: Int = if (advanced) 0 else 1
+    final def hasNext: Boolean = advanced && !traversed
+    def next(): T = if (hasNext) {
+      traversed = true
+      elem
+    } else throw new IllegalStateException
+    def markCompleted(): Boolean = {
+      advanced = true
+      traversed = true
+      true
+    }
+    def markStolen(): Boolean = throw new IllegalStateException
+    def state = if (advanced) Completed else AvailableOrOwned
+    def split = throw new IllegalStateException
+    override def duplicated = {
+      val s = new Single(elem)
+      s.advanced = this.advanced
+      s.traversed = this.traversed
+      s
+    }
+    override def toString = s"Stealer.Single($elem, advanced: $advanced, traversed: $traversed)"
+  }
+
 }
+
