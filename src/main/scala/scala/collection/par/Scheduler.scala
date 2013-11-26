@@ -202,8 +202,7 @@ object Scheduler {
 
     val config = new Config.Default(1) { override def stealingStrategy = Predefined }
 
-    def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
-    }
+    def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {}
 
     override def invokeParallelOperation[@specialized T, @specialized R](stealer: Stealer[T], kernel: Kernel[T, R]): R = {
       val node = new Node[T, R](null, null)(stealer)
@@ -221,7 +220,7 @@ object Scheduler {
         result = kernel.combine(result, kernel.apply(node, chunksize))
       }
       kernel.validateResult(result)
-  }
+    }
 
   }
 
