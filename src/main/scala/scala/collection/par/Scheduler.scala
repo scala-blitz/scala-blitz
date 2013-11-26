@@ -73,7 +73,7 @@ object Scheduler {
       /* see https://blogs.oracle.com/dave/entry/false_sharing_induced_by_card for details */
       val maximumStep = if (scala.util.Properties.isJavaAtLeast("1.7") && isConditionalCardMarkingUsed) 4096 else 1000000
 
-      def stealingStrategy = FindMax
+      def stealingStrategy: Strategy = FindMax
     }
 
     class FromExecutionContext(parlevel: Int, val ctx: scala.concurrent.ExecutionContext) extends Default(parlevel)
@@ -132,10 +132,9 @@ object Scheduler {
       // create workstealing tree
       val node = new Node[T, R](null, null)(stealer)
       val root = new Ref[T, R](null, 0)(node)
-      val work = root.child
       kernel.afterCreateRoot(root)
 
-      work.tryOwn(invoker)
+      node.tryOwn(invoker)
 
       // let other workers know there's something to do
       dispatchWork(root, kernel)
@@ -201,11 +200,29 @@ object Scheduler {
   object Sequential extends WorkstealingTree {
     import scala.concurrent.forkjoin._
 
-    val config = new Config.Default(1)
+    val config = new Config.Default(1) { override def stealingStrategy = Predefined }
 
     def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {
-      root.child.step = 32 // tweaking equilibrium
     }
+
+    override def invokeParallelOperation[@specialized T, @specialized R](stealer: Stealer[T], kernel: Kernel[T, R]): R = {
+      val node = new Node[T, R](null, null)(stealer)
+      val root = new Ref[T, R](null, 0)(node)
+      node.step = 32
+
+      kernel.afterCreateRoot(root)
+      kernel.beforeWorkOn(root, node)
+      node.tryOwn(invoker)
+
+      var result: R = kernel.zero
+      
+      while (stealer.state == Stealer.AvailableOrOwned) {
+        val chunksize = stealer.nextBatch(Int.MaxValue)
+        result = kernel.combine(result, kernel.apply(node, chunksize))
+      }
+      kernel.validateResult(result)
+  }
+
   }
 
   /* internals */
@@ -269,7 +286,7 @@ object Scheduler {
      * Returns the result if there was no early termination.
      *  Otherwise may throw an exception based on the termination cause.
      */
-    def validateResult(r: R): R = {
+    @inline def validateResult(r: R): R = {
       if (notTerminated) r
       else terminationCauseRef.get.validateResult(r)
     }

@@ -21,7 +21,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
-    exec.independentSamples -> 6,
+    exec.independentSamples -> 1,
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=true",
     reports.regression.noiseMagnitude -> 0.15)
 
@@ -115,22 +115,22 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
     }
 
     measure method "aggregate(tinyCollections)" in {
-      using(ranges(tiny/100)) curve ("collections") in { x =>
+      using(ranges(tiny)) curve ("collections") in { x =>
         var sum = 0
         var i = x.head
         val until = x.end
         while(i < until) {
-          sum = sum + (1 to 20).aggregate(0)(_+_, _+_)
+          sum = sum + (1 to 13).aggregate(0)(_+_, _+_)
           i = i + 1
         }
       }
-      using(ranges(tiny/100)) curve ("optimized") in { x => 
+      using(ranges(tiny)) curve ("optimized") in { x => 
         optimize{
           var sum = 0
           var i = x.head
           val until = x.end
           while(i < until) {
-            sum = sum + (1 to 20).aggregate(0)(_+_, _+_)
+            sum = sum + (1 to 13).aggregate(0)(_+_, _+_)
             i = i + 1
           }
         }
