@@ -20,7 +20,7 @@ class HashStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   def testTraversal(sz: Int) {
     def traverseHash(hm: mutable.HashMap[Int, Int]) {
       val stealer = hm.toPar.stealer
-      stealer.advance(getHashTableContents(hm).table.length)
+      stealer.nextBatch(getHashTableContents(hm).table.length)
   
       val s = mutable.HashSet[Int]()
       while (stealer.hasNext) s += stealer.next()._1
@@ -50,7 +50,7 @@ class HashStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       val stealer = hm.toPar.stealer
       var step = 1
       while (stealer.isAvailable) {
-        stealer.advance(step)
+        stealer.nextBatch(step)
         while (stealer.hasNext) b += stealer.next()._1
         step *= 2
       }
@@ -62,7 +62,7 @@ class HashStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
     traverseHash(hm)
   }
 
-  test("stealer.advance") {
+  test("stealer.nextBatch") {
     testSizes(testAdvance)
   }
 

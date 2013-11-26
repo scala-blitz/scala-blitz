@@ -24,12 +24,29 @@ abstract class Scheduler {
 
 }
 
-
 object Scheduler {
 
   trait Config {
+    /** number of workers used in computation */
     def parallelismLevel: Int
+
+    /**
+     * How often should chunk size requested from stealer be increased
+     *
+     * In order to provide efficient sheduling, chunks sizes start from small and during the computation
+     * value of -1 forces defaultIncrementStepFrequency to be used
+     *  for more details @see <a href="https://parasol.tamu.edu/lcpc2013/papers/lcpc2013_submission_6.pdf">Near Optimal Work-Stealing Tree Scheduler for Highly Irregular Data-Parallel Workloads
+     * Aleksandar Prokopec, Martin Odersky</a>
+     */
     def incrementStepFrequency: Int
+
+    /**
+     * How much the requested chunksize from stealer should be increased
+     *
+     * Default implementation uses exponential increasing of chunk size
+     * This defines exponent base
+     * See also the method {@link #incrementStepFrequency()}
+     */
     def incrementStepFactor: Int
     def maximumStep: Int
     def stealingStrategy: Strategy
@@ -46,19 +63,17 @@ object Scheduler {
       }
 
       def this() = this(Runtime.getRuntime.availableProcessors)
-      
+
       def incrementStepFrequency = -1
 
       def incrementStepFactor = -1
-      
-      def maximumStep = {
-        if (
-          scala.util.Properties.isJavaAtLeast("1.7") &&
-          runtimeParameters.contains("-XX:+UseCondCardMark")
-        ) 4096 else 1000000
-      }
 
-      def stealingStrategy = FindMax
+      val isConditionalCardMarkingUsed = runtimeParameters.contains("-XX:+UseCondCardMark")
+
+      /* see https://blogs.oracle.com/dave/entry/false_sharing_induced_by_card for details */
+      val maximumStep = if (scala.util.Properties.isJavaAtLeast("1.7") && isConditionalCardMarkingUsed) 4096 else 1000000
+
+      def stealingStrategy: Strategy = FindMax
     }
 
     class FromExecutionContext(parlevel: Int, val ctx: scala.concurrent.ExecutionContext) extends Default(parlevel)
@@ -76,6 +91,8 @@ object Scheduler {
 
   object Implicits {
     implicit val global = new ExecutionContext()
+    implicit val sequential = Sequential
+
   }
 
   abstract class WorkstealingTree extends Scheduler {
@@ -110,25 +127,25 @@ object Scheduler {
         // no more work
       }
     }
-  
+
     def invokeParallelOperation[T, R](stealer: Stealer[T], kernel: Kernel[T, R]): R = {
       // create workstealing tree
       val node = new Node[T, R](null, null)(stealer)
       val root = new Ref[T, R](null, 0)(node)
-      val work = root.child
       kernel.afterCreateRoot(root)
-      work.tryOwn(invoker)
-  
+
+      node.tryOwn(invoker)
+
       // let other workers know there's something to do
       dispatchWork(root, kernel)
-  
+
       // piggy-back the caller into doing work
       if (!kernel.workOn(root, config, invoker)) workUntilNoWork(invoker, root, kernel)
-  
+
       // synchronize in case there's some other worker just
       // about to complete work
       joinWork(root, kernel)
-  
+
       val c = root.READ
       val r = c.READ_RESULT
       kernel.validateResult(r.asInstanceOf[R])
@@ -142,7 +159,7 @@ object Scheduler {
     val pool = config.ctx
 
     class ExecutionContextWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
-    extends Runnable with WorkstealingTreeTask[T, R] {
+      extends Runnable with WorkstealingTreeTask[T, R] {
       def run() = workstealingTreeScheduling()
     }
 
@@ -165,7 +182,7 @@ object Scheduler {
     val pool = new ForkJoinPool(config.parallelismLevel)
 
     class ForkJoinWorkstealingTreeTask[T, R](val scheduler: Scheduler.WorkstealingTree, val root: Ref[T, R], val kernel: Kernel[T, R], val index: Int, val total: Int)
-    extends RecursiveAction with WorkstealingTreeTask[T, R] {
+      extends RecursiveAction with WorkstealingTreeTask[T, R] {
       def compute() = workstealingTreeScheduling()
     }
 
@@ -178,6 +195,33 @@ object Scheduler {
         i += 1
       }
     }
+  }
+
+  object Sequential extends WorkstealingTree {
+    import scala.concurrent.forkjoin._
+
+    val config = new Config.Default(1) { override def stealingStrategy = Predefined }
+
+    def dispatchWork[T, R](root: Ref[T, R], kernel: Kernel[T, R]) {}
+
+    override def invokeParallelOperation[@specialized T, @specialized R](stealer: Stealer[T], kernel: Kernel[T, R]): R = {
+      val node = new Node[T, R](null, null)(stealer)
+      val root = new Ref[T, R](null, 0)(node)
+      node.step = 32
+
+      kernel.afterCreateRoot(root)
+      kernel.beforeWorkOn(root, node)
+      node.tryOwn(invoker)
+
+      var result: R = kernel.zero
+      
+      while (stealer.state == Stealer.AvailableOrOwned) {
+        val chunksize = stealer.nextBatch(Int.MaxValue)
+        result = kernel.combine(result, kernel.apply(node, chunksize))
+      }
+      kernel.validateResult(result)
+    }
+
   }
 
   /* internals */
@@ -203,7 +247,7 @@ object Scheduler {
       }
     }
   }
-  
+
   trait WorkerTask {
     def index: Int
     def total: Int
@@ -219,12 +263,14 @@ object Scheduler {
   }
 
   trait Kernel[@specialized T, @specialized R] {
-    /** Used for cancelling operations early (e.g. due to exceptions).
+    /**
+     * Used for cancelling operations early (e.g. due to exceptions).
      *  Holds information on why the operation failed
      */
     protected val terminationCauseRef = new AtomicReference[TerminationCause](null)
 
-    /** Returns `true` as long as `terminationCause` is `null`.
+    /**
+     * Returns `true` as long as `terminationCause` is `null`.
      */
     def notTerminated = terminationCauseRef.get eq null
 
@@ -235,15 +281,17 @@ object Scheduler {
       }
     }
 
-    /** Returns the result if there was no early termination.
+    /**
+     * Returns the result if there was no early termination.
      *  Otherwise may throw an exception based on the termination cause.
      */
-    def validateResult(r: R): R = {
+    @inline def validateResult(r: R): R = {
       if (notTerminated) r
       else terminationCauseRef.get.validateResult(r)
     }
 
-    /** Initializes the workstealing tree node.
+    /**
+     * Initializes the workstealing tree node.
      *
      *  By default does nothing, but some kernels may choose to override this default behaviour
      *  to store operation-specific information into the node.
@@ -252,20 +300,23 @@ object Scheduler {
       node.WRITE_INTERMEDIATE(zero)
     }
 
-    /** Initializes the workstealing tree root.
+    /**
+     * Initializes the workstealing tree root.
      *
      *  By default does nothing, but some kernels may choose to override this default behaviour.
      */
     def afterCreateRoot(tree: Ref[T, R]) {}
 
-    /** Initializes a node that has just been expanded.
-     * 
+    /**
+     * Initializes a node that has just been stolen.
+     *
      *  By default does nothing, but some kernels may choose to override this default behaviour
      *  to store operation-specific information into the node.
      */
     def afterExpand(old: Node[T, R], node: Node[T, R]) {}
-  
-    /** Stores the result of processing the node into the `lresult` field.
+
+    /**
+     * Stores the result of processing the node into the `lresult` field.
      *
      *  This behaviour can be overridden.
      */
@@ -287,7 +338,8 @@ object Scheduler {
       if (isf == -1) defaultIncrementStepFactor else isf
     }
 
-    /** Returns true if completed with no stealing.
+    /**
+     * Returns true if completed with no stealing.
      *  Returns false if steal occurred.
      *
      *  May be overridden in subclass to specialize for better performance.
@@ -311,13 +363,13 @@ object Scheduler {
         while (looping && notTerminated) {
           val currstep = node.READ_STEP
           val currstate = stealer.state
-    
+
           if (currstate != Completed && currstate != StolenOrExpanded) {
             // reserve some work
-            val chunk = stealer.advance(currstep)
-  
+            val chunk = stealer.nextBatch(currstep)
+
             if (chunk != -1) intermediate = combine(intermediate, apply(node, chunk))
-    
+
             // update step
             incCount = (incCount + 1) % incFreq
             if (incCount == 0) node.WRITE_STEP(math.min(ms, currstep * incFact))
@@ -334,8 +386,9 @@ object Scheduler {
       completeNode(intermediate, tree, worker)
     }
 
-    /** Completes the iteration in the stealer.
-     * 
+    /**
+     * Completes the iteration in the stealer.
+     *
      *  Some parallel operations do not traverse all the elements in a chunk or a node. The purpose of this
      *  method is to bring the node into a Completed or Stolen state before proceeding.
      */
@@ -343,8 +396,9 @@ object Scheduler {
       stealer.markCompleted()
     }
 
-    /** Completes the iteration in the node.
-     * 
+    /**
+     * Completes the iteration in the node.
+     *
      *  Some parallel operations do not traverse all the elements in a chunk or a node. The purpose of this
      *  method is to bring the node into a Completed or Stolen state before proceeding.
      */
@@ -358,20 +412,25 @@ object Scheduler {
         true
       } else if (state_t1 eq StolenOrExpanded) {
         // help expansion if necessary
-        if (tree.READ.isLeaf) tree.markExpand(this, worker)
+        if (tree.READ.isLeaf) tree.markStolenAndExpand(this, worker)
 
         val node_t2 = tree.READ
         storeIntermediateResult(node_t2, intermediate)
         while (node_t2.result == NO_RESULT) node_t2.CAS_RESULT(NO_RESULT, INTERMEDIATE_READY)
         false
       } else sys.error("unreachable: " + state_t1 + ", " + node_t0.toString(0))
-  
+
       // push result up as far as possible
       pushUp(tree, worker)
-  
+
       wasCompleted
     }
-    
+
+    /**
+     * Pushes the result up the tree
+     *
+     * After completing node worker tryes to push the result up the tree, as far as he could
+     */
     @tailrec protected final def pushUp(tree: Ref[T, R], worker: WorkerTask): Unit = {
       val node_t0 = tree.READ
       val r_t1 = node_t0.READ_RESULT
@@ -402,23 +461,31 @@ object Scheduler {
               // if at root, notify completion, otherwise go one level up
               if (tree.up == null) tree.synchronized {
                 tree.notifyAll()
-              } else pushUp(tree.up, worker)
-            } else pushUp(tree, worker) // retry
+              }
+              else {
+                pushUp(tree.up, worker)
+              }
+            } else {
+              pushUp(tree, worker) // retry
+            }
           } // one of the children is not ready yet
         case _ =>
           // we're done, somebody else already pushed up
       }
     }
 
-    /** The neutral element of the reduction.
+    /**
+     * The neutral element of the reduction.
      */
     def zero: R
-  
-    /** Combines results from two chunks into the aggregate result.
+
+    /**
+     * Combines results from two chunks into the aggregate result.
      */
     def combine(a: R, b: R): R
-  
-    /** Processes the specified chunk.
+
+    /**
+     * Processes the specified chunk.
      */
     def apply(node: Node[T, R], chunkSize: Int): R
   }
@@ -428,10 +495,11 @@ object Scheduler {
     def WRITE(nv: Node[T, R]) = unsafe.putObjectVolatile(this, CHILD_OFFSET, nv)
     def READ = unsafe.getObjectVolatile(this, CHILD_OFFSET).asInstanceOf[Node[T, R]]
 
-    /** Try to mark the node as stolen, expand the node and return `true` if node was expanded.
+    /**
+     * Try to mark the node as stolen, expand the node and return `true` if node was expanded.
      *  Return `false` if node was completed.
      */
-    @tailrec def markExpand(kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
+    @tailrec def markStolenAndExpand(kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
       import Stealer._
       val child_t0 = READ
       val stealer_t0 = child_t0.stealer
@@ -440,14 +508,14 @@ object Scheduler {
         if (state_t1 eq Completed) false // already completed
         else {
           if (state_t1 ne StolenOrExpanded) { // mark it stolen
-            if (stealer_t0.markStolen()) markExpand(kernel, worker) // marked stolen - now move on to node creation
-            else markExpand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
+            if (stealer_t0.markStolen()) markStolenAndExpand(kernel, worker) // marked stolen - now move on to node creation
+            else markStolenAndExpand(kernel, worker) // wasn't marked stolen and failed marking stolen - retry
           } else { // already marked stolen - expand
             // node effectively immutable (except for `intermediateResult` and `result`) - expand it
             val expanded = child_t0.newExpanded(this, worker)
             kernel.afterExpand(child_t0, expanded)
             if (CAS(child_t0, expanded)) true // try to replace with expansion
-            else markExpand(kernel, worker) // failure (spurious or due to another expand) - retry
+            else markStolenAndExpand(kernel, worker) // failure (spurious or due to another expand) - retry
           }
         }
       }
@@ -488,7 +556,7 @@ object Scheduler {
     }
 
     final def trySteal(parent: Ref[T, R], kernel: Kernel[T, R], worker: WorkerTask): Boolean = {
-      parent.markExpand(kernel, worker)
+      parent.markStolenAndExpand(kernel, worker)
     }
 
     final def newExpanded(parent: Ref[T, R], worker: WorkerTask): Node[T, R] = {
@@ -507,7 +575,7 @@ object Scheduler {
 
       nnode
     }
-  
+
     def isLeafEligibleForWork(worker: WorkerTask): Boolean = {
       import Stealer._
       val decision = stealer.state match {
@@ -536,12 +604,14 @@ object Scheduler {
   }
 
   abstract class Strategy {
-    /** Finds work in the tree for the given worker, which is one out of `total` workers.
+    /**
+     * Finds work in the tree for the given worker, which is one out of `total` workers.
      *  This search may include stealing work.
      */
     def findWork[T, R](worker: WorkerTask, tree: Ref[T, R], kernel: Kernel[T, R]): Ref[T, R]
 
-    /** Returns true if the worker labeled with `index` with a total of
+    /**
+     * Returns true if the worker labeled with `index` with a total of
      *  `total` workers should go left at level `level`.
      *  Returns false otherwise.
      */
@@ -576,7 +646,7 @@ object Scheduler {
 
       val max = search(tree)
       if (max != null) {
-        val node = /*READ*/max.child
+        val node = /*READ*/ max.child
         if (node.tryOwn(worker)) max
         else if (node.trySteal(max, kernel, worker)) {
           val subnode = chooseAsStealer(worker.index, worker.total, max)
@@ -635,7 +705,7 @@ object Scheduler {
 
     /** Returns true iff the level of the tree is such that: 2^level < total */
     final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
+
     /** Returns true iff the worker should first go left at this level of the tree top. */
     final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
 
@@ -667,7 +737,7 @@ object Scheduler {
   object AssignTopLeaf extends FindFirstStrategy {
 
     final def isTreeTop(total: Int, level: Int): Boolean = (1 << level) < total
-    
+
     final def chooseInTreeTop(index: Int, level: Int): Boolean = ((index >> level) & 0x1) == 0
 
     def choose[T, R](index: Int, total: Int, tree: Ref[T, R]): Boolean = {
@@ -753,7 +823,6 @@ object Scheduler {
     def chooseAsVictim[T, R](index: Int, total: Int, tree: Ref[T, R]) = tree.READ.left
 
   }
-
 
 }
 
