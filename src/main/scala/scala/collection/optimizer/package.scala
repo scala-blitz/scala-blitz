@@ -8,7 +8,7 @@ import scala.reflect.macros._
 
 
 package object optimizer {
-  final val debug = falsex
+  final val debug = false
 
   def optimize[T](exp: T) = macro optimize_impl[T]
 
