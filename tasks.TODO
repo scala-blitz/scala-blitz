@@ -1,32 +1,33 @@
 Reducable interface:
  ☐ go through all operations in standard collections and filter them for the Reducable interface
  ☐ foreach
- ☐ fold
- ☐ reduce
- ☐ aggregate
- ☐ mapReduce
- ☐ max
- ☐ min
- ☐ sum
- ☐ product
- ☐ map
- ☐ filter
- ☐ flatMap
+ ✔ fold @done (13-11-27 16:40)
+ ✔ reduce @done (13-11-27 16:40)
+ ✔ aggregate @done (13-11-27 16:40)
+ ✔ mapReduce @done (13-11-27 16:40)
+ ✔ max @done (13-11-27 16:40)
+ ✔ min @done (13-11-27 16:40)
+ ✔ sum @done (13-11-27 16:40)
+ ✔ product @done (13-11-27 16:40)
+ ✔ map @done (13-11-27 16:40)
+ ✔ filter @done (13-11-27 16:40)
+ ✔ flatMap @done (13-11-27 16:40)
  ☐ contains\exists\containsSlice
- ☐ corresponds
  ☐ distinct
  ☐ forall
- ☐ groupBy
+ ✔ groupBy @done (13-11-27 16:41)
  ☐ intersect
  ☐ sort
  ☐ to
  ☐ have a variant of breakOut for parallel collections to allow mapping ranges to arbitrary collections
+ ☐ parallel views
 
  Zippable interface:
  ☐ copyToArray
  ☐ zip
  ☐ zipWithIndex
  ☐ zipView
+ ☐ corresponds
 
 Parallel ranges:
  ✔ fold @done (13-05-27 14:24)
@@ -40,8 +41,8 @@ Parallel ranges:
  ✔ product @done (13-05-27 14:25)
  ☐ copyToArray
  ☐ map
- ☐ filter
- ☐ flatMap
+ ✔ filter @done (13-11-27 16:41)
+ ✔ flatMap @done (13-11-27 16:41)
  ☐ every operation in the Reducable interface
  ☐ unit tests
  ☐ microbenchmarks
@@ -93,7 +94,7 @@ Parallel hash tables:
  ☐ unit tests
  ☐ microbenchmarks
 
-Parallel n-ary tree operations:
+Parallel binary tree operations:
  ☐ reduce
  ☐ fold
  ☐ aggregate
@@ -103,10 +104,6 @@ Parallel n-ary tree operations:
  ☐ filter
  ☐ unit tests
  ☐ microbenchmarks
-
-
-Synchronized stealers (non-lock free):
- ☐ see if we can do generically
 
 Splitting package:
  ☐ same interface for old parallel collections (implicit conversions in the same style as the workstealing package)
@@ -121,21 +118,20 @@ To fix:
  ✔ replace volatile reads with unsafe calls @done (13-04-26 13:49)
 
 Todo items:
- ☐ write a comprehensive suite of unit tests
- ☐ write a comprehensive suite of microbenchmark regression tests
- ☐ implement HashNode and parallel hash tables
- ☐ implement LockNode and port hash tries to use it
+ ✔ write a comprehensive suite of unit tests @done (13-11-27 16:43)
+ ✔ write a comprehensive suite of microbenchmark regression tests @done (13-11-27 16:43)
+ ✔ implement HashNode and parallel hash tables @done (13-11-27 16:43)
  ☐ an interface for thread pools and their configuration
- ☐ value/implicit class conversion to support parallel operations - an API to convert between normal and parallel operations
+ ✔ value/implicit class conversion to support parallel operations - an API to convert between normal and parallel operations @done (13-11-27 16:44)
  ☐ verify performance on AMD platforms, UltraSPARC, multi-socket Intels
  ☐ design an API for scheduler configuration (number of threads, pool, chunking size, schedule, stealing strategy, etc.)
 
 Bigger applications:
  ☐ PageRank
  ☐ K-means
- ☐ Barnes-Hut
+ ✔ Barnes-Hut @done (13-11-27 16:44)
  ☐ Smith-Waterman
- ☐ Mandelbrot set computation
+ ✔ Mandelbrot set computation @done (13-11-27 16:44)
  ☐ genetic algorithm optimization
  ☐ flocking
  ☐ some linear algebra applications
