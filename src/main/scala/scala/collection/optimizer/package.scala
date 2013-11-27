@@ -62,25 +62,24 @@ package object optimizer {
 
         def unWrapArray(tree: Tree) = {
           val treeWithImports = addImports(tree)
-          if(debug) println("unwrapping " + treeWithImports)
+          if (debug) println("unwrapping " + treeWithImports)
           val typeChecked = c.typeCheck(treeWithImports)
-          if(debug) println("got type " + typeChecked.tpe)
+          if (debug) println("got type " + typeChecked.tpe)
           val result = {
-            if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.WrappedArray[_]].typeSymbol))
-              {
-                if(debug) println("*********************unwrapping to array!")
+            if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.WrappedArray[_]].typeSymbol)) {
+                if (debug) println("*********************unwrapping to array!")
                 val r = q"$tree.array"
                 r.setType(c.typeCheck(q"$typeChecked.array").tpe)
                 r
               }
-              else if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.ArrayOps[_]].typeSymbol)) 
-              {
-                if(debug) println("*********************unwrapping to array!")
-                val r = q"$tree.repr"
-                r.setType(c.typeCheck(q"$typeChecked.repr").tpe)
-                r
+              else {
+                if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.ArrayOps[_]].typeSymbol)) {
+                  if (debug) println("*********************unwrapping to array!")
+                  val r = q"$tree.repr"
+                  r.setType(c.typeCheck(q"$typeChecked.repr").tpe)
+                  r
+                } else tree
               }
-            else tree
           }
           
           result 
@@ -104,60 +103,48 @@ package object optimizer {
         val append2ArgumentList: Set[Name] = Set(TermName("sum"), TermName("product"), TermName("min"), TermName("max"))
 
         tree match {
-          case q"$seqO.aggregate[$tag]($zeroO)($seqopO, $comboopO)" =>
-            val seq = unWrapArray(transform(seqO))
-            if(debug) println("\n\nAGGREGATEtransforming " + tree)
-            if(debug) println("seq type is " + seq.tpe)
+          case q"$seqOriginal.aggregate[$tag]($zeroOriginal)($seqopOriginal, $comboopOriginal)" =>
+            val seq = unWrapArray(transform(seqOriginal))
             val whiteListed = (seq.tpe ne null) && typesWhiteList.contains(seq.tpe.typeSymbol)
-            if(debug) println("type is in whiteList: " + whiteListed)
+            if (debug) println(s"\n\nAGGREGATEtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed")
             val rewrite: Tree = 
-              if(whiteListed){
-                val seqop = transform(seqopO)
-                val comboop = transform(comboopO)
-                val zero = transform(zeroO)
+              if (whiteListed) {
+                val seqop = transform(seqopOriginal)
+                val comboop = transform(comboopOriginal)
+                val zero = transform(zeroOriginal)
                 unPar(q"$seq.toPar.aggregate($zero)($seqop)($comboop)")
               } else super.transform(tree)
-            if (whiteListed) if(debug) println("quasiquote formed " + rewrite + "\n")
+            if (whiteListed) if (debug) println("quasiquote formed " + rewrite + "\n")
             rewrite
-          case q"$seqO.$method[..$targs]($blaO)($cbf)" => //map
-            val seq = unWrapArray(transform(seqO))
-            if(debug) println("\n\nMAPtransforming " + tree)
-            if(debug) println("recursive seq is " + seq)
-            if(debug) println("seq type is " + seq)
-            if(debug) println("method is " + method)
-
+          case q"$seqOriginal.$method[..$targs]($argsOriginal)($cbf)" => //map
+            val seq = unWrapArray(transform(seqOriginal))
             val whiteListed = (seq.tpe ne null) && typesWhiteList.contains(seq.tpe.typeSymbol)
             val methodListed = methodWhiteList.contains(method)
-            if(debug) println("type is in whiteList: " + whiteListed)
-            if(debug) println("method is in whiteList: " + methodListed)
+            if (debug) println(s"\n\nMAPtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed\nmethod is ${method}\nmethod is in whiteList: $methodListed")
             val rewrite: Tree = 
-              if(whiteListed && methodListed){
-                val bla = transform(blaO)
-                if(maintain2ArgumentList.contains(method))
-                  unPar(q"$seq.toPar.$method($bla)($cbf)")
-                else unPar(q"$seq.toPar.$method($bla)")
+              if (whiteListed && methodListed) {
+                val args = transform(argsOriginal)
+                if (maintain2ArgumentList.contains(method))
+                  unPar(q"$seq.toPar.$method($args)($cbf)")
+                else unPar(q"$seq.toPar.$method($args)")
               } else super.transform(tree)
-            if (whiteListed) if(debug) println("quasiquote formed " + rewrite + "\n")
+            if (whiteListed) if (debug) println(s"quasiquote formed ${rewrite}")
             rewrite
-          case q"$seqO.$method[..$targs]($blaO)" => //foreach, reduce, groupBy(broken?), exists, filter
-            val seq = unWrapArray(transform(seqO))
-            if(debug) println("\n\nFOREACHtransforming " + tree)
-            if(debug) println("seq type is " + seq.tpe)
-            if(debug) println("method is " + method)
+          case q"$seqOriginal.$method[..$targs]($argsOriginal)" => //foreach, reduce, groupBy(broken?), exists, filter
+            val seq = unWrapArray(transform(seqOriginal))
             val whiteListed = (seq.tpe ne null) && typesWhiteList.contains(seq.tpe.typeSymbol)
             val methodListed = methodWhiteList.contains(method)
-            if(debug) println("type is in whiteList: " + whiteListed)
-            if(debug) println("method is in whiteList: " + methodListed)
-            val rewrite: Tree = if(whiteListed && methodListed) {
-              val bla = transform(blaO)
-              if(append2ArgumentList.contains(method))
-                  unPar(q"$seq.toPar.$method($bla, dummy$$0)")
-              else unPar(q"$seq.toPar.$method($bla)") // q"$seq.foreach[..$targs]($bla)"
+            if (debug) println(s"\n\nFOREACHtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed\nmethod is ${method}\nmethod is in whiteList: $methodListed")
+            val rewrite: Tree = if (whiteListed && methodListed) {
+              val args = transform(argsOriginal)
+              if (append2ArgumentList.contains(method))
+                  unPar(q"$seq.toPar.$method($args, dummy$$0)")
+              else unPar(q"$seq.toPar.$method($args)") // q"$seq.foreach[..$targs]($args)"
             } else super.transform(tree)
-            if (whiteListed && methodListed) if(debug) println("quasiquote formed " + rewrite + "\n")
+            if (whiteListed && methodListed) if (debug) println(s"quasiquote formed ${rewrite}")
             rewrite
           case _ =>
-            if(debug) println("not transforming " + tree) 
+            if (debug) println(s"not transforming $tree") 
             super.transform(tree)
         }
       }
@@ -166,7 +153,7 @@ package object optimizer {
     val t = CastingTransformer.transform(exp.tree)
     
     val resultWithImports = addImports(t)
-     if(debug) println("\n\n\nresult: " + resultWithImports)
+     if (debug) println(s"\n\n\nresult: $resultWithImports")
 
     (c.resetAllAttrs(resultWithImports))
   }
