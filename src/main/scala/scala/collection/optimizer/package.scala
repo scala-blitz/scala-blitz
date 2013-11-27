@@ -8,7 +8,7 @@ import scala.reflect.macros._
 
 
 package object optimizer {
-  final val debug = false
+  final val debug = falsex
 
   def optimize[T](exp: T) = macro optimize_impl[T]
 
@@ -33,28 +33,8 @@ package object optimizer {
           val treeWithImports = addImports(tree)
           if(debug) println("typechecking " + treeWithImports)
           val typeChecked = c.typeCheck(treeWithImports)
-          val result = {// we need to temporary wrap arrays to help typecheker
-            if (typeChecked.tpe == typeOf[scala.collection.par.Par[Array[Int]]])
-              q"new scala.collection.mutable.WrappedArray.ofInt($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Double]]]) 
-              q"new scala.collection.mutable.WrappedArray.ofDouble($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Long]]])  
-              q"new scala.collection.mutable.WrappedArray.ofLong($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Float]]]) 
-              q"new scala.collection.mutable.WrappedArray.ofFloat($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Char]]]) 
-              q"new scala.collection.mutable.WrappedArray.ofChar($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Byte]]])
-              q"new scala.collection.mutable.WrappedArray.ofByte($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Short]]])
-              q"new scala.collection.mutable.WrappedArray.ofShort($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Boolean]]])
-              q"new scala.collection.mutable.WrappedArray.ofBoolean($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[Unit]]])
-              q"new scala.collection.mutable.WrappedArray.ofUnit($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[Array[AnyRef]]])
-              q"new scala.collection.mutable.WrappedArray.ofRef($tree.seq)"
-            else if (typeChecked.tpe == typeOf[Par[_]])  q"$tree.seq"
+          val result = {
+            if (typeChecked.tpe.typeSymbol == typeOf[Par[_]].typeSymbol)  q"$tree.seq"
             else tree
           }
           result 
@@ -65,7 +45,7 @@ package object optimizer {
           if (debug) println("unwrapping " + treeWithImports)
           val typeChecked = c.typeCheck(treeWithImports)
           if (debug) println("got type " + typeChecked.tpe)
-          val result = {
+          val resultWrapped = {
             if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.WrappedArray[_]].typeSymbol)) {
                 if (debug) println("*********************unwrapping to array!")
                 val r = q"$tree.array"
@@ -81,7 +61,43 @@ package object optimizer {
                 } else tree
               }
           }
-          
+
+
+
+          // check for wrap&unwrap
+          val result = resultWrapped match {
+            // for some reason those aren't equal mathes, and comiler adds with'this' 
+            case q"scala.this.Predef.intArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.longArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.refArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.shortArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.unitArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.booleanArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.byteArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.charArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.doubleArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.floatArrayOps($arr).repr" => q"$arr"
+            case q"scala.this.Predef.genericArrayOps[$tags]($arr).repr" => q"$arr"
+
+            case q"scala.Predef.intArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.longArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.refArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.shortArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.unitArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.booleanArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.byteArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.charArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.doubleArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.floatArrayOps($arr).repr" => q"$arr"
+            case q"scala.Predef.genericArrayOps[$tags]($arr).repr" => q"$arr"
+            case _ => resultWrapped
+          }
+
+          if(resultWrapped.tpe ne null) {
+            result.setType(resultWrapped.tpe)
+          }
+
+          if(debug) println(s"wrapped:  ${tree}\nunwrapped: ${result}")
           result 
         }
 
@@ -149,6 +165,7 @@ package object optimizer {
         }
       }
     }
+
 
     val t = CastingTransformer.transform(exp.tree)
     
