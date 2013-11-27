@@ -16,7 +16,7 @@ package object optimizer {
     import c.universe._
     import Flag._
 
-    def addImports(tree:Tree) = {
+    def addImports(tree: Tree) = {
       q"""
          import scala.collection.par._
          import scala.reflect.ClassTag
@@ -25,24 +25,16 @@ package object optimizer {
          $tree"""
     }
 
-
     object CastingTransformer extends Transformer {
       override def transform(tree: Tree): Tree = {
 
         def unPar(tree: Tree) = {
           import scala.collection.par.Par
           val treeWithImports = addImports(tree)
-           if(debug) println("typechecking " + treeWithImports)
+          if(debug) println("typechecking " + treeWithImports)
           val typeChecked = c.typeCheck(treeWithImports)
-          if(debug) println("got type " + typeChecked.tpe)
-          if (typeChecked.tpe == typeOf[scala.collection.par.Par[Array[Int]]])
-            if(debug) println("int array")
-          if (typeChecked.tpe == typeOf[scala.collection.par.Par[Array[Double]]])
-            if(debug) println("double array")
-          if (typeChecked.tpe == typeOf[scala.collection.par.Par[scala.collection.immutable.HashSet[Int]]])
-            if(debug) println("int hashset")
-          val result = // we need to temporary wrap arrays to help typecheker
-            if (typeChecked.tpe == typeOf[scala.collection.par.Par[Array[Int]]]) 
+          val result = {// we need to temporary wrap arrays to help typecheker
+            if (typeChecked.tpe == typeOf[scala.collection.par.Par[Array[Int]]])
               q"new scala.collection.mutable.WrappedArray.ofInt($tree.seq)"
             else if (typeChecked.tpe == typeOf[Par[Array[Double]]]) 
               q"new scala.collection.mutable.WrappedArray.ofDouble($tree.seq)"
@@ -64,17 +56,17 @@ package object optimizer {
               q"new scala.collection.mutable.WrappedArray.ofRef($tree.seq)"
             else if (typeChecked.tpe == typeOf[Par[_]])  q"$tree.seq"
             else tree
-          
+          }
           result 
         }
 
         def unWrapArray(tree: Tree) = {
           val treeWithImports = addImports(tree)
-           if(debug) println("unwrapping " + treeWithImports)
+          if(debug) println("unwrapping " + treeWithImports)
           val typeChecked = c.typeCheck(treeWithImports)
           if(debug) println("got type " + typeChecked.tpe)
-          val result = 
-            if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.WrappedArray[_]].typeSymbol)) 
+          val result = {
+            if (typeChecked.tpe.baseClasses.contains(typeOf[scala.collection.mutable.WrappedArray[_]].typeSymbol))
               {
                 if(debug) println("*********************unwrapping to array!")
                 val r = q"$tree.array"
@@ -89,6 +81,7 @@ package object optimizer {
                 r
               }
             else tree
+          }
           
           result 
         }
