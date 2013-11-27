@@ -13,9 +13,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
 
   def persistor = new SerializationPersistor
 
-  val tiny = 300000
-  val small = 3000000
-  val large = 30000000
+
 
   val opts = Seq(
     exec.minWarmupRuns -> 50,
@@ -35,6 +33,9 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
   /* benchmarks */
 
   performance of "Optimized[Range]" config (opts: _*) in {
+    val tiny = 300000
+    val small = 3000000
+    val large = 30000000
 
     measure method "reduce" in {
       using(ranges(large)) curve ("collections") in { x =>
@@ -66,16 +67,9 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
 
     measure method "filter" in {
       using(ranges(small)) curve ("collections") in { x =>
-        x.find(_>0)
+        x.filter(_>5)
       }
-      using(ranges(small)) curve ("optimized") in { x => optimize{x.filter(_>0)} }
-    }
-
-    measure method "forall" in {
-      using(ranges(large)) curve ("collections") in { x =>
-        x.forall(_>0)
-      }
-      using(ranges(large)) curve ("optimized") in { x => optimize{x.forall(_>0)} }
+      using(ranges(small)) curve ("optimized") in { x => optimize{x.filter(_>5)} }
     }
 
     measure method "flatMap" in {
@@ -137,24 +131,99 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
       }
     }
 
-    measure method "min" in {
-      using(ranges(large)) curve ("collections") in { x =>
-        x.min
+    measure method "ProjectEuler1" in {
+
+      using(ranges(small)) curve ("collections") in { x =>
+        x.filter(x => (x % 3 == 0)|| (x % 5 == 0)).reduce(_ + _)
       }
-      using(ranges(large)) curve ("optimized") in { x => 
-        optimize{x.min}
-      }
-    }
-    measure method "product" in {
-      using(ranges(large)) curve ("collections") in { x =>
-        x.product
-      }
-      using(ranges(large)) curve ("optimized") in { x => 
-        optimize{x.product}
+      using(ranges(small)) curve ("optimized") in { x => 
+        optimize{x.filter(x => (x % 3 == 0)|| (x % 5 == 0)).reduce(_ + _)}
       }
     }
 
   }
+
+
+  performance of "Optimized[ImmutableSet]" config (opts: _*) in {
+
+
+    val small = 25000
+    val large = 150000
+
+    measure method "reduce" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        x.reduce(_+_)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => optimize{x.reduce(_+_)} }
+    }
+
+
+
+    measure method "map" in {
+      using(hashTrieSets(small)) curve ("collections") in { x =>
+        x.map(x=>x)
+      }
+      using(hashTrieSets(small)) curve ("optimized") in { x => optimize{x.map(x=>x)} }
+    }
+
+
+    measure method "exists" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        x.exists(_<Int.MinValue)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => optimize{x.exists(_<Int.MinValue)} }
+    }
+
+    measure method "find" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        x.find(_<Int.MinValue)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => optimize{x.find(_<Int.MinValue)} }
+    }
+
+    measure method "filter" in {
+      using(hashTrieSets(small)) curve ("collections") in { x =>
+        x.filter(_>5)
+      }
+      using(hashTrieSets(small)) curve ("optimized") in { x => optimize{x.filter(_>5)} }
+    }
+
+    measure method "flatMap" in {
+      using(hashTrieSets(small)) curve ("collections") in { x =>
+        x.flatMap(x=> List(x, x, x))
+      }
+      using(hashTrieSets(small)) curve ("optimized") in { x => optimize{x.flatMap(x=> List(x, x, x))} }
+    }
+
+    measure method "foreach" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        var count = 0
+        x.foreach(x=> count = count + 1)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => 
+        var count = 0 
+        optimize{x.foreach(x=> count = count + 1) }
+      }
+    }
+
+    measure method "count" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        x.count(_>0)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => 
+        optimize{x.count(_>0)}
+      }
+    }
+
+    measure method "fold" in {
+      using(hashTrieSets(large)) curve ("collections") in { x =>
+        x.fold(0)(_+_)
+      }
+      using(hashTrieSets(large)) curve ("optimized") in { x => 
+        optimize{x.fold(0)(_+_)}
+      }
+    }
  
 
+ }
 }
