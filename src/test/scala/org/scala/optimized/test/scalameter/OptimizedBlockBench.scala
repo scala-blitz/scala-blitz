@@ -226,4 +226,5 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
  
 
  }
+
 }

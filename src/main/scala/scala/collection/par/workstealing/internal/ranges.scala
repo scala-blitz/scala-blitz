@@ -268,7 +268,7 @@ object RangesMacros {
 
     reify {
       ordv.splice
-      if (Configuration.manualOptimizations && (ordg.splice eq Ordering.Int)) {
+      if (Configuration.manualOptimizations && (ordg.splice eq scala.math.Ordering.Int)) {
         val range = calleeExpression.splice.r
         if (range.step > 0) range.head else range.last
       } else reduceResult.splice
@@ -285,7 +285,7 @@ object RangesMacros {
 
     reify {
       ordv.splice
-      if (Configuration.manualOptimizations && (ordg.splice eq Ordering.Int)) {
+      if (Configuration.manualOptimizations && (ordg.splice eq scala.math.Ordering.Int)) {
         val range = calleeExpression.splice.r
         if (range.step < 0) range.head else range.last
       } else reduceResult.splice
