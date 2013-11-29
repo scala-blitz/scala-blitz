@@ -202,7 +202,7 @@ class OptimizedBlockTest extends FunSuite {
     val size = 200
     val elems = 0 until size
     val expected = elems.flatMap(x => elems.map(_ + 1)).sum
-    val obtained = optimize { elems.flatMap(x => elems.map(_ + 1)).sum}
+    val obtained = optimize { elems.flatMap(x => elems.map(_ + 1)).sum }
     assert(obtained == expected)
   }
 
@@ -210,7 +210,7 @@ class OptimizedBlockTest extends FunSuite {
     val size = 200
     val elems = 0 until size
     val expected = elems.flatMap(x => elems.map(_ + 1).filter(_ % 2 == x % 2)).filter(_ % 2 == 0).sum
-    val obtained = optimize { elems.flatMap(x => elems.map(_ + 1).filter(_ % 2 == x % 2)).filter(_ % 2 == 0).sum}
+    val obtained = optimize { elems.flatMap(x => elems.map(_ + 1).filter(_ % 2 == x % 2)).filter(_ % 2 == 0).sum }
     assert(obtained == expected)
   }
 
