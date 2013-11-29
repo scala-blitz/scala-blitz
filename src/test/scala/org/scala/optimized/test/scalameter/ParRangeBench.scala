@@ -20,10 +20,10 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   val single = Gen.single("sizes")(500000)
 
   val opts = Seq(
-    exec.minWarmupRuns -> 5,
-    exec.maxWarmupRuns -> 10,
+    exec.minWarmupRuns -> 50,
+    exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
-    exec.independentSamples -> 3,
+    exec.independentSamples -> 6,
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
@@ -35,7 +35,6 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     reports.regression.noiseMagnitude -> 0.75)
 
   @volatile var global = 0
-
   /* benchmarks */
 
   performance of "Par[Range]" config (opts: _*) in {
@@ -56,7 +55,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     }
 
     measure method "reduce(step)" in {
-      def workOnElement(e: Int, size: Int) = {
+      def workOnElement(e:Int, size:Int) = {
         var until = 1
         if (e > size * 0.97) until = 200000
         var acc = 1
@@ -64,20 +63,20 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         while (i < until) {
           acc *= i
           i += 1
+          }
+          acc
         }
-        acc
-      }
 
       using(ranges(single)) curve ("Sequential") in { r =>
         var i = r.head
         val end = r.last
         var sum = 0
-        while(i != end) {
+        while(i!= end) {
           sum = sum + workOnElement(i, end)
           i = i + 1
         }
         global = sum
-      }
+     }
 
       using(withSchedulers(ranges(single))) curve ("Par") in { t => 
         implicit val scheduler = t._2
@@ -92,7 +91,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
           var acc = 1;
           var i = 0;
           val until = math.sqrt(e)
-          while(i < until) {
+          while(i<until) {
             acc = (acc * i) / 3;
             i = i + 1
           }
@@ -122,11 +121,11 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         val until: Int = 1<< (e/30000);
         var acc = 1
         var i = 1
-        while (i < until) {
+          while(i<until) {
           acc *= i
           i += 1
-        }
-        acc
+          }
+          acc
       }
       using(ranges(single)) curve ("Sequential") in { r =>
         var i = r.head

@@ -9,13 +9,13 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     name := "workstealing",
     version := "0.1",
-    scalaVersion := "2.10.2",
+    scalaVersion := "2.11.0-M7",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % "2.10.2"
-      , "org.scalatest" %% "scalatest" % "1.9.1" % "test"
-      , "com.github.axel22" %% "scalameter" % "0.4"
+      "org.scala-lang" % "scala-reflect" % "2.11.0-M7"
+      , "com.github.axel22" % "scalameter_2.11" % "0.5-SNAPSHOT"
+//      , "org.scalatest" %% "scalatest" % "2.0.1-SNAP4" % "test"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
     logBuffered := false

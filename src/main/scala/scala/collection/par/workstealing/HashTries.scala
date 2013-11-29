@@ -1,6 +1,8 @@
 package scala.collection.par
 package workstealing
 
+
+
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
@@ -9,6 +11,8 @@ import scala.collection.immutable.HashSet
 import scala.collection.immutable.HashMap
 import scala.collection.immutable.TrieIterator
 import scala.annotation.unchecked.{ uncheckedVariance => uV }
+
+
 
 object HashTries {
 
@@ -88,14 +92,12 @@ object HashTries {
     implicit def hashTrieMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
       def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)] {
         def iterator = pa.seq.iterator
-        def splitter = ???
         def stealer = pa.stealer
       }
     }
     implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
       def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
         def iterator = pa.seq.iterator
-        def splitter = ???
         def stealer = pa.stealer
       }
     }
@@ -169,7 +171,7 @@ object HashTries {
 
     type StealerType = HashSetIndexedStealer[T]
 
-    val chunkIterator = new TrieChunkIterator[T, HashSet[T]] {
+    val chunkIterator:TrieChunkIterator[T, HashSet[T]] = new TrieChunkIterator[T, HashSet[T]] {
       final def getElem(x: AnyRef): T = {
         val hs1 = x.asInstanceOf[HashSet.HashSet1[T]]
         HashTries.key(hs1)

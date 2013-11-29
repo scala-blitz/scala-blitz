@@ -135,8 +135,8 @@ object Mandelbrot extends PerformanceTest.Regression with Serializable {
 
     private def fillWsTree(pixels: Array[Int], wdt: Int, hgt: Int) {
       val range = 0 until (wdt * hgt)
-      val conf = new workstealing.Scheduler.Config.Default(parallelism)
-      implicit val s = new workstealing.Scheduler.ForkJoin(conf)
+      val conf = new Scheduler.Config.Default(parallelism)
+      implicit val s = new Scheduler.ForkJoin(conf)
   
       for (idx <- range.toPar) {
         val x = idx % wdt
@@ -248,12 +248,12 @@ object Mandelbrot extends PerformanceTest.Regression with Serializable {
 
   @volatile var dummy: Int = Int.MinValue;
 
-  lazy val conf =  new workstealing.Scheduler.Config.Default()
-  lazy val s = new workstealing.Scheduler.ForkJoin(conf)
+  lazy val conf =  new Scheduler.Config.Default()
+  lazy val s = new Scheduler.ForkJoin(conf)
 
   /* inputs */
 
-  def benchmarkWs() {
+  def benchmarkWs() = {
     val wdt = 580
     val hgt = 570
     val xlo = -1.0349498063694267
@@ -276,7 +276,7 @@ object Mandelbrot extends PerformanceTest.Regression with Serializable {
     dummy
   }
 
-  def benchmarkSequential() {
+  def benchmarkSequential(): Int = {
     val wdt = 580
     val hgt = 570
     val xlo = -1.0349498063694267

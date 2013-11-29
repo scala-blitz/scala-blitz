@@ -4,8 +4,7 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
-import workstealing.Scheduler
-import workstealing.Scheduler.Config
+import Scheduler.Config
 import scala.collection._
 import scala.collection.parallel.ForkJoinTaskSupport
 
@@ -28,35 +27,48 @@ trait Generators {
     for (i <- 0 until size) conc = conc <> i
     conc
   }
+
   def normalizedConcs(from: Int) = for (conc <- concs(from)) yield conc.normalized
+
   def bufferConcs(from: Int) = for (size <- sizes(from)) yield {
     var cb = new Conc.Buffer[Int]
     for (i <- 0 until size) cb += i
     cb.result.normalized
   }
+
   def hashMaps(from: Int) = for (size <- sizes(from)) yield {
     val hm = new mutable.HashMap[Int, Int]
     for (i <- 0 until size) hm += ((i, i))
     hm
   }
+
   def hashTrieSets(from: Int) = for (size <- sizes(from)) yield {
     var hs = immutable.HashSet[Int]()
     for (i <- 0 until size) hs += i
     hs
   }
+
   def hashSets(from: Int) = for (size <- sizes(from)) yield {
     val hs = new mutable.HashSet[Int]
     for (i <- 0 until size) hs += i
     hs
   }
 
+  def immutableTreeSets(from: Int) = for (size <- sizes(from)) yield {
+    var ts = immutable.TreeSet[String]()
+    for (i <- 0 until size) ts += i.toString
+    ts
+  }
+
   def withArrays[Repr <% TraversableOnce[_]](gen: Gen[Repr]) = for (coll <- gen) yield (coll, new Array[Int](coll.size))
 
   val parallelismLevels = Gen.exponential("par")(1, Runtime.getRuntime.availableProcessors, 2)
+
   val schedulers = {
-    val ss = for (par <- parallelismLevels) yield new Scheduler.ForkJoin(new Config.Default(par) { override def maximumStep = 1024})
+    val ss = for (par <- parallelismLevels) yield new Scheduler.ForkJoin(new Config.Default(par) { override val maximumStep = 1024 })
     ss.cached
   }
+
   val tasksupports = {
     val ss = for (par <- parallelismLevels) yield new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(par))
     ss.cached

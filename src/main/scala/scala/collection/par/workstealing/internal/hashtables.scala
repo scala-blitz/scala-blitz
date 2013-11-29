@@ -6,7 +6,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing._
-import scala.collection.par.workstealing.Scheduler.Node
+import scala.collection.par.Scheduler
+import scala.collection.par.Scheduler.Node
 import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Merger
@@ -263,8 +264,8 @@ c.Expr[HashTables.HashMapKernel[K, V, Merger[S, That]]] = {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new HashTables.HashMapKernel[K, V, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -320,8 +321,8 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Scheduler]
 
       import scala.reflect.ClassTag
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice
@@ -354,8 +355,8 @@ merger += mpg.splice.apply(elem) })
 
       import scala.reflect.ClassTag
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       mpv.splice
       cv.splice
       cmfv.splice
@@ -389,8 +390,8 @@ mpg.splice.apply(elem).foreach{merger += _} })
 
       import scala.reflect.ClassTag
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       mpv.splice
       cv.splice
       cmfv.splice
@@ -417,8 +418,8 @@ c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       val kernel = new HashTables.HashMapKernel[K, V, Option[(K, V)]] {
         lv.splice
         def zero = None
@@ -584,8 +585,8 @@ c.Expr[HashTables.HashSetKernel[T, Merger[S, That]]] = {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new scala.collection.par.workstealing.HashTables.HashSetKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -631,8 +632,8 @@ f.splice(elem) })
       import workstealing._
 
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -663,8 +664,8 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[
       import workstealing._
 
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer
@@ -697,8 +698,8 @@ f.splice(elem).foreach(x=> merger +=x) })
 
 
       import scala.collection.par.workstealing.HashTables
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
       cv.splice
       val stealer = callee.splice.stealer

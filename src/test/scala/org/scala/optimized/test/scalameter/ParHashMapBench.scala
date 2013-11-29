@@ -10,8 +10,7 @@ import scala.reflect.ClassTag
 
 
 class ParHashMapBench extends PerformanceTest.Regression with Serializable with ParHashMapSnippets with Generators {
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
+  import Scheduler.Config
 
   /* config */
 

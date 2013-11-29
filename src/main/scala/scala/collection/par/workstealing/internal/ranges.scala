@@ -7,6 +7,7 @@ import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.generic._
 import scala.collection.par.Par
+import scala.collection.par.Scheduler
 import scala.collection.par.workstealing._
 import scala.collection.par.Configuration
 import scala.collection.par.Merger
@@ -267,7 +268,7 @@ object RangesMacros {
 
     reify {
       ordv.splice
-      if (Configuration.manualOptimizations && (ordg.splice eq Ordering.Int)) {
+      if (Configuration.manualOptimizations && (ordg.splice eq scala.math.Ordering.Int)) {
         val range = calleeExpression.splice.r
         if (range.step > 0) range.head else range.last
       } else reduceResult.splice
@@ -284,7 +285,7 @@ object RangesMacros {
 
     reify {
       ordv.splice
-      if (Configuration.manualOptimizations && (ordg.splice eq Ordering.Int)) {
+      if (Configuration.manualOptimizations && (ordg.splice eq scala.math.Ordering.Int)) {
         val range = calleeExpression.splice.r
         if (range.step < 0) range.head else range.last
       } else reduceResult.splice
@@ -460,7 +461,7 @@ object RangesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
+      import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
       val sTag = getTagForS.splice
       val range = callee.splice.r
@@ -468,7 +469,7 @@ object RangesMacros {
 
       val sarray = sTag.newArray(len)
       new Ranges.CopyMapRangeKernel[S] {
-        import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+        import scala.collection.par.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
 
         def resultArray = sarray
@@ -507,8 +508,8 @@ object RangesMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       new Ranges.RangeKernel[Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[Int, Merger[S, That]], node: Node[Int, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
@@ -562,8 +563,8 @@ object RangesMacros {
 
       import scala.collection.par.workstealing.Ranges
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -603,8 +604,8 @@ object RangesMacros {
       import workstealing._
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.workstealing.Ranges
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
       lv.splice
       cv.splice
@@ -634,8 +635,8 @@ object RangesMacros {
       import workstealing._
 
       import scala.collection.par.workstealing.{ Arrays, Ranges }
-      import scala.collection.par.workstealing.Scheduler
-      import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+      import scala.collection.par.Scheduler
+      import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice
       cv.splice
       cmfv.splice

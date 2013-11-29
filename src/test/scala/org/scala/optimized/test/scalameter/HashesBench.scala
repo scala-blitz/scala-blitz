@@ -9,8 +9,7 @@ import org.scalameter.api._
 
 
 class HashesBench extends PerformanceTest.Regression with Serializable with Generators with scala.collection.parallel.scalatest.Helpers{
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
+  import Scheduler.Config
 
   /* config */
 

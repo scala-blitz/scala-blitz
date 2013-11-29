@@ -25,7 +25,6 @@ object Ranges {
     implicit def rangeIsZippable(implicit ctx: Scheduler) = new IsZippable[Range, Int] {
       def apply(pr: Par[Range]) = new Zippable[Int]{
       def iterator = pr.seq.iterator
-      def splitter =  ???
       def stealer = new RangeStealer(pr.seq, 0, pr.seq.length)
       def newMerger = new Arrays.ArrayMerger2ZippableMergerConvertor[Int](new Arrays.ArrayMerger[Int](ctx))
       }
@@ -45,9 +44,9 @@ object Ranges {
     override def min[U >: Int](implicit ord: Ordering[U], ctx: Scheduler): Int = macro internal.RangesMacros.min[U]
     override def foreach[U >: Int](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.foreach[U]
     override def max[U >: Int](implicit ord: Ordering[U], ctx: Scheduler): Int = macro internal.RangesMacros.max[U]
-    override def find[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Option[Int] = macro internal.RangesMacros.find[U]
-    override def exists[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.exists[U]
-    override def forall[U >: Int](p: U=> Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.forall[U]
+    override def find[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Option[Int] = macro internal.RangesMacros.find[U]
+    override def exists[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.exists[U]
+    override def forall[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.forall[U]
     override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler) = macro internal.RangesMacros.map[Int, S, That]
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:Scheduler): Unit = macro internal.RangesMacros.copyToArray[U]
     def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.copyToArray2[U]
@@ -111,7 +110,7 @@ object Ranges {
   }
 
   abstract class CopyMapRangeKernel[@specialized S] extends IndexedStealer.IndexedKernel[Int, Unit] {
-    import scala.collection.par.workstealing.Scheduler.{ Ref, Node }
+    import scala.collection.par.Scheduler.{ Ref, Node }
     def zero: Unit = ()
     def combine(a: Unit, b: Unit) = a
     def resultArray: Array[S]

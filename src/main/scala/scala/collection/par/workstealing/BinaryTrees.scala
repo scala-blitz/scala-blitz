@@ -1,51 +1,37 @@
-package scala.collection
+package scala.collection.par
+package workstealing
 
 
 
-import scala.collection.immutable.RedBlackTree
+import scala.collection.parallel.Splitter
+import scala.collection.immutable.TreeSet
+import generic._
 
 
 
-package immutable {
+object BinaryTrees {
 
-  import par._
-  import workstealing._
+  trait Scope {
 
-  object RedBlackTreeStealer {
-    val TREESET_OFFSET_TREE = unsafe.objectFieldOffset(classOf[immutable.TreeSet[_]].getDeclaredField("tree"))
+    implicit def treeSetOps[T](ts: Par[TreeSet[T]]) = new TreeSetOps(ts)
 
-    final def redBlackRoot[T](ts: immutable.TreeSet[T]) = unsafe.getObject(ts, TREESET_OFFSET_TREE).asInstanceOf[immutable.RedBlackTree.Tree[T, Unit]]
-    
-    abstract class RedBlackTreeIsBinary[T, K, V] extends BinaryTreeStealer.Binary[T, RedBlackTree.Tree[K, V]] {
-      def sizeBound(total: Int, depth: Int): Int = {
-        1 << depthBound(total, depth)
+    implicit def immutableTreeSetIsReducable[T] = new IsReducable[TreeSet[T], T] {
+      def apply(pts: Par[TreeSet[T]]) = new Reducable[T] {
+        def iterator: Iterator[T] = pts.seq.iterator
+        def splitter: Splitter[T] = ???
+        def stealer: Stealer[T] = pts.stealer
       }
-      def depthBound(total: Int, depth: Int): Int = {
-        math.max(2, (2.5 * math.log(total) / math.log(2) + 2).toInt - depth)
-      }
-      def isEmptyLeaf(n: RedBlackTree.Tree[K, V]): Boolean = n eq null
-      def left(n: RedBlackTree.Tree[K, V]): RedBlackTree.Tree[K, V] = n.left
-      def right(n: RedBlackTree.Tree[K, V]): RedBlackTree.Tree[K, V] = n.right
-      def value(n: RedBlackTree.Tree[K, V]): T
-    }
-
-    def redBlackTreeSetIsBinary[K] = new RedBlackTreeIsBinary[K, K, Unit] {
-      def value(n: RedBlackTree.Tree[K, Unit]) = n.key
-    }
-  }
-
-}
-
-
-package par {
-  package workstealing {
-
-    object BinaryTrees {
-    
-      trait Scope {
-      }
-
     }
 
   }
+
+  class TreeSetOps[T](val treeset: Par[TreeSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[TreeSet[T]]] {
+    def stealer: Stealer[T] = {
+      val root = scala.collection.immutable.RedBlackTreeStealer.redBlackRoot(treeset.seq)
+      val binary = scala.collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[T]
+      new workstealing.BinaryTreeStealer(root, 0, treeset.seq.size, binary)
+    }
+    def seq = treeset
+  }
+
 }

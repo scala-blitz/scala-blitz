@@ -17,7 +17,7 @@ object BarnesHut {
   self =>
 
   var bodies: Array[Quad.Body] = _
-  var scheduler: workstealing.Scheduler = _
+  var scheduler: Scheduler = _
   var tasksupport: TaskSupport = _
   var initialBoundaries: Boundaries = _
   var boundaries: Boundaries = _
@@ -270,7 +270,7 @@ object BarnesHut {
     override def toString = s"Sectors(${matrix.mkString(", ")})"
   }
 
-  def toQuad(sectors: Sectors[Conc.Buffer[Quad.Body]])(implicit ctx: workstealing.Scheduler): Quad = {
+  def toQuad(sectors: Sectors[Conc.Buffer[Quad.Body]])(implicit ctx: Scheduler): Quad = {
     buckets = sectors.matrix.map(_.result)
     val indexedBuckets: Array[(Conc[Quad.Body], Int)] = buckets.zipWithIndex
     val quads: Array[Quad] = if (useWsTree) {
@@ -385,8 +385,8 @@ object BarnesHut {
 
   def initScheduler() {
     val p = parallelism
-    val conf = new workstealing.Scheduler.Config.Default(p)
-    scheduler = new workstealing.Scheduler.ForkJoin(conf)
+    val conf = new Scheduler.Config.Default(p)
+    scheduler = new Scheduler.ForkJoin(conf)
     tasksupport = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(p))
     println(s"parallelism level: $p")
   }
@@ -415,7 +415,7 @@ object BarnesHut {
     frame.info.setText(text)
   }
 
-  def step()(implicit s: workstealing.Scheduler): Unit = self.synchronized {
+  def step()(implicit s: Scheduler): Unit = self.synchronized {
     def constructTree() {
       // construct sectors
       if (useWsTree) {

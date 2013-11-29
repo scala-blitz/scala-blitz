@@ -9,8 +9,6 @@ import scala.reflect.ClassTag
 
 
 class ParConcBench extends PerformanceTest.Regression with Serializable with ParConcSnippets with Generators {
-  import workstealing.Scheduler
-  import workstealing.Scheduler.Config
 
   /* config */
 

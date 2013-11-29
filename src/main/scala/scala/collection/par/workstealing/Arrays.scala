@@ -51,7 +51,6 @@ object Arrays {
     def apply(pa: Par[Array[T]]) = new Zippable[T] {
       def iterator = pa.seq.iterator
       def stealer = new ArrayStealer(pa.seq, 0, pa.seq.length)
-      def splitter = ???
       def newMerger = new ArrayMerger2ZippableMergerConvertor[T](Arrays.newArrayMerger(pa))
     }
 
@@ -88,14 +87,14 @@ object Arrays {
 
   }
 
-  class ArrayMerger2ZippableMergerConvertor[T](val merger:ArrayMerger[T])(implicit ctx: Scheduler) extends Merger[T, Zippable[T]] {
+  class ArrayMerger2ZippableMergerConvertor[T](val merger: ArrayMerger[T])(implicit ctx: Scheduler) extends Merger[T, Zippable[T]] {
     def +=(elem: T) = { merger += (elem); this }
     def result = par2zippable(merger.result)(new Array2ZippableConvertor[T])
     def clear() = merger.clear()
     def merge(that: Merger[T, Zippable[T]]) = {
       that match {
         case x: ArrayMerger2ZippableMergerConvertor[T] => new ArrayMerger2ZippableMergerConvertor(merger.merge(x.merger))
-        case _ => 
+        case _ =>
           that.result.iterator.foreach { merger += _ } //todo: unefficient
           this
       }
