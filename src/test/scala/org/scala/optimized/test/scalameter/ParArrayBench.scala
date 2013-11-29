@@ -37,9 +37,40 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
     reports.regression.noiseMagnitude -> 0.75)
 
   /* benchmarks */
+  class VolatileContainer {
+    @volatile var m = 1
+  }
+  class NonVolatileContainer {
+    var m = 1
+  }
+
 
   performance of "Par[Array]" config (opts: _*) in {
 
+    measure method "NonContendedVolatileReads" config (opts: _*) in {
+      def arraysInitV(from: Int) =
+	for (size <- sizes(from)) yield (0 until size).map(i=>new VolatileContainer).toArray
+      def arraysInitNV(from: Int) =
+	for (size <- sizes(from)) yield (0 until size).map(i=>new NonVolatileContainer).toArray
+
+/*      using(arraysInitV(small)) curve ("volatile") in { x => (1 to 100).map{a: Int =>{ var i = 0
+	val to = x.size
+	var acc = 0
+	while(i<to) {acc = acc + x(i).m
+	  i = i + 1}
+	acc}
+      }
+      }*/
+      using(arraysInitNV(small)) curve ("nonVolatile") in { x => (1 to 100).map{a: Int =>{ var i = 0
+	val to = x.size
+	var acc = 0
+	while(i<to) {acc = acc + x(i).m
+	  i = i + 1}
+	acc}
+      }
+      }
+
+    }
     measure method "Boxing" config (opts: _*) in {
       using(arrays(large)) curve ("Sequential") in { x => noboxing(x)(_ + _) }
       using(arrays(large)) curve ("SequentialBoxedOp") in { x => boxing(x)(_ + _) }

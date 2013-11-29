@@ -65,7 +65,7 @@ trait Generators {
   val parallelismLevels = Gen.exponential("par")(1, Runtime.getRuntime.availableProcessors, 2)
 
   val schedulers = {
-    val ss = for (par <- parallelismLevels) yield new Scheduler.ForkJoin(new Config.Default(par))
+    val ss = for (par <- parallelismLevels) yield new Scheduler.ForkJoin(new Config.Default(par) { override val maximumStep = 1024 })
     ss.cached
   }
 

@@ -17,7 +17,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   val small = 3000000
   val large = 30000000
 
-  val single = Gen.single("sizes")(3000000)
+  val single = Gen.single("sizes")(500000)
 
   val opts = Seq(
     exec.minWarmupRuns -> 50,
@@ -34,6 +34,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.independentSamples -> 1,
     reports.regression.noiseMagnitude -> 0.75)
 
+  @volatile var global = 0
   /* benchmarks */
 
   performance of "Par[Range]" config (opts: _*) in {
@@ -55,18 +56,17 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "reduce(step)" in {
       def workOnElement(e:Int, size:Int) = {
-        if(e>size*0.9995){    
-          println("big")
-          var acc = 1;
-          var i = 0;
-          while(i<2000000) {
-            acc = (acc * i) * 3;
-            i = i + 1
+        var until = 1
+        if (e > size * 0.97) until = 200000
+        var acc = 1
+        var i = 1
+        while (i < until) {
+          acc *= i
+          i += 1
           }
           acc
         }
-        else 0
-      }
+
       using(ranges(single)) curve ("Sequential") in { r =>
         var i = r.head
         val end = r.last
@@ -75,6 +75,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
           sum = sum + workOnElement(i, end)
           i = i + 1
         }
+        global = sum
      }
 
       using(withSchedulers(ranges(single))) curve ("Par") in { t => 
@@ -102,14 +103,14 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         val end = r.last
         var sum = 0
         while(i!= end) {
-          sum = sum + workOnElement(i, end)
+          sum = sum + workOnElement(i, 3000000)
           i = i + 1
         }
      }
 
       using(withSchedulers(ranges(single))) curve ("Par") in { t => 
         implicit val scheduler = t._2
-        val sz = t._1.length
+        val sz = 3000000
         t._1.toPar.mapReduce(x=>workOnElement(x,sz))(_+_)
       }
 
@@ -117,16 +118,16 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
     measure method "reduce(exp)" in {
       def workOnElement(e:Int, size:Int) = {
-          var acc = 1;
-          var i = 0;
-          val until = math.pow(2, e / 250000.0)
-          while(i < until) {
-            acc = (acc * i) / 3;
-            i = i + 1
+        val until: Int = 1<< (e/30000);
+        var acc = 1
+        var i = 1
+          while(i<until) {
+          acc *= i
+          i += 1
           }
           acc
       }
-      using(ranges(small)) curve ("Sequential") in { r =>
+      using(ranges(single)) curve ("Sequential") in { r =>
         var i = r.head
         val end = r.last
         var sum = 0
@@ -136,7 +137,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
         }
      }
 
-      using(withSchedulers(ranges(small))) curve ("Par") in { t => 
+      using(withSchedulers(ranges(single))) curve ("Par") in { t => 
         implicit val scheduler = t._2
         val sz = t._1.length
         t._1.toPar.mapReduce(x=>workOnElement(x,sz))(_+_)
