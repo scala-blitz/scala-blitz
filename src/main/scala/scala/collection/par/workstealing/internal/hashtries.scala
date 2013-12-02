@@ -25,7 +25,7 @@ object HashTrieSetMacros {
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
     val (comblv, comboper) = c.nonFunctionToLocal[(S, S) => S](combop)
     val (zv, zg) = c.nonFunctionToLocal[S](z)
-    val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -34,13 +34,13 @@ object HashTrieSetMacros {
 
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Trees.HashSetKernel[T, S] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashSetKernel[T, S] {
         seqlv.splice
         comblv.splice
         zv.splice
         def zero = zg.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: Node[T, S], ci: Trees.HashSetIndexedStealer[T], elems: Int): S = {
+        def apply(node: Node[T, S], ci: HashTries.HashSetIndexedStealer[T], elems: Int): S = {
           if (elems < 1) zero
           else {
             var sum = zero
@@ -64,7 +64,7 @@ object HashTrieSetMacros {
     import c.universe._
 
     val (predv, predoper) = c.nonFunctionToLocal[T => Boolean](pred)
-    val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -76,10 +76,10 @@ object HashTrieSetMacros {
       predv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Trees.HashSetKernel[T, Option[T]] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashSetKernel[T, Option[T]] {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
-        def apply(node: Node[T, Option[T]], ci: Trees.HashSetIndexedStealer[T], elems: Int): Option[T] = {
+        def apply(node: Node[T, Option[T]], ci: HashTries.HashSetIndexedStealer[T], elems: Int): Option[T] = {
           var res: Option[T] = zero
           var got = 0
           while (res.isEmpty && got < elems) {
@@ -204,7 +204,7 @@ object HashTrieSetMacros {
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
     val (comblv, comboper) = c.nonFunctionToLocal[(M, M) => M](combop)
 
-    val calleeExpression = c.Expr[Trees.HashSetOps[T]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashSetOps[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -217,7 +217,7 @@ object HashTrieSetMacros {
       val stealer = callee.stealer
       mpv.splice
       comblv.splice
-      val kernel = new scala.collection.par.workstealing.Trees.HashSetKernel[T, ResultCell[M]] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashSetKernel[T, ResultCell[M]] {
         def zero = new ResultCell[M]()
         override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[M]], node: Scheduler.Node[T, ResultCell[M]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[M])
@@ -229,7 +229,7 @@ object HashTrieSetMacros {
             r
           }
         }
-        def apply(node: Node[T, ResultCell[M]], ci: Trees.HashSetIndexedStealer[T], elems: Int): ResultCell[M] = {
+        def apply(node: Node[T, ResultCell[M]], ci: HashTries.HashSetIndexedStealer[T], elems: Int): ResultCell[M] = {
           val cur = node.READ_INTERMEDIATE
           if (elems < 1) cur
           else {
@@ -253,7 +253,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
-  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Trees.HashSetKernel[T, Merger[S, That]]] = {
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[HashTries.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[HashTries.HashSetKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -264,7 +264,7 @@ object HashTrieSetMacros {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      new Trees.HashSetKernel[T, Merger[S, That]] {
+      new HashTries.HashSetKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -274,7 +274,7 @@ object HashTrieSetMacros {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[T, Merger[S, That]], ci: Trees.HashSetIndexedStealer[T], elems: Int): Merger[S, That] = {
+        def apply(node: Node[T, Merger[S, That]], ci: HashTries.HashSetIndexedStealer[T], elems: Int): Merger[S, That] = {
           val merger = node.READ_INTERMEDIATE
           var got = 0
           while (got < elems) {
@@ -291,7 +291,7 @@ object HashTrieSetMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => S](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -303,7 +303,7 @@ object HashTrieSetMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -321,7 +321,7 @@ object HashTrieSetMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -333,7 +333,7 @@ object HashTrieSetMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -351,7 +351,7 @@ object HashTrieSetMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashSetOps[T]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashSetOps[T]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashset)
     }
@@ -363,7 +363,7 @@ object HashTrieSetMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -387,7 +387,7 @@ object HashTrieMapMacros {
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, (K, V)) => S](seqop)
     val (comblv, comboper) = c.nonFunctionToLocal[(S, S) => S](combop)
     val (zv, zg) = c.nonFunctionToLocal[S](z)
-    val calleeExpression = c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -396,12 +396,12 @@ object HashTrieMapMacros {
 
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Trees.HashMapKernel[K, V, S] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashMapKernel[K, V, S] {
         seqlv.splice
         comblv.splice
         def zero = z.splice
         def combine(a: S, b: S) = comboper.splice.apply(a, b)
-        def apply(node: Node[(K, V), S], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): S = {
+        def apply(node: Node[(K, V), S], ci: HashTries.HashMapIndexedStealer[K, V], elems: Int): S = {
           var got = 0
           var res = zero
           while (got < elems) { res = seqoper.splice(res, ci.next); got += 1 }
@@ -418,7 +418,7 @@ object HashTrieMapMacros {
     import c.universe._
 
     val (predv, predoper) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
-    val calleeExpression = c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -429,10 +429,10 @@ object HashTrieMapMacros {
       predv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Trees.HashMapKernel[K, V, Option[(K, V)]] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashMapKernel[K, V, Option[(K, V)]] {
         def zero = None
         def combine(a: Option[(K, V)], b: Option[(K, V)]) = if (a.isDefined) a else b
-        def apply(node: Node[(K, V), Option[(K, V)]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): Option[(K, V)] = {
+        def apply(node: Node[(K, V), Option[(K, V)]], ci: HashTries.HashMapIndexedStealer[K, V], elems: Int): Option[(K, V)] = {
           var result: Option[(K, V)] = None
           var got = 0
           while (got < elems && result.isEmpty) {
@@ -476,7 +476,7 @@ object HashTrieMapMacros {
     val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => M](mp)
     val (comblv, comboper) = c.nonFunctionToLocal[(M, M) => M](combop)
 
-    val calleeExpression = c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix)
+    val calleeExpression = c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -489,7 +489,7 @@ object HashTrieMapMacros {
       val stealer = callee.stealer
       mpv.splice
       comblv.splice
-      val kernel = new scala.collection.par.workstealing.Trees.HashMapKernel[K, V, ResultCell[M]] {
+      val kernel = new scala.collection.par.workstealing.HashTries.HashMapKernel[K, V, ResultCell[M]] {
         def zero = new ResultCell[M]()
         override def beforeWorkOn(tree: Scheduler.Ref[(K, V), ResultCell[M]], node: Scheduler.Node[(K, V), ResultCell[M]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[M])
@@ -501,7 +501,7 @@ object HashTrieMapMacros {
             r
           }
         }
-        def apply(node: Node[(K, V), ResultCell[M]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): ResultCell[M] = {
+        def apply(node: Node[(K, V), ResultCell[M]], ci: HashTries.HashMapIndexedStealer[K, V], elems: Int): ResultCell[M] = {
           val cur = node.READ_INTERMEDIATE
           if (elems < 1) cur
           else {
@@ -522,7 +522,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(result)
   }
 
-  def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Trees.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[Trees.HashMapKernel[K, V, Merger[S, That]]] = {
+  def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[HashTries.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[HashTries.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -533,7 +533,7 @@ object HashTrieMapMacros {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      new Trees.HashMapKernel[K, V, Merger[S, That]] {
+      new HashTries.HashMapKernel[K, V, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[(K, V), Merger[S, That]], node: Node[(K, V), Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -543,7 +543,7 @@ object HashTrieMapMacros {
           else if (b eq null) a
           else if (a eq b) a
           else a merge b
-        def apply(node: Node[(K, V), Merger[S, That]], ci: Trees.HashMapIndexedStealer[K, V], elems: Int): Merger[S, That] = {
+        def apply(node: Node[(K, V), Merger[S, That]], ci: HashTries.HashMapIndexedStealer[K, V], elems: Int): Merger[S, That] = {
           val merger = node.READ_INTERMEDIATE
           var got = 0
           while (got < elems) { applyer.splice(merger, ci.next); got += 1 }
@@ -557,7 +557,7 @@ object HashTrieMapMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => S](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashmap)
     }
@@ -572,7 +572,7 @@ object HashTrieMapMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -671,7 +671,7 @@ object HashTrieMapMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => TraversableOnce[S]](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashmap)
     }
@@ -683,7 +683,7 @@ object HashTrieMapMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice
@@ -701,7 +701,7 @@ object HashTrieMapMacros {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Trees.HashMapOps[K, V]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[HashTries.HashMapOps[K, V]](c.applyPrefix), "callee")
     val mergerExpr = reify {
       cmf.splice(callee.splice.hashmap)
     }
@@ -713,7 +713,7 @@ object HashTrieMapMacros {
       import par._
       import workstealing._
 
-      import scala.collection.par.workstealing.Trees
+      import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       fv.splice

@@ -1,0 +1,2 @@
+Running those tests requires Intel c++ compiler and Intel Threading Building Blocks library
+Checked to compile and run under 4.2 update 1

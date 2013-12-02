@@ -14,16 +14,16 @@ import scala.collection.mutable.FlatHashTable
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashEntry
 import scala.collection.mutable.DefaultEntry
-import scala.collection.parallel.Splitter
 
 
 
-object Hashes {
+
+object HashTables {
 
   import Scheduler.{ Kernel, Node }
 
   trait Scope {
-    implicit def hashMapOps[K, V](a: Par[HashMap[K, V]]) = new Hashes.HashMapOps(a)
+    implicit def hashMapOps[K, V](a: Par[HashMap[K, V]]) = new HashTables.HashMapOps(a)
     implicit def canMergeHashMap[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashMap[_, _]], (K, V), Par[HashMap[K, V]]] {
       def apply(from: Par[HashMap[_, _]]) = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
@@ -32,12 +32,11 @@ object Hashes {
       def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)] {
         def iterator: Iterator[(K, V)] = pa.seq.iterator
 
-        def splitter: Splitter[(K, V)] = ???
 
         def stealer: Stealer[(K, V)] = pa.stealer
       }
     }
-    implicit def hashSetOps[T](a: Par[HashSet[T]]) = new Hashes.HashSetOps(a)
+    implicit def hashSetOps[T](a: Par[HashSet[T]]) = new HashTables.HashSetOps(a)
     implicit def canMergeHashSet[T: ClassTag](implicit ctx: Scheduler) = new CanMergeFrom[Par[HashSet[_]], T, Par[HashSet[T]]] {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashSetMerger[T](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
@@ -50,7 +49,6 @@ object Hashes {
       def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
         def iterator: Iterator[T] = pa.seq.iterator
 
-        def splitter: Splitter[T] = ???
 
         def stealer: Stealer[T] = pa.stealer
       }
@@ -235,7 +233,8 @@ object Hashes {
     new HashMapCombiningMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, valueCombiner, ctx)
   }
 
-    def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <:AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
+  def newHashMapCollectingMerger[@specialized(Int, Long) K <: AnyVal: ClassTag, @specialized(Int, Long, Float, Double) V <: AnyVal: ClassTag, That <: AnyRef, Repr](callee: Par[HashMap[K, V]])(implicit ctx: Scheduler, cmf: CanMergeFrom[Repr, V, That]) = {
+    new HashMapCollectingMerger[K, V, That, Repr](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, cmf, ctx)
   }
 
     def newHashMapCollectingMerger[@specialized(Int, Long) K: ClassTag, @specialized(Int, Long, Float, Double) V: ClassTag, That <:AnyRef, Repr](implicit ctx: Scheduler, cmf:CanMergeFrom[Repr, V, That]) = {
@@ -539,11 +538,11 @@ object Hashes {
     override def insertEntry(key: K, value: V) = table.tryAggregateEntry[V](key, value, valueInitializer, valueCombiner)
   }
 
-  class HashMapCollectingMergerCallResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V, That <: AnyRef] extends scala.collection.par.workstealing.Hashes.HashMapKernel[K, Object, Unit] {
+  class HashMapCollectingMergerCallResultKernel[@specialized(Int, Long) K, @specialized(Int, Long, Float, Double) V, That <: AnyRef] extends scala.collection.par.workstealing.HashTables.HashMapKernel[K, Object, Unit] {
         def zero = ()
         def combine(a: Unit, b: Unit) = ()
         def apply(node: Scheduler.Node[(K, Object), Unit], from: Int, until: Int) = {
-          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.Hashes.HashMapStealer[K, Object]]
+          val stealer = node.stealer.asInstanceOf[scala.collection.par.workstealing.HashTables.HashMapStealer[K, Object]]
           val table = stealer.table
           var i = from
           while (i < until) {

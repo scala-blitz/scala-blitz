@@ -31,7 +31,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   def testTraversal(sz: Int) {
     def traverseConc(c: Conc[Int]) {
       val stealer = new par.workstealing.Concs.ConcStealer(c, 0, c.size)
-      stealer.advance(c.size)
+      stealer.nextBatch(c.size)
   
       val b = mutable.ArrayBuffer[Int]()
       while (stealer.hasNext) b += stealer.next()
@@ -63,7 +63,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
   def testMoveN(sz: Int) {
     def moveStealer(c: Conc[Int], startIndex: Int, num: Int) {
       val stealer = new par.workstealing.Concs.ConcStealer(c, startIndex, c.size)
-      stealer.advance(c.size)
+      stealer.nextBatch(c.size)
       if (c.size > 0) callMoveN(stealer, num)
   
       val b = mutable.ArrayBuffer[Int]()
@@ -102,7 +102,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       val stealer = new par.workstealing.Concs.ConcStealer(c, 0, c.size)
       var step = 1
       while (stealer.isAvailable) {
-        stealer.advance(step)
+        stealer.nextBatch(step)
         while (stealer.hasNext) b += stealer.next()
         step *= 2
       }
@@ -115,7 +115,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
       val stealer = new par.workstealing.Concs.ConcStealer(c, 0, c.size)
       var step = 1
       while (stealer.isAvailable) {
-        stealer.advance(step)
+        stealer.nextBatch(step)
         callMoveN(stealer, step)
         step *= 2
       }
@@ -164,7 +164,7 @@ class ConcStealerTest extends FunSuite with scala.collection.par.scalatest.Helpe
 
       val sizes = Array(c.size / 8, c.size / 8, c.size / 4, c.size - c.size / 8 * 2 - c.size / 4)
       for (s <- sizes) {
-        stealer.advance(s)
+        stealer.nextBatch(s)
         kernel.apply(node, s)
       }
       assert(b == (0 until c.size))

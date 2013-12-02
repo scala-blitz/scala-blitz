@@ -27,7 +27,7 @@ object Concs {
     def genericCopyToArray[U >: T](arr: Array[U], start: Int, len: Int)(implicit ctx: Scheduler): Unit = internal.ConcsMethods.copyToArray[T, U](c, arr, start, len)(ctx)
     def seq = c
   }
-  
+
   /* stealer implementation */
 
   import Scheduler.{ Kernel, Node }
@@ -145,7 +145,7 @@ object Concs {
   }
 
   abstract class ConcKernel[@specialized(Int, Long, Float, Double) T, @specialized(Int, Long, Float, Double) R]
-  extends IndexedStealer.IndexedKernel[T, R] {
+    extends IndexedStealer.IndexedKernel[T, R] {
     override def defaultIncrementStepFactor = 4
 
     def apply(node: Node[T, R], chunkSize: Int): R = {
@@ -168,7 +168,7 @@ object Concs {
             stealer.switch()
           }
         case _ =>
-          // nothing
+        // nothing
       }
 
       while (stealer.peek != null && remaining > 0) {
@@ -202,15 +202,4 @@ object Concs {
   }
 
 }
-
-
-
-
-
-
-
-
-
-
-
 

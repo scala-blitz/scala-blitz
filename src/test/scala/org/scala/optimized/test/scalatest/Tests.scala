@@ -21,14 +21,13 @@ trait Tests[Repr] extends Timeouts with scala.collection.par.scalatest.Helpers {
 
   def targetCollections(r: Range): Seq[Repr]
 
-  def testOperation[T, S](numSec: Int = 10, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
+  def testOperation[T, S](numSec: Int = 3000, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
     testForSizes { r =>
       testOperationForSize(r, numSec, testEmpty, comparison)(rop)(collop)
     }
   }
 
   def testOperationForSize[T, S](r: Range, numSec: Int = 10, testEmpty: Boolean = true, comparison: (Range, T, S) => Boolean = (r: Range, x: T, y: S) => x == y)(rop: Range => T)(collop: Repr => S): Unit = {
-
     val colls = targetCollections(r)
 
     for (coll <- colls) try {

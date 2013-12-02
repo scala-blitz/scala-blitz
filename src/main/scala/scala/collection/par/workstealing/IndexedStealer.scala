@@ -30,7 +30,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
     else Stealer.AvailableOrOwned
   }
 
-  @tailrec final def advance(step: Int): Int = {
+  @tailrec final def nextBatch(step: Int): Int = {
     val p_t0 = READ_PROGRESS
     if (p_t0 == untilIndex || p_t0 < 0) -1
     else {
@@ -39,7 +39,7 @@ abstract class IndexedStealer[T](val startIndex: Int, val untilIndex: Int) exten
         nextProgress = p_t0
         nextUntil = np
         np - p_t0
-      } else advance(step)
+      } else nextBatch(step)
     }
   }
 
