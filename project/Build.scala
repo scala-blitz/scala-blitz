@@ -7,8 +7,9 @@ import java.io.File
 
 object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
-    name := "workstealing",
-    version := "0.1",
+    name := "scala-blitz",
+    organization := "com.github.scala-blitz",
+    version := "1.0-M1",
     scalaVersion := "2.11.0-M7",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
