@@ -13,7 +13,7 @@ package object optimizer {
   final def debug(s: String) = if (debugOutput) println(s)
   final val echoSplicedCode = false
 
-  def optimize[T](exp: T) = macro optimize_impl[T]
+  def optimize[T](exp: T): Any = macro optimize_impl[T]
 
   /** Eliminates consecutive Box&Unbox pairs */
   def optimize_postprocess[T](exp: T) = macro optimize_postprocess_impl[T]
