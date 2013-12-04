@@ -18,7 +18,7 @@ package object optimizer {
   /** Eliminates consecutive Box&Unbox pairs */
   def optimize_postprocess[T](exp: T) = macro optimize_postprocess_impl[T]
 
-  def optimize_postprocess_impl[T: c.WeakTypeTag](c: WhiteboxContext)(exp: c.Expr[T]) = {
+  def optimize_postprocess_impl[T: c.WeakTypeTag](c: Context)(exp: c.Expr[T]) = {
     import c.universe._
     import Flag._
 
@@ -60,11 +60,11 @@ package object optimizer {
 
     val t = BoxUnboxEliminating.transform(exp.tree)
     if (echoSplicedCode) println(t)
-    (c.resetAllAttrs(t))
+    c.Expr(c.resetAllAttrs(t))
   }
   
 
-  def optimize_impl[T: c.WeakTypeTag](c: WhiteboxContext)(exp: c.Expr[T]) = {
+  def optimize_impl[T: c.WeakTypeTag](c: Context)(exp: c.Expr[T]) = {
     import c.universe._
     import Flag._
 
@@ -151,13 +151,13 @@ package object optimizer {
         )
 
         // TODO: fix broken newTermName("groupBy") 
-        val methodWhiteList: Set[Name] = Set(TermName("foreach"), TermName("map"), TermName("reduce"), TermName("exists"), TermName("filter"), TermName("find"), TermName("flatMap"), TermName("forall"), TermName("count"), TermName("fold"), TermName("sum"), TermName("product"), TermName("min"), TermName("max"))
+        val methodWhiteList: Set[Name] = Set(newTermName("foreach"), newTermName("map"), newTermName("reduce"), newTermName("exists"), newTermName("filter"), newTermName("find"), newTermName("flatMap"), newTermName("forall"), newTermName("count"), newTermName("fold"), newTermName("sum"), newTermName("product"), newTermName("min"), newTermName("max"))
         // methods that result in Par[collection] and thus require .seq invocation
-        val collectionMethods: Set[Name] = Set(TermName("map"), TermName("filter"), TermName("flatMap"))
+        val collectionMethods: Set[Name] = Set(newTermName("map"), newTermName("filter"), newTermName("flatMap"))
         // methods for which second argument list should be maintained
-        val maintain2ArgumentList: Set[Name] = Set(TermName("fold"))
+        val maintain2ArgumentList: Set[Name] = Set(newTermName("fold"))
         // methods that already have an implicit argument list. we reuse it and add scheduler to it
-        val append2ArgumentList: Set[Name] = Set(TermName("sum"), TermName("product"), TermName("min"), TermName("max"))
+        val append2ArgumentList: Set[Name] = Set(newTermName("sum"), newTermName("product"), newTermName("min"), newTermName("max"))
 
         tree match {
           case q"$seqOriginal.aggregate[$tag]($zeroOriginal)($seqopOriginal, $comboopOriginal)" =>
@@ -249,6 +249,6 @@ package object optimizer {
       else addImports(q"optimize{$t}")
      debug(s"\n\n\n***********************************************************************************\nresult: $resultWithImports")
 
-    (c.resetAllAttrs(resultWithImports))
+    c.Expr((c.resetAllAttrs(resultWithImports)))
   }
 }

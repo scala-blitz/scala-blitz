@@ -10,16 +10,17 @@ object BuildSettings {
     name := "scala-blitz",
     organization := "com.github.scala-blitz",
     version := "1.0-M1",
-    scalaVersion := "2.11.0-M7",
+    scalaVersion := "2.10.3",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % "2.11.0-M7"
-      , "com.github.axel22" % "scalameter_2.11" % "0.5-SNAPSHOT"
+//      "org.scala-lang" % "scala-reflect" % "2.11.0-M7"
+       "com.github.axel22" %% "scalameter" % "0.4"
 //      , "org.scalatest" %% "scalatest" % "2.0.1-SNAP4" % "test"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
-    logBuffered := false
+    logBuffered := false,
+    addCompilerPlugin("org.scala-lang.plugins" % "macro-paradise" % "2.0.0-SNAPSHOT" cross CrossVersion.full)
   )
 }
 
