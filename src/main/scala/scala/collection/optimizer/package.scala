@@ -176,7 +176,7 @@ package object optimizer {
                 val comboop = transform(comboopOriginal)
                 val zero = transform(zeroOriginal)
                 progress = true
-                q"$seq.toPar.aggregate($zero)($seqop)($comboop)"
+                q"$seq.toPar.aggregate($zero)($comboop)($seqop)"
               } else super.transform(tree)
             if (whiteListed) debug("quasiquote formed " + rewrite + "\n")
             rewrite
