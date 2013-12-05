@@ -126,6 +126,14 @@ class OptimizedBlockTest extends FunSuite {
     assert(obtained.toSeq == expected.toSeq)
   }
 
+  test("Array.aggregate") {
+    val size = 200000
+    val elems = (0 until size).toArray
+    val expected = elems.aggregate(0.0)((acc:Double, x:Int) => acc + x, _ + _)
+    val obtained = optimize { elems.aggregate(0.0)((acc:Double, x:Int) => acc + x, _ + _) }
+    assert(obtained == expected)
+  }
+
   test("Array.filter") {
     val size = 200000
     val elems = (0 until size).toArray
