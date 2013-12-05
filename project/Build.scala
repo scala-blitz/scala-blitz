@@ -9,7 +9,7 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     name := "scala-blitz",
     organization := "com.github.scala-blitz",
-    version := "1.0-M1",
+    version := "1.0-SNAPSHOT",
     scalaVersion := "2.11.0-M7",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
@@ -19,7 +19,8 @@ object BuildSettings {
 //      , "org.scalatest" %% "scalatest" % "2.0.1-SNAP4" % "test"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
-    logBuffered := false
+    logBuffered := false,
+    initialCommands in console := "import scala.collection.optimizer._"
   )
 }
 
