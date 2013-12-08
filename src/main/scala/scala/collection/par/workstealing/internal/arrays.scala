@@ -183,8 +183,10 @@ object ArraysMacros {
     reify {
       calleeExpressionv.splice
       val mayBeIndex = found.splice
-      if (mayBeIndex.isDefined) Some(calleeExpressiong.splice.array.seq(mayBeIndex.get))
-      else None
+      val result =
+        if (mayBeIndex.isDefined) Some(calleeExpressiong.splice.array.seq(mayBeIndex.get))
+        else None
+      result
     }
   }
 
