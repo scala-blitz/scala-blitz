@@ -7,15 +7,15 @@ import scala.collection._
 
 
 
-class Optimizer[C <: Context](val c: C) {
+class Optimizer[C <: BlackboxContext](val c: C) {
   import c.universe._
 
   /* utilities */
 
-  val ApplyName = newTermName("apply")
-  val MapName = newTermName("map")
-  val FlatMapName = newTermName("flatMap")
-  val ForeachName = newTermName("foreach")
+  val ApplyName = TermName("apply")
+  val MapName = TermName("map")
+  val FlatMapName = TermName("flatMap")
+  val ForeachName = TermName("foreach")
   val uncheckedTpe = typeOf[scala.unchecked]
 
   object collections {
@@ -56,7 +56,7 @@ class Optimizer[C <: Context](val c: C) {
     case Function(_, _) =>
       (c.Expr[Unit](EmptyTree), c.Expr[F](f.tree))
     case _ =>
-      val localname = newTermName(c.fresh(prefix))
+      val localname = TermName(c.freshName(prefix))
       (c.Expr[Unit](ValDef(Modifiers(), localname, TypeTree(), f.tree)), c.Expr[F](Ident(localname)))
   }
 
@@ -106,11 +106,11 @@ class Optimizer[C <: Context](val c: C) {
                 c.abort(c.enclosingPosition, "incorrect arity: " + (params.length, args.length))
               val paramVals = params.zip(args).map {
                 case (ValDef(_, paramname, _, _), a) =>
-                  ValDef(Modifiers(), newTermName("" + paramname + "$0"), TypeTree(), a)
+                  ValDef(Modifiers(), TermName("" + paramname + "$0"), TypeTree(), a)
               }
               val paramVals2 = params.zip(args).map {
                 case (ValDef(_, paramname, _, _), a) =>
-                  ValDef(Modifiers(), paramname, TypeTree(), Ident(newTermName("" + paramname + "$0")))
+                  ValDef(Modifiers(), paramname, TypeTree(), Ident(TermName("" + paramname + "$0")))
               }
               Block(paramVals, Block(paramVals2, body))
             }
@@ -213,7 +213,7 @@ class Optimizer[C <: Context](val c: C) {
         def SecondaryOpName = ForeachName
         def fuse(callee: Tree, pf: Function, sf: Function) = (pf, sf) match {
           case (Function(List(pparam), pbody), Function(List(sparam), sbody)) =>
-            val localName = newTermName(c.fresh("primaryres$"))
+            val localName = TermName(c.freshName("primaryres$"))
             Function(List(pparam), Block(
               List(ValDef(Modifiers(), localName, TypeTree(), pbody)),
               Apply(sf, List(Ident(localName)))
@@ -226,8 +226,8 @@ class Optimizer[C <: Context](val c: C) {
         def SecondaryOpName = ForeachName
         def fuse(callee: Tree, pf: Function, sf: Function) = (pf, sf) match {
           case (Function(List(pparam), pbody), Function(List(sparam), sbody)) =>
-            val primaryResName = newTermName(c.fresh("primaryres$"))
-            val nestedResName = newTermName(c.fresh("nestedres$"))
+            val primaryResName = TermName(c.freshName("primaryres$"))
+            val nestedResName = TermName(c.freshName("nestedres$"))
             Function(List(pparam), Apply(
               Select(pbody, ForeachName),
               List(Function(
@@ -282,7 +282,7 @@ class Optimizer[C <: Context](val c: C) {
 
 
 object Optimizer {
-  implicit def c2opt(c: Context) = new Optimizer[c.type](c)
+  implicit def c2opt(c: BlackboxContext) = new Optimizer[c.type](c)
 }
 
 

@@ -20,7 +20,7 @@ object ConcsMacros {
 
   /* macro implementations */
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(U, U) => U](operator)
@@ -99,7 +99,7 @@ object ConcsMacros {
     c.inlineAndReset(operation)
   }
 
-  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def copyToArray[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Concs.Ops[T]](c.applyPrefix)

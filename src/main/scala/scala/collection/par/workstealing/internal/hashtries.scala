@@ -19,7 +19,7 @@ import Optimizer.c2opt
 
 object HashTrieSetMacros {
 
-  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
+  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
@@ -60,7 +60,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
-  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(pred: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
     import c.universe._
 
     val (predv, predoper) = c.nonFunctionToLocal[T => Boolean](pred)
@@ -96,7 +96,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
-  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -108,7 +108,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[T, U](c)(p)(ctx)
@@ -117,7 +117,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def product[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def product[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -130,7 +130,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def sum[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def sum[U: c.WeakTypeTag, T >: U: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -142,11 +142,11 @@ object HashTrieSetMacros {
     }
   }
 
-  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     aggregate[T, U](c)(z)(op)(op)(ctx)
   }
 
-  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
@@ -160,7 +160,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
@@ -174,9 +174,9 @@ object HashTrieSetMacros {
     }
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[T, U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[T, U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
 
-  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -187,7 +187,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -198,7 +198,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def mapReduce[T: c.WeakTypeTag, S >: T: c.WeakTypeTag, M: c.WeakTypeTag](c: Context)(mp: c.Expr[S => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[Scheduler]): c.Expr[M] = {
+  def mapReduce[T: c.WeakTypeTag, S >: T: c.WeakTypeTag, M: c.WeakTypeTag](c: BlackboxContext)(mp: c.Expr[S => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[Scheduler]): c.Expr[M] = {
     import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
@@ -253,7 +253,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(result)
   }
 
-  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[HashTries.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[HashTries.HashSetKernel[T, Merger[S, That]]] = {
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[HashTries.HashSetOps[T]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[HashTries.HashSetKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -287,7 +287,7 @@ object HashTrieSetMacros {
     }
   }
 
-  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => S](func)
@@ -317,7 +317,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(operation)
   }
 
-  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -347,7 +347,7 @@ object HashTrieSetMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[T => Boolean](pred)
@@ -381,7 +381,7 @@ object HashTrieSetMacros {
 
 object HashTrieMapMacros {
 
-  def aggregate[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
+  def aggregate[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, (K, V)) => S](seqop)
@@ -414,7 +414,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(result)
   }
 
-  def find[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(pred: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
+  def find[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[(K, V)]] = {
     import c.universe._
 
     val (predv, predoper) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
@@ -449,7 +449,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(result)
   }
 
-  def forall[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def forall[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -461,7 +461,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def exists[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def exists[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[K, V, U](c)(p)(ctx)
@@ -470,7 +470,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def mapReduce[K: c.WeakTypeTag, V: c.WeakTypeTag, M: c.WeakTypeTag](c: Context)(mp: c.Expr[((K, V)) => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[Scheduler]): c.Expr[M] = {
+  def mapReduce[K: c.WeakTypeTag, V: c.WeakTypeTag, M: c.WeakTypeTag](c: BlackboxContext)(mp: c.Expr[((K, V)) => M])(combop: c.Expr[(M, M) => M])(ctx: c.Expr[Scheduler]): c.Expr[M] = {
     import c.universe._
 
     val (mpv, mpg) = c.nonFunctionToLocal[((K, V)) => M](mp)
@@ -522,7 +522,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(result)
   }
 
-  def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[HashTries.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[HashTries.HashMapKernel[K, V, Merger[S, That]]] = {
+  def transformerKernel[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[HashTries.HashMapOps[K, V]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], (K, V)) => Any]): c.Expr[HashTries.HashMapKernel[K, V, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -553,7 +553,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def map[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[((K, V)) => S])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def map[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[((K, V)) => S])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => S](func)
@@ -586,7 +586,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(operation)
   }
 
-  def product[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def product[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -599,7 +599,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def sum[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def sum[K: c.WeakTypeTag, V: c.WeakTypeTag, T >: (K, V): c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[T]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[T]](num)
@@ -611,11 +611,11 @@ object HashTrieMapMacros {
     }
   }
 
-  def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def fold[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     aggregate[K, V, U](c)(z)(op)(op)(ctx)
   }
 
-  def count[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def count[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (pv, pred) = c.nonFunctionToLocal[U => Boolean](p)
@@ -629,7 +629,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def foreach[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def foreach[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actv, actg) = c.nonFunctionToLocal[U => Unit](action)
@@ -643,9 +643,9 @@ object HashTrieMapMacros {
     }
   }
 
-  def reduce[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[K, V, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+  def reduce[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[K, V, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
 
-  def min[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[(K, V)] = {
+  def min[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[(K, V)] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -656,7 +656,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def max[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[(K, V)] = {
+  def max[K: c.WeakTypeTag, V: c.WeakTypeTag, U >: (K, V): c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[(K, V)] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -667,7 +667,7 @@ object HashTrieMapMacros {
     }
   }
 
-  def flatMap[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[((K, V)) => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def flatMap[K: c.WeakTypeTag, V: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[((K, V)) => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => TraversableOnce[S]](func)
@@ -697,7 +697,7 @@ object HashTrieMapMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[K: c.WeakTypeTag, V: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(pred: c.Expr[((K, V)) => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], (K, V), That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def filter[K: c.WeakTypeTag, V: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[((K, V)) => Boolean])(cmf: c.Expr[CanMergeFrom[Par[HashMap[K, V]], (K, V), That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (fv, f) = c.nonFunctionToLocal[((K, V)) => Boolean](pred)
