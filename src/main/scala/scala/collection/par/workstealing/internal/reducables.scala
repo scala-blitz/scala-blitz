@@ -21,7 +21,7 @@ import scala.collection.par.Scheduler.Node
 
 object ReducablesMacros {
 
-  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
+  def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, T) => S](seqop)
@@ -31,14 +31,14 @@ object ReducablesMacros {
     invokeAggregateKernel[T, S, Repr](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateN[T, S](c)(init, seqoper))(ctx)
   }
 
-  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     val (lv, oper: c.Expr[(U, U) => U]) = c.nonFunctionToLocal[(U, U) => U](op)
     val (zv, zg: c.Expr[U]) = c.nonFunctionToLocal[U](z)
     val init = c.universe.reify { a: U => oper.splice.apply(zg.splice, a) }
     invokeAggregateKernel[T, U, Repr](c)(lv, zv)(zg)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -54,7 +54,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, U, Repr](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def foreach[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[U => Unit](action)
@@ -65,7 +65,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, Unit, Repr](c)(actionv)(zero)(comboop)(aggregateN[T, Unit](c)(init, seqoper))(ctx)
   }
 
-  def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -81,7 +81,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, U, Repr](c)(lv, numv, zerov)(zerog)(oper)(aggregateN[T, U](c)(init, oper))(ctx)
   }
 
-  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (predicv, predic) = c.nonFunctionToLocal[T => Boolean](p)
@@ -99,7 +99,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, Int, Repr](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateN[T, Int](c)(init, seqoper))(ctx)
   }
 
-  def aggregateN[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (node: Node[T, R], chunkSize: Int, kernel: Reducables.ReducableKernel[T, R]) =>
+  def aggregateN[T: c.WeakTypeTag, R: c.WeakTypeTag](c: BlackboxContext)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (node: Node[T, R], chunkSize: Int, kernel: Reducables.ReducableKernel[T, R]) =>
     {
       val stealer = node.stealer
       if (!stealer.hasNext) kernel.zero
@@ -114,7 +114,7 @@ object ReducablesMacros {
     }
   }
 
-  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducables.ReducableKernel[T, R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducables.ReducableKernel[T, R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
@@ -148,7 +148,7 @@ object ReducablesMacros {
     c.inlineAndReset(result)
   }
 
-  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
+  def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
@@ -184,7 +184,7 @@ object ReducablesMacros {
     c.inlineAndReset(result)
   }
 
-  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -196,7 +196,7 @@ object ReducablesMacros {
     }
   }
 
-  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find[T, U, Repr](c)(p)(ctx)
@@ -205,13 +205,13 @@ object ReducablesMacros {
     }
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     mapReduce[T, U, U, Repr](c)(reify { u: U => u })(op)(ctx)
   }
 
-  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
+  def mapReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
@@ -276,7 +276,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -287,7 +287,7 @@ object ReducablesMacros {
     }
   }
 
-  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
+  def max[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
     val (ordv, ordg) = c.nonFunctionToLocal[Ordering[U]](ord)
@@ -298,7 +298,7 @@ object ReducablesMacros {
     }
   }
 
-  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T, Repr]], ctx: c.Expr[Scheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
+  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T, Repr]], ctx: c.Expr[Scheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
     import c.universe._
 
     reify {
@@ -332,7 +332,7 @@ object ReducablesMacros {
     }
   }
 
-  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(callee: c.Expr[Reducables.OpsLike[T, Repr]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Reducables.ReducableKernel[T, Merger[S, That]]] = {
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[Reducables.OpsLike[T, Repr]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Reducables.ReducableKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -366,7 +366,7 @@ object ReducablesMacros {
     }
   }
 
-  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[Scheduler]) = {
+  def groupMapAggregate[T: c.WeakTypeTag, K: c.WeakTypeTag, M: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(gr: c.Expr[T => K])(mp: c.Expr[T => M])(aggr: c.Expr[(M, M) => M])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], mClassTag: c.Expr[scala.reflect.ClassTag[M]], ctx: c.Expr[Scheduler]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
@@ -418,7 +418,7 @@ object ReducablesMacros {
 
   }
 
-  def groupBy[T: c.WeakTypeTag, K: c.WeakTypeTag, Repr: c.WeakTypeTag, That <:AnyRef : c.WeakTypeTag ](c: Context)(gr: c.Expr[T => K])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], tClassTag: c.Expr[scala.reflect.ClassTag[T]], ctx: c.Expr[Scheduler], cmf:c.Expr[CanMergeFrom[Repr, T, That]]) = {
+  def groupBy[T: c.WeakTypeTag, K: c.WeakTypeTag, Repr: c.WeakTypeTag, That <:AnyRef : c.WeakTypeTag ](c: BlackboxContext)(gr: c.Expr[T => K])(kClassTag: c.Expr[scala.reflect.ClassTag[K]], tClassTag: c.Expr[scala.reflect.ClassTag[T]], ctx: c.Expr[Scheduler], cmf:c.Expr[CanMergeFrom[Repr, T, That]]) = {
     import c.universe._
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
@@ -468,7 +468,7 @@ object ReducablesMacros {
   }
 
 
-  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def map[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => S](func)
@@ -510,7 +510,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def flatMap[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Repr, S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -545,7 +545,7 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: Context)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Repr, T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def filter[T: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[T => Boolean])(cmf: c.Expr[CanMergeFrom[Repr, T, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[T => Boolean](pred)

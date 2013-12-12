@@ -20,14 +20,14 @@ object RangesMacros {
 
   /* macro implementations */
 
-  def fold[U >: Int: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def fold[U >: Int: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[U])(op: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = {
     val (lv, oper: c.Expr[(U, U) => U]) = c.nonFunctionToLocal[(U, U) => U](op)
     val (zv, zg: c.Expr[U]) = c.nonFunctionToLocal[U](z)
     val init = c.universe.reify { a: U => oper.splice.apply(zg.splice, a) }
     invokeAggregateKernel[U, U](c)(lv, zv)(zg)(oper)(aggregateZero(c), aggregate1[U](c)(init, oper), aggregateN[U](c)(init, oper))(ctx)
   }
 
-  def aggregate[S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, Int) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
+  def aggregate[S: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, Int) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
 
     val (seqlv, seqoper) = c.nonFunctionToLocal[(S, Int) => S](seqop)
@@ -37,7 +37,7 @@ object RangesMacros {
     invokeAggregateKernel[Int, S](c)(seqlv, comblv, zv)(zg)(comboper)(aggregateZero(c), aggregate1[S](c)(init, seqoper), aggregateN[S](c)(init, seqoper))(ctx)
   }
 
-  def foreach[U >: Int: c.WeakTypeTag](c: Context)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def foreach[U >: Int: c.WeakTypeTag](c: BlackboxContext)(action: c.Expr[U => Unit])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[Int => Unit](action)
@@ -48,7 +48,7 @@ object RangesMacros {
     invokeAggregateKernel[Int, Unit](c)(actionv)(zero)(comboop)(aggregateZero(c), aggregate1[Unit](c)(init, seqoper), aggregateN[Unit](c)(init, seqoper))(ctx)
   }
 
-  def sum[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def sum[U >: Int: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -66,13 +66,13 @@ object RangesMacros {
       if (Configuration.manualOptimizations && (num.splice eq scala.math.Numeric.IntIsIntegral)) {
         val range = calleeExpression.splice.r
 
-        if (range.isEmpty) 0 else (range.numRangeElements.toLong * (range.head + range.last) / 2).toInt
+        if (range.isEmpty) 0 else (range.length.toLong * (range.head + range.last) / 2).toInt
       } else { computator.splice }
     }
 
   }
 
-  def product[U >: Int: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
+  def product[U >: Int: c.WeakTypeTag](c: BlackboxContext)(num: c.Expr[Numeric[U]], ctx: c.Expr[Scheduler]): c.Expr[U] = {
     import c.universe._
 
     val (numv, numg) = c.nonFunctionToLocal[Numeric[U]](num)
@@ -93,7 +93,7 @@ object RangesMacros {
     }
   }
 
-  def count[U>:Int: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def count[U>:Int: c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val (predicv, predic) = c.nonFunctionToLocal[Int => Boolean](p)
@@ -111,9 +111,9 @@ object RangesMacros {
     invokeAggregateKernel[Int, Int](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateZero(c), aggregate1[Int](c)(init, seqoper), aggregateN[Int](c)(init, seqoper))(ctx)
   }
 
-  def aggregateZero[R: c.WeakTypeTag](c: Context): c.Expr[(Scheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R] = c.universe.reify { (node: Scheduler.Node[Int, R], at: Int, kernel: Ranges.RangeKernel[R]) => node.READ_INTERMEDIATE }
+  def aggregateZero[R: c.WeakTypeTag](c: BlackboxContext): c.Expr[(Scheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R] = c.universe.reify { (node: Scheduler.Node[Int, R], at: Int, kernel: Ranges.RangeKernel[R]) => node.READ_INTERMEDIATE }
 
-  def aggregate1[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node:Scheduler.Node[Int, R], from: Int, to: Int, kernel: Ranges.RangeKernel[R]) =>
+  def aggregate1[R: c.WeakTypeTag](c: BlackboxContext)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node:Scheduler.Node[Int, R], from: Int, to: Int, kernel: Ranges.RangeKernel[R]) =>
     {
       val fin = if (from > to) from else to
       var i: Int = from + to - fin
@@ -126,7 +126,7 @@ object RangesMacros {
     }
   }
 
-  def aggregateN[R: c.WeakTypeTag](c: Context)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node: Scheduler.Node[Int, R], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[R]) =>
+  def aggregateN[R: c.WeakTypeTag](c: BlackboxContext)(init: c.Expr[Int => R], oper: c.Expr[(R, Int) => R]) = c.universe.reify { (node: Scheduler.Node[Int, R], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[R]) =>
     {
       var i = from
       var sum: R = node.READ_INTERMEDIATE
@@ -145,7 +145,7 @@ object RangesMacros {
     }
   }
 
-  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Scheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R], applyer1: c.Expr[(Scheduler.Node[Int, R], Int, Int, Ranges.RangeKernel[R]) => R], applyerN: c.Expr[(Scheduler.Node[Int, R], Int, Int, Int, Ranges.RangeKernel[R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: BlackboxContext)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyer0: c.Expr[(Scheduler.Node[Int, R], Int, Ranges.RangeKernel[R]) => R], applyer1: c.Expr[(Scheduler.Node[Int, R], Int, Int, Ranges.RangeKernel[R]) => R], applyerN: c.Expr[(Scheduler.Node[Int, R], Int, Int, Int, Ranges.RangeKernel[R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
@@ -181,9 +181,9 @@ object RangesMacros {
     c.inlineAndReset(result)
   }
 
-  def reduce[U >: Int: c.WeakTypeTag](c: Context)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
+  def reduce[U >: Int: c.WeakTypeTag](c: BlackboxContext)(operator: c.Expr[(U, U) => U])(ctx: c.Expr[Scheduler]): c.Expr[U] = mapReduce[U, U](c)(c.universe.reify { x: U => x })(operator)(ctx)
 
-  def mapReduce[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
+  def mapReduce[U >: Int: c.WeakTypeTag, R: c.WeakTypeTag](c: BlackboxContext)(mapper: c.Expr[U => R])(reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
@@ -258,7 +258,7 @@ object RangesMacros {
     c.inlineAndReset(operation)
   }
 
-  def min[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def min[U >: Int: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
@@ -275,7 +275,7 @@ object RangesMacros {
     }
   }
 
-  def max[U >: Int: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[Int] = {
+  def max[U >: Int: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[Int] = {
     import c.universe._
 
     val calleeExpression = c.Expr[Ranges.Ops](c.applyPrefix)
@@ -292,7 +292,7 @@ object RangesMacros {
     }
   }
 
-  def find[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[Int]] = {
+  def find[U >: Int : c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
@@ -352,7 +352,7 @@ object RangesMacros {
     c.inlineAndReset(result)
   }
 
-  def forall[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def forall[U >: Int : c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val np = reify {
@@ -364,7 +364,7 @@ object RangesMacros {
     }
   }
 
-  def exists[U >: Int : c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
+  def exists[U >: Int : c.WeakTypeTag](c: BlackboxContext)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
     val found = find(c)(p)(ctx)
@@ -373,7 +373,7 @@ object RangesMacros {
     }
   }
 
-  def copyToArray1[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: Scheduler.Node[Int, Array[U]], from: Int, to: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
+  def copyToArray1[U >: Int: c.WeakTypeTag](c: BlackboxContext)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: Scheduler.Node[Int, Array[U]], from: Int, to: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
       val arr = kernel.zero
       val fin = if (from > to) from else to
@@ -390,7 +390,7 @@ object RangesMacros {
     }
   }
 
-  def copyToArrayN[U >: Int: c.WeakTypeTag](c: Context)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: Scheduler.Node[Int, Array[U]], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
+  def copyToArrayN[U >: Int: c.WeakTypeTag](c: BlackboxContext)(start: c.Expr[Int], len: c.Expr[Int], rhead: c.Expr[Int]) = c.universe.reify { (node: Scheduler.Node[Int, Array[U]], from: Int, to: Int, stride: Int, kernel: Ranges.RangeKernel[Array[U]]) =>
     {
       val arr = kernel.zero
       var i = from
@@ -416,7 +416,7 @@ object RangesMacros {
     }
   }
 
-  def invokeCopyToArrayKernel[U >: Int: c.WeakTypeTag](c: Context)(initializer: c.Expr[Unit]*)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def invokeCopyToArrayKernel[U >: Int: c.WeakTypeTag](c: BlackboxContext)(initializer: c.Expr[Unit]*)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     import c.universe._
     val (startv, startg) = c.nonFunctionToLocal[Int](start)
     val (lenv, lengg) = c.nonFunctionToLocal[Int](len)
@@ -435,24 +435,24 @@ object RangesMacros {
     }
   }
 
-  def copyToArray[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def copyToArray[U >: Int: c.WeakTypeTag](c: BlackboxContext)(arr: c.Expr[Array[U]], start: c.Expr[Int], len: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     invokeCopyToArrayKernel[U](c)()(arr, start, len)(ctx)
   }
 
-  def copyToArray3[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def copyToArray3[U >: Int: c.WeakTypeTag](c: BlackboxContext)(arr: c.Expr[Array[U]])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     val (arrv, arrg) = c.nonFunctionToLocal[Array[U]](arr)
     val len = c.universe.reify { arrg.splice.length }
     val start = c.universe.reify { 0 }
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
 
-  def copyToArray2[U >: Int: c.WeakTypeTag](c: Context)(arr: c.Expr[Array[U]], start: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
+  def copyToArray2[U >: Int: c.WeakTypeTag](c: BlackboxContext)(arr: c.Expr[Array[U]], start: c.Expr[Int])(ctx: c.Expr[Scheduler]): c.Expr[Unit] = {
     val (arrv, arrg) = c.nonFunctionToLocal[Array[U]](arr)
     val len = c.universe.reify { arrg.splice.length }
     invokeCopyToArrayKernel[U](c)(arrv)(arr, start, len)(ctx)
   }
 
-  def copyMapKernel[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(f: c.Expr[T => S])(callee: c.Expr[Ranges.Ops])(getTagForS: c.Expr[ClassTag[S]]): c.Expr[Ranges.CopyMapRangeKernel[S]] = {
+  def copyMapKernel[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag](c: BlackboxContext)(f: c.Expr[T => S])(callee: c.Expr[Ranges.Ops])(getTagForS: c.Expr[ClassTag[S]]): c.Expr[Ranges.CopyMapRangeKernel[S]] = {
     import c.universe._
 
     reify {
@@ -499,7 +499,7 @@ object RangesMacros {
     }
   }
 
-  def transformerKernel[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(callee: c.Expr[Ranges.Ops], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], Int) => Any]): c.Expr[Ranges.RangeKernel[Merger[S, That]]] = {
+  def transformerKernel[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[Ranges.Ops], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], Int) => Any]): c.Expr[Ranges.RangeKernel[Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -542,7 +542,7 @@ object RangesMacros {
     }
   }
 
-  def map[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def map[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => S])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => S](func)
@@ -585,7 +585,7 @@ object RangesMacros {
     c.inlineAndReset(operation)
   }
 
-  def flatMap[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: Context)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def flatMap[T >: Int: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag](c: BlackboxContext)(func: c.Expr[T => TraversableOnce[S]])(cmf: c.Expr[CanMergeFrom[Par[Range], S, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
@@ -619,7 +619,7 @@ object RangesMacros {
     c.inlineAndReset(operation)
   }
 
-  def filter[That:c.WeakTypeTag](c: Context)(pred: c.Expr[Int => Boolean])(cmf: c.Expr[CanMergeFrom[Par[Range], Int, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
+  def filter[That:c.WeakTypeTag](c: BlackboxContext)(pred: c.Expr[Int => Boolean])(cmf: c.Expr[CanMergeFrom[Par[Range], Int, That]], ctx: c.Expr[Scheduler]): c.Expr[That] = {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[Int => Boolean](pred)
