@@ -137,12 +137,11 @@ object ArraysMacros {
     }
   }
 
-  def findIndex[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[Int]] = {
+  def findIndex[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(calleeExpr: c.Expr[Arrays.Ops[T]])(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[Int]] = {
     import c.universe._
 
     val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
 
-    val calleeExpression = c.Expr[Arrays.Ops[T]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -151,7 +150,7 @@ object ArraysMacros {
       import internal._
       import scala.collection.par
       lv.splice
-      val callee = calleeExpression.splice
+      val callee = calleeExpr.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.par.workstealing.Arrays.ArrayKernel[T, Option[Int]] {
         def zero = None
@@ -179,23 +178,28 @@ object ArraysMacros {
   def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Option[T]] = {
     import c.universe._
 
-    val calleeExpression = c.Expr[Arrays.Ops[T]](c.applyPrefix)
-    val found = findIndex[T, T](c)(p)(ctx)
+    val (calleeExpressionv, calleeExpressiong) = c.nonFunctionToLocal(c.Expr[Arrays.Ops[T]](c.applyPrefix))
+    val found = findIndex[T, T](c)(calleeExpressiong)(p)(ctx)
     reify {
+      calleeExpressionv.splice
       val mayBeIndex = found.splice
-      if (mayBeIndex.isDefined) Some(calleeExpression.splice.array.seq(mayBeIndex.get))
-      else None
+      val result =
+        if (mayBeIndex.isDefined) Some(calleeExpressiong.splice.array.seq(mayBeIndex.get))
+        else None
+      result
     }
   }
 
   def forall[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
+    val (calleeExpressionv, calleeExpressiong) = c.nonFunctionToLocal(c.Expr[Arrays.Ops[T]](c.applyPrefix))
     val np = reify {
       (x: T) => !p.splice(x)
     }
-    val found = findIndex[T, T](c)(np)(ctx)
+    val found = findIndex[T, T](c)(calleeExpressiong)(np)(ctx)
     reify {
+      calleeExpressionv.splice
       found.splice.isEmpty
     }
   }
@@ -203,8 +207,10 @@ object ArraysMacros {
   def exists[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean])(ctx: c.Expr[Scheduler]): c.Expr[Boolean] = {
     import c.universe._
 
-    val found = findIndex[T, U](c)(p)(ctx)
+    val (calleeExpressionv, calleeExpressiong) = c.nonFunctionToLocal(c.Expr[Arrays.Ops[T]](c.applyPrefix))
+    val found = findIndex[T, U](c)(calleeExpressiong)(p)(ctx)
     reify {
+      calleeExpressionv.splice
       found.splice.nonEmpty
     }
   }
