@@ -259,7 +259,7 @@ object RayTracer extends JFrame("Raytracing")  {
 class RenderImage extends JLabel {  
   
   
-  val Witdth = 640
+  val Width = 640
   val Height = 480
   val CamZ = -1000
   val MaxLengthRay = 20000
@@ -281,7 +281,7 @@ class RenderImage extends JLabel {
   var zoom = 30.0
   var zoomFactor = 0.0
   var reflectionRate = 0
-  val aspectratio: Double = Witdth.toDouble / Height.toDouble
+  val aspectratio: Double = Width.toDouble / Height.toDouble
   
   var renderObjects: Vector[RenderObject] = null
   var lights: Vector[Light] = null  
@@ -328,16 +328,13 @@ class RenderImage extends JLabel {
     cosPitch = Math.cos(pitch)
     cosYaw = Math.cos(yaw)
     
-    val time1 = System.currentTimeMillis()
     if (parallelismType== ParallelismType.parOld) {     
       setIcon(new ImageIcon((drawParallelOld())))
     }
     else if (parallelismType == ParallelismType.parScalaBlitz){
       setIcon(new ImageIcon((drawScalaBlitz())))		     
     }
-    if (timeLabel!=null) {
-       timeLabel.setText((System.currentTimeMillis()-time1) + " ms")
-    }
+
   }
     
   addMouseMotionListener(new MouseMotionAdapter {
@@ -417,7 +414,7 @@ class RenderImage extends JLabel {
       if (k.getKeyChar() == 'p'){
         println("pitch: " + pitch)
         println("yaw: " + yaw)
-        println("x: " +(Witdth/2 + xOff))
+        println("x: " +(Width/2 + xOff))
         println("y: " + (Height/2 +yOff))
         println("z: " + (CamZ +zOff))
         println("zoom: "+ zoom)
@@ -435,35 +432,53 @@ class RenderImage extends JLabel {
   }) 
   
   def drawParallelOld(): BufferedImage = {    
-    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
+    val img = new BufferedImage(Width, Height, BufferedImage.TYPE_INT_ARGB)
+    val imageArray = new Array[Int](Width * Height) 
     
     if(fj.parallelismLevel != parallelism){
       fj.environment.shutdown()
       fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
     }
-    val range = 0 until (Witdth * Height)
+    val range = 0 until (Width * Height)
     val pr = range.par
     pr.tasksupport = fj
+    val time1 = System.currentTimeMillis()
     for (pixel<- pr)  {
-      val y  = (pixel / Witdth)
-      val x  = pixel % Witdth
-      img.setRGB(x, y, drawPixel(x, y))    
-    }    
+      val y  = pixel / Width
+      val x  = pixel % Width
+      imageArray(pixel) = drawPixel(x, y)
+    } 
+    if (timeLabel!=null) {
+      timeLabel.setText((System.currentTimeMillis()-time1) + " ms")
+    }
+    for(pixel <- range){
+      img.setRGB(pixel%Width,pixel/Width,imageArray(pixel))
+    } 
     img
   } 
   def drawScalaBlitz(): BufferedImage = {  
-    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
+    val img = new BufferedImage(Width, Height, BufferedImage.TYPE_INT_ARGB)
+    val imageArray = new Array[Int](Width * Height) 
     
     if(conf.parallelismLevel != parallelism){
       s.pool.shutdown()
       conf = new Scheduler.Config.Default(parallelism)
       s = new Scheduler.ForkJoin(conf)    
     }
+    val range = 0 until (Width * Height)
+    val parRange = range.toPar
+    val time1 = System.currentTimeMillis()
 
-    for (pixel<- ((0 to Witdth*Height -1).toPar))  {
-      val y  = (pixel / Witdth)
-      val x  = pixel % Witdth
-      img.setRGB(x, y, drawPixel(x, y))
+    for (pixel<- parRange)  {
+      val y  = pixel / Width
+      val x  = pixel % Width
+      imageArray(pixel) = drawPixel(x, y)
+    } 
+    if (timeLabel!=null) {
+      timeLabel.setText((System.currentTimeMillis()-time1) + " ms")
+    }    
+    for(pixel <- range){
+    	img.setRGB(pixel%Width,pixel/Width,imageArray(pixel))
     }
     img
   }
@@ -472,14 +487,14 @@ class RenderImage extends JLabel {
     
     var red, blue, green: Double = 0.0
       
-    val xx = (2 * (x / Witdth.toDouble) - 1) *aspectratio * zoomFactor    
+    val xx = (2 * (x / Width.toDouble) - 1) *aspectratio * zoomFactor    
     val yy = (1 - 2 * (y / Height.toDouble))* zoomFactor 
       
     val xDir = -cosPitch*sinYaw + xx*cosYaw + yy*sinPitch*sinYaw
     val yDir = sinPitch +yy*cosPitch 
     val zDir = cosPitch*cosYaw  + xx*sinYaw - yy*sinPitch*cosYaw    
       
-    val currentViewRay = new Ray(new Vector3(Witdth/2 + xOff, Height/2 + yOff, CamZ + zOff), (new Vector3(xDir, yDir, zDir).normalize), MaxLengthRay)
+    val currentViewRay = new Ray(new Vector3(Width/2 + xOff, Height/2 + yOff, CamZ + zOff), (new Vector3(xDir, yDir, zDir).normalize), MaxLengthRay)
       
     computeColorContribution(currentViewRay, 0, 1.0)    
       
