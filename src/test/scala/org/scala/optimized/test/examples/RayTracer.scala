@@ -1,6 +1,7 @@
 package org.scala.optimized.test.examples
 
 
+
 import scala.collection.parallel._
 import scala.collection.par._
 
@@ -43,12 +44,14 @@ import scala.collection.mutable.MutableList
 import java.awt.event.KeyListener
 import java.awt.event.KeyEvent
 
+
+
 object ParallelismType extends Enumeration {
   type parType = Value
   val parOld, parScalaBlitz = Value
 }
 
-object RayTracer extends JFrame("Raytracing")  {
+object RayTracer extends JFrame("Raytracing") {
   var settingIndex: Integer = 0
   val settingArray: Array[String] = Array("IceCream","PlanetMoon", "NiceLight", "Pool", "SpherePyramid", "TrianglesAndSpheres", "Random")
   
@@ -56,17 +59,17 @@ object RayTracer extends JFrame("Raytracing")  {
   def computeRandomMaterial() = new Material(new Vector3(r1.nextDouble(), r1.nextDouble(), r1.nextDouble()),r1.nextDouble())
   
   val poolSphereList = MutableList[Sphere]()
-  for (x <- (0 to 6)){
-    for (y <- (0 to 6)){
-      poolSphereList+= new Sphere(new Vector3(x*20, y*20, (x+y)*200), 10, computeRandomMaterial)
+  for (x <- (0 to 6)) {
+    for (y <- (0 to 6)) {
+      poolSphereList += new Sphere(new Vector3(x*20, y*20, (x+y)*200), 10, computeRandomMaterial)
     }
   }
   
-  val pyramidSphereList = MutableList[Sphere]()  
-  for (y<- (1 to 4)){
-    for (x <- (0 to y)){
-      for (z <- (0 to y)){
-        pyramidSphereList+= new Sphere(new Vector3(300 + x*20, 200 + y*20, -500+ z*20), 10, computeRandomMaterial)
+  val pyramidSphereList = MutableList[Sphere]()
+  for (y<- (1 to 4)) {
+    for (x <- (0 to y)) {
+      for (z <- (0 to y)) {
+        pyramidSphereList += new Sphere(new Vector3(300 + x*20, 200 + y*20, -500+ z*20), 10, computeRandomMaterial)
       }
     }
   }
@@ -144,6 +147,7 @@ object RayTracer extends JFrame("Raytracing")  {
       new Triangle(p4,p2,p3,computeRandomMaterial)     
     )
   }
+
   val randomLighting = Vector(
     new Light(new Vector3(0, 240, 1000),new Vector3(125,125,125)),
     new Light(new Vector3(640, 240, -1000.0),new Vector3(255,125,125)))
@@ -151,6 +155,7 @@ object RayTracer extends JFrame("Raytracing")  {
   var objectSettings: Vector[Vector[RenderObject]] = Vector(
     iceCreamSetting, planetMoonSetting, niceLightSetting, 
     poolSphereList.toVector, pyramidSphereList.toVector, triangleList.toVector, computeNewrandomSetting)
+
   val lightSettings: Vector[Vector[Light]] = Vector(
     iceCreamLighting, planetMoonLighting, niceLightLighting,  
     poolSphereLighting, pyramidSphereLighting, triangleLighting, triangleLighting)
@@ -181,9 +186,10 @@ object RayTracer extends JFrame("Raytracing")  {
         if (implcombo.getSelectedItem() == "Classic Parallel Collections"){
           label.changeParallelismType(ParallelismType.parOld)         
         }
-        if (implcombo.getSelectedItem() == "ScalaBlitz"){
+        else if (implcombo.getSelectedItem() == "ScalaBlitz"){
           label.changeParallelismType(ParallelismType.parScalaBlitz)
         }
+        else sys.error("Unsupported Parallelism Type: " +  implcombo.getSelectedItem())
         label.updateImage()
       }
     })    
@@ -327,17 +333,37 @@ class RenderImage extends JLabel {
     sinYaw = Math.sin(yaw)
     cosPitch = Math.cos(pitch)
     cosYaw = Math.cos(yaw)
-    
+
+    if(fj.parallelismLevel != parallelism){
+      fj.environment.shutdown()
+      fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
+    }
+
+    if(conf.parallelismLevel != parallelism){
+      s.pool.shutdown()
+      conf = new Scheduler.Config.Default(parallelism)
+      s = new Scheduler.ForkJoin(conf)
+    }
     val time1 = System.currentTimeMillis()
-    if (parallelismType== ParallelismType.parOld) {     
-      setIcon(new ImageIcon((drawParallelOld())))
+
+    val imageData = 
+      if (parallelismType == ParallelismType.parOld) {
+        drawParallelOld()
+      }
+      else {
+        drawScalaBlitz()
+      }
+    if (timeLabel != null) {
+       timeLabel.setText((System.currentTimeMillis() - time1) + " ms")
     }
-    else if (parallelismType == ParallelismType.parScalaBlitz){
-      setIcon(new ImageIcon((drawScalaBlitz())))		     
+    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
+    val pixelRange = 0 until (Witdth * Height)
+    for(pixel <- pixelRange) {
+      val y = pixel / Witdth; 
+      val x = pixel % Witdth
+      img.setRGB(x, y, imageData(pixel))  
     }
-    if (timeLabel!=null) {
-       timeLabel.setText((System.currentTimeMillis()-time1) + " ms")
-    }
+    setIcon(new ImageIcon(img))
   }
     
   addMouseMotionListener(new MouseMotionAdapter {
@@ -433,43 +459,31 @@ class RenderImage extends JLabel {
     override def keyReleased(e: KeyEvent){    
     }
   }) 
+
+  private var backBuffer: Array[Int] = new Array[Int](Witdth * Height)
   
-  def drawParallelOld(): BufferedImage = {    
-    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
-    
-    if(fj.parallelismLevel != parallelism){
-      fj.environment.shutdown()
-      fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
-    }
+  private def drawParallelOld(): Array[Int] = {    
     val range = 0 until (Witdth * Height)
     val pr = range.par
     pr.tasksupport = fj
-    for (pixel<- pr)  {
-      val y  = (pixel / Witdth)
-      val x  = pixel % Witdth
-      img.setRGB(x, y, drawPixel(x, y))    
-    }    
-    img
-  } 
-  def drawScalaBlitz(): BufferedImage = {  
-    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
-    
-    if(conf.parallelismLevel != parallelism){
-      s.pool.shutdown()
-      conf = new Scheduler.Config.Default(parallelism)
-      s = new Scheduler.ForkJoin(conf)    
+    for (pixel <- pr) {
+      val y = pixel / Witdth
+      val x = pixel % Witdth
+      backBuffer(pixel) = drawPixel(x, y)
     }
-
-    for (pixel<- ((0 to Witdth*Height -1).toPar))  {
-      val y  = (pixel / Witdth)
-      val x  = pixel % Witdth
-      img.setRGB(x, y, drawPixel(x, y))
+    backBuffer
+  }
+  private def drawScalaBlitz(): Array[Int] = {  
+    val pr = ((0 to Witdth*Height -1).toPar)
+    for (pixel <- pr) {
+      val y = pixel / Witdth
+      val x = pixel % Witdth
+      backBuffer(pixel) = drawPixel(x, y)
     }
-    img
+    backBuffer
   }
   
   def drawPixel(x: Double, y:Double) = {
-    
     var red, blue, green: Double = 0.0
       
     val xx = (2 * (x / Witdth.toDouble) - 1) *aspectratio * zoomFactor    
@@ -538,7 +552,7 @@ class RenderImage extends JLabel {
     green = math.min(green, 255).toInt << 8
     blue = math.min(blue, 255).toInt << 0
     val a = 255 << 24
-    a.toInt| red.toInt | green.toInt | blue.toInt //return the resulting color    
+    a.toInt| red.toInt | green.toInt | blue.toInt //return the resulting color
   } 
 }
   
@@ -674,7 +688,6 @@ class Material(colorS: Vector3, reflectionS: Double){
 class Light(lPos: Vector3, lcolor: Vector3) {
   val pos: Vector3 = lPos
   val color = lcolor
-
 }
 
 class Ray(rStart: Vector3, rDir: Vector3, rT: Double) {
