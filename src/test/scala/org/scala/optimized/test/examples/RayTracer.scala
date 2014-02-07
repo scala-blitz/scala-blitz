@@ -148,6 +148,14 @@ object RayTracer extends JFrame("Raytracing") {
     )
   }
 
+  val scenes = Map("IceCream" -> (iceCreamSetting, iceCreamLighting),
+    "PlanetMoon" -> (planetMoonSetting, planetMoonLighting),
+    "NiceLight" -> (niceLightSetting, niceLightLighting),
+    "Pool" -> (poolSphereList, poolSphereLighting),
+    "SpherePyramid" -> (pyramidSphereList, pyramidSphereLighting),
+    "TrianglesAndSpheres" -> (triangleList, triangleLighting)
+  )
+
   val randomLighting = Vector(
     new Light(new Vector3(0, 240, 1000),new Vector3(125,125,125)),
     new Light(new Vector3(640, 240, -1000.0),new Vector3(255,125,125)))
@@ -167,7 +175,7 @@ object RayTracer extends JFrame("Raytracing") {
     setSize(1100, 600)
     setLayout(new BorderLayout)
     var label = new RenderImage()
-    label.initialize(objectSettings.apply(settingIndex), lightSettings.apply(settingIndex), computationLabel)
+    label.initialize(objectSettings(settingIndex), lightSettings(settingIndex), computationLabel)
     
     label.updateImage()
     label.setVisible(true)
@@ -265,7 +273,7 @@ object RayTracer extends JFrame("Raytracing") {
 class RenderImage extends JLabel {  
   
   
-  val Witdth = 640
+  val Width = 640
   val Height = 480
   val CamZ = -1000
   val MaxLengthRay = 20000
@@ -287,7 +295,7 @@ class RenderImage extends JLabel {
   var zoom = 30.0
   var zoomFactor = 0.0
   var reflectionRate = 0
-  val aspectratio: Double = Witdth.toDouble / Height.toDouble
+  val aspectratio: Double = Width.toDouble / Height.toDouble
   
   var renderObjects: Vector[RenderObject] = null
   var lights: Vector[Light] = null  
@@ -297,12 +305,16 @@ class RenderImage extends JLabel {
   
   //needed for the scala blitz scheduler
   var conf = new Scheduler.Config.Default(parallelism)
-  implicit var s = new Scheduler.ForkJoin(conf)    
+  implicit var s: Scheduler = new Scheduler.ForkJoin(conf)    
 
   def changeParallelismType(parType : ParallelismType.Value) = {
     parallelismType = parType
     if (parallelismType== ParallelismType.parOld) {
-      s.pool.shutdown()
+      s match {
+        case s:Scheduler.ForkJoin => s.pool.shutdown()
+        case _ =>
+      }
+      
       fj = new collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
     }
     else {
@@ -340,7 +352,12 @@ class RenderImage extends JLabel {
     }
 
     if(conf.parallelismLevel != parallelism){
-      s.pool.shutdown()
+      s match {
+        case s: Scheduler.ForkJoin =>
+                s.pool.shutdown()
+        case _ =>
+      }
+
       conf = new Scheduler.Config.Default(parallelism)
       s = new Scheduler.ForkJoin(conf)
     }
@@ -356,11 +373,11 @@ class RenderImage extends JLabel {
     if (timeLabel != null) {
        timeLabel.setText((System.currentTimeMillis() - time1) + " ms")
     }
-    val img = new BufferedImage(Witdth, Height, BufferedImage.TYPE_INT_ARGB)
-    val pixelRange = 0 until (Witdth * Height)
+    val img = new BufferedImage(Width, Height, BufferedImage.TYPE_INT_ARGB)
+    val pixelRange = 0 until (Width * Height)
     for(pixel <- pixelRange) {
-      val y = pixel / Witdth; 
-      val x = pixel % Witdth
+      val y = pixel / Width; 
+      val x = pixel % Width
       img.setRGB(x, y, imageData(pixel))  
     }
     setIcon(new ImageIcon(img))
@@ -443,7 +460,7 @@ class RenderImage extends JLabel {
       if (k.getKeyChar() == 'p'){
         println("pitch: " + pitch)
         println("yaw: " + yaw)
-        println("x: " +(Witdth/2 + xOff))
+        println("x: " +(Width/2 + xOff))
         println("y: " + (Height/2 +yOff))
         println("z: " + (CamZ +zOff))
         println("zoom: "+ zoom)
@@ -460,24 +477,24 @@ class RenderImage extends JLabel {
     }
   }) 
 
-  private var backBuffer: Array[Int] = new Array[Int](Witdth * Height)
+  private var backBuffer: Array[Int] = new Array[Int](Width * Height)
   
-  private def drawParallelOld(): Array[Int] = {    
-    val range = 0 until (Witdth * Height)
+  def drawParallelOld(): Array[Int] = {    
+    val range = 0 until (Width * Height)
     val pr = range.par
     pr.tasksupport = fj
     for (pixel <- pr) {
-      val y = pixel / Witdth
-      val x = pixel % Witdth
+      val y = pixel / Width
+      val x = pixel % Width
       backBuffer(pixel) = drawPixel(x, y)
     }
     backBuffer
   }
-  private def drawScalaBlitz(): Array[Int] = {  
-    val pr = ((0 to Witdth*Height -1).toPar)
+  def drawScalaBlitz(): Array[Int] = {  
+    val pr = ((0 to Width*Height -1).toPar)
     for (pixel <- pr) {
-      val y = pixel / Witdth
-      val x = pixel % Witdth
+      val y = pixel / Width
+      val x = pixel % Width
       backBuffer(pixel) = drawPixel(x, y)
     }
     backBuffer
@@ -486,14 +503,14 @@ class RenderImage extends JLabel {
   def drawPixel(x: Double, y:Double) = {
     var red, blue, green: Double = 0.0
       
-    val xx = (2 * (x / Witdth.toDouble) - 1) *aspectratio * zoomFactor    
+    val xx = (2 * (x / Width.toDouble) - 1) *aspectratio * zoomFactor    
     val yy = (1 - 2 * (y / Height.toDouble))* zoomFactor 
       
     val xDir = -cosPitch*sinYaw + xx*cosYaw + yy*sinPitch*sinYaw
     val yDir = sinPitch +yy*cosPitch 
     val zDir = cosPitch*cosYaw  + xx*sinYaw - yy*sinPitch*cosYaw    
       
-    val currentViewRay = new Ray(new Vector3(Witdth/2 + xOff, Height/2 + yOff, CamZ + zOff), (new Vector3(xDir, yDir, zDir).normalize), MaxLengthRay)
+    val currentViewRay = new Ray(new Vector3(Width/2 + xOff, Height/2 + yOff, CamZ + zOff), (new Vector3(xDir, yDir, zDir).normalize), MaxLengthRay)
       
     computeColorContribution(currentViewRay, 0, 1.0)    
       
@@ -524,7 +541,7 @@ class RenderImage extends JLabel {
             
             //now we create a lightRay for the current light which has as direction the normalized fromInteresectionToLight 
             val lightRay = new Ray(intersectionPoint, 
-              new Vector3(fromInteresectionToLight.x/newT, fromInteresectionToLight.y/newT, fromInteresectionToLight.z/newT), newT) 
+              new Vector3(fromInteresectionToLight.x/newT, fromInteresectionToLight.y/newT, fromInteresectionToLight.z/newT), newT)
             
             // we check if it illuminates the intersecting object: is it in the shadow of some sphere?
             val inShadow = renderObjects.exists(o => o.intersect(lightRay))
@@ -541,7 +558,7 @@ class RenderImage extends JLabel {
             val reflection =  2*currentViewRay.dir.scalarProdWith(n)
             val reflectionRayDirection = currentViewRay.dir.subtractVector(new Vector3(n.x*reflection, n.y*reflection, n.z*reflection))
             
-            computeColorContribution(new Ray(intersectionPoint, reflectionRayDirection, MaxLengthRay),
+            computeColorContribution(new Ray(intersectionPoint, reflectionRayDirection.normalize, MaxLengthRay),
               reflectionLevel+1, 
               reflectionCoefficient*currentRenderObject.material.reflection)          
           }           
@@ -565,11 +582,13 @@ class Vector3(xt: Double, yt: Double, zt: Double){
   def subtractVector(v2: Vector3): Vector3 = new Vector3(x -v2.x, y -v2.y, z -v2.z)  
   def scalarProdWith(v2: Vector3): Double = x*v2.x + y*v2.y + z*v2.z  
   def crossProdWith(v2: Vector3): Vector3 = new Vector3(y*v2.z-z*v2.y, z*v2.x - x*v2.z, x*v2.y-y*v2.x)    
-  def normalize(): Vector3 = {    
-    if (squareNorm > 0){    
-      x = x/Math.sqrt(squareNorm)
-      y = y/Math.sqrt(squareNorm)
-      z = z/Math.sqrt(squareNorm)      
+  def normalize(): Vector3 = { 
+    val norm = squareNorm
+    if (norm > 0){
+      val snorm = Math.sqrt(norm)
+      x = x / snorm
+      y = y / snorm
+      z = z / snorm
       this
     }
     else {
@@ -636,7 +655,7 @@ class Triangle(xT: Vector3, yT: Vector3, zT: Vector3, mat: Material) extends Ren
    
     val t = (e2.x*qx + e2.y*qy + e2.z*qz) * inv_det
     
-    if (t <= ray.t && t >EPSILON) {  //return ture only if the interestion is closer than any of the previous one's we found  
+    if (t <= ray.t && t > EPSILON) {  //return ture only if the interestion is closer than any of the previous one's we found  
       ray.t = t    
       return true
     } 
@@ -651,47 +670,53 @@ class Sphere(sPos: Vector3, sSize: Double, mat: Material) extends RenderObject(m
   def normalVectorToSurfaceAtPoint(point: Vector3): Vector3 = point.subtractVector(this.center).normalize()
   
   def intersect(r: Ray): Boolean = {
-    //The Vector3 methods subVector and scalaProdWith are not used here as they slow the code down by recreating another Vector3-object every time.
-    //In the other portions of the code, this is not an issue, but here, in the most
-    //used code section, they are not necessary and make the code run a little bit slower.
-    val A = r.dir.x*r.dir.x + r.dir.y*r.dir.y + r.dir.z*r.dir.z
-    val B = 2 * (r.dir.x * (r.start.x - this.center.x) + r.dir.y * (r.start.y - this.center.y) + r.dir.z * (r.start.z - this.center.z))
+
     val c1 = r.start.x - this.center.x
     val c2 = r.start.y - this.center.y
     val c3 = r.start.z - this.center.z
-    val C = c1*c1 + c2*c2 + c3*c3 - this.radius*this.radius
-    val delta = B*B - 4* A*C 
+
+    val dotProduct = r.dir.x * c1 + r.dir.y * c2 + r.dir.z * c3
+    if (dotProduct <= EPSILON) false 
+    else {
+
+    //The Vector3 methods subVector and scalaProdWith are not used here as they slow the code down by recreating another Vector3-object every time.
+    //In the other portions of the code, this is not an issue, but here, in the most
+    //used code section, they are not necessary and make the code run a little bit slower.
+      val B = 2 * (r.dir.x * c1 + r.dir.y * c2 + r.dir.z * c3)
+
+      val C = c1*c1 + c2*c2 + c3*c3 - this.radius*this.radius
+      val delta = B*B - 4*C
     
-    if (delta <0){
-      return false
+      if (delta < 0) {
+        false
+      }
+      else {
+        val sdelta = Math.sqrt(delta)
+        val t0 = (-B - sdelta)/2
+
+        if (t0 <= r.t && t0 > EPSILON){ //take the first intersection with the sphere that is closer than any of the previous one's we found
+          r.t = t0
+          true
+        }
+        else {
+          val t1 = (-B + sdelta)/2 //compute t1 only if necessary, as we allways have t0<t1
+          if (t1 <= r.t && t1 > EPSILON){
+            r.t= t1
+            true
+          }
+          else  false
+        }
+      }
     }
-    val t0 = (-B - Math.sqrt(delta))/(2*A)
-    
-    if (t0 <= r.t && t0 > EPSILON){ //take the first intersection with the sphere that is closer than any of the previous one's we found
-      r.t = t0
-      return true
-    }
-    val t1 = (-B + Math.sqrt(delta))/(2*A) //compute t1 only if necessary, as we allways have t0<t1
-    if (t1 <= r.t && t1 > EPSILON){    
-      r.t= t1
-      return true
-    }
-    return false    
   }
 }
   
-class Material(colorS: Vector3, reflectionS: Double){
-  val color: Vector3 = colorS //Represents the color of that material on a scale from 0 to 1 for each entry
-  val reflection: Double = reflectionS
+class Material(val color: Vector3, val reflection: Double) {
+  //Represents the color of that material on a scale from 0 to 1 for each entry
 }
 
-class Light(lPos: Vector3, lcolor: Vector3) {
-  val pos: Vector3 = lPos
-  val color = lcolor
-}
+class Light(val pos: Vector3, val color: Vector3) 
 
-class Ray(rStart: Vector3, rDir: Vector3, rT: Double) {
-  var start: Vector3 = rStart
-  var dir = rDir
-  var t: Double = rT //represents the limit until where on the halfline starting at start we test for intersections.
+class Ray(val start: Vector3, val dir: Vector3, var t: Double) {
+ //t represents the limit until where on the halfline starting at start we test for intersections.
 }
