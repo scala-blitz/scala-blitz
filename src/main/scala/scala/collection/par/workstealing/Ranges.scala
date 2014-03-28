@@ -13,17 +13,18 @@ import scala.reflect.ClassTag
 object Ranges {
 
   trait Scope {
-    implicit def rangeOps(r: Par[Range]) = new Ranges.Ops(r)
+    implicit def rangeOps[T <: Range](r: Par[T]) = new Ranges.Ops(r)
     implicit def canMergeRange(implicit ctx: Scheduler): CanMergeFrom[Range, Int, Par[Array[Int]]] = new CanMergeFrom[Range, Int, Par[Array[Int]]] {
       def apply(from: Range) = new Arrays.ArrayMerger[Int](ctx)
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
-    implicit def canMergeParRange(implicit ctx: Scheduler): CanMergeFrom[Par[Range], Int, Par[Array[Int]]] = new CanMergeFrom[Par[Range], Int, Par[Array[Int]]] {
-      def apply(from: Par[Range]) = new Arrays.ArrayMerger[Int](ctx)
+    implicit def canMergeParRange[T <: Range](implicit ctx: Scheduler): CanMergeFrom[Par[T], Int, Par[Array[Int]]] = new 
+CanMergeFrom[Par[T], Int, Par[Array[Int]]] {
+      def apply(from: Par[T]) = new Arrays.ArrayMerger[Int](ctx)
       def apply() = new Arrays.ArrayMerger[Int](ctx)
     }
-    implicit def rangeIsZippable(implicit ctx: Scheduler) = new IsZippable[Range, Int] {
-      def apply(pr: Par[Range]) = new Zippable[Int]{
+    implicit def rangeIsZippable[T <: Range](implicit ctx: Scheduler) = new IsZippable[T, Int] {
+      def apply(pr: Par[T]) = new Zippable[Int]{
       def iterator = pr.seq.iterator
       def stealer = new RangeStealer(pr.seq, 0, pr.seq.length)
       def newMerger = new Arrays.ArrayMerger2ZippableMergerConvertor[Int](new Arrays.ArrayMerger[Int](ctx))
