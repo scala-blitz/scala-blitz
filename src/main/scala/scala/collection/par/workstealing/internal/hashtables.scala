@@ -14,8 +14,7 @@ import scala.collection.par.Merger
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import Optimizer.c2opt
-
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object HashMapMacros {

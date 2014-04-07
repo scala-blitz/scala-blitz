@@ -13,7 +13,7 @@ import collection.par.Configuration
 import scala.collection.par.Conc
 import scala.math
 import Optimizer._
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object ConcsMacros {
