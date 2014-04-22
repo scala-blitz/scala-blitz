@@ -134,7 +134,8 @@ class Optimizer[C <: Context](val c: C) {
 
   def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] = {
     val inliner = new Inlining.Optimization
-    c.Expr[T](c untypecheck  inliner.transform(expr.tree))
+    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
+    c.Expr[T](global.brutallyResetAttrs(inliner.transform(expr.tree).asInstanceOf[global.Tree]).asInstanceOf[c.Tree])
   }
 
   /* fusion */
@@ -276,7 +277,8 @@ class Optimizer[C <: Context](val c: C) {
     val inltree = inlineFunctionApply(tree)
     val fustree = flatMapFusion(inltree)
     val opttree = fustree
-    c.Expr[T](c untypecheck  opttree)
+    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
+    c.Expr[T](global.brutallyResetAttrs(opttree.asInstanceOf[global.Tree]).asInstanceOf[c.Tree])
   }
 
 }
