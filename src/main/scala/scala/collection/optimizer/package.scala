@@ -4,7 +4,7 @@ package scala.collection
 
 import scala.language.experimental.macros
 import scala.reflect.macros._
-
+import scala.reflect.macros.whitebox.Context
 
 
 
@@ -13,12 +13,12 @@ package object optimizer {
   final def debug(s: String) = if (debugOutput) println(s)
   final val echoSplicedCode = false
 
-  def optimize[T](exp: T) = macro optimize_impl[T]
+  def optimize[T](exp: T): Any = macro optimize_impl[T]
 
   /** Eliminates consecutive Box&Unbox pairs */
-  def optimize_postprocess[T](exp: T) = macro optimize_postprocess_impl[T]
+  def optimize_postprocess[T](exp: T): Any = macro optimize_postprocess_impl[T]
 
-  def optimize_postprocess_impl[T: c.WeakTypeTag](c: WhiteboxContext)(exp: c.Expr[T]) = {
+  def optimize_postprocess_impl[T: c.WeakTypeTag](c: Context)(exp: c.Expr[T]) = {
     import c.universe._
     import Flag._
 
@@ -60,11 +60,11 @@ package object optimizer {
 
     val t = BoxUnboxEliminating.transform(exp.tree)
     if (echoSplicedCode) println(t)
-    (c.resetAllAttrs(t))
+    (c.untypecheck(t))
   }
   
 
-  def optimize_impl[T: c.WeakTypeTag](c: WhiteboxContext)(exp: c.Expr[T]) = {
+  def optimize_impl[T: c.WeakTypeTag](c: Context)(exp: c.Expr[T]) = {
     import c.universe._
     import Flag._
 
@@ -249,6 +249,6 @@ package object optimizer {
       else addImports(q"optimize{$t}")
      debug(s"\n\n\n***********************************************************************************\nresult: $resultWithImports")
 
-    (c.resetAllAttrs(resultWithImports))
+    (c.untypecheck(resultWithImports))
   }
 }

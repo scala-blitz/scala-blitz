@@ -13,7 +13,7 @@ import scala.collection.par.Configuration
 import scala.collection.par.Merger
 import Optimizer._
 import scala.reflect.ClassTag
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object RangesMacros {

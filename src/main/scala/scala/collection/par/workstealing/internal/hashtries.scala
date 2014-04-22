@@ -14,7 +14,7 @@ import scala.collection.par.Merger
 import scala.collection.immutable.HashSet
 import scala.collection.immutable.HashMap
 import Optimizer.c2opt
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object HashTrieSetMacros {

@@ -12,7 +12,7 @@ import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.Merger
 import Optimizer.c2opt
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object ArraysMacros {

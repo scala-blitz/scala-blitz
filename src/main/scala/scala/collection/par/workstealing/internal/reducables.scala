@@ -16,7 +16,7 @@ import scala.collection.par.PreciseStealer
 import scala.reflect.ClassTag
 import scala.collection.par.workstealing.internal.Optimizer._
 import scala.collection.par.Scheduler.Node
-
+import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
 object ReducablesMacros {
