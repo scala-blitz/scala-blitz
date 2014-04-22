@@ -5,15 +5,13 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class HashesBench extends PerformanceTest.Regression with Serializable with Generators with scala.collection.parallel.scalatest.Helpers{
+class HashesBench extends OnlineRegressionReport with Serializable with Generators with scala.collection.parallel.scalatest.Helpers{
   import Scheduler.Config
 
   /* config */
-
-  def persistor = new SerializationPersistor
 
   val from = 3000000
 

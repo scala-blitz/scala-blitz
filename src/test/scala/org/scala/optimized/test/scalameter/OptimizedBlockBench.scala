@@ -15,7 +15,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
 
 
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
@@ -23,7 +23,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=true",
     reports.regression.noiseMagnitude -> 0.15)
 
-  val pcopts = Seq(
+  val pcopts = Context(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
@@ -32,7 +32,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
 
   /* benchmarks */
 
-  performance of "Optimized[Array]" config (opts: _*) in {
+  performance of "Optimized[Array]" config (opts) in {
 
     val small = 250000
     val large = 1500000
@@ -108,7 +108,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
     }
   }
 
-  performance of "Optimized[Range]" config (opts: _*) in {
+  performance of "Optimized[Range]" config (opts) in {
     val tiny = 300000
     val small = 3000000
     val large = 30000000
@@ -219,7 +219,7 @@ class OptimizedBlockBench extends PerformanceTest.Regression with Serializable w
 
   }
 
-  performance of "Optimized[ImmutableSet]" config (opts: _*) in {
+  performance of "Optimized[ImmutableSet]" config (opts) in {
 
     val small = 25000
     val large = 150000

@@ -7,18 +7,14 @@ import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
 import org.scala.optimized.test.examples._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class RayTracerBench extends PerformanceTest.Regression with Serializable with Generators {
-
-  /* config */
-
-  def persistor = new SerializationPersistor
+class RayTracerBench extends OnlineRegressionReport with Serializable with Generators {
 
   /* generators */
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 20,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
@@ -27,7 +23,7 @@ class RayTracerBench extends PerformanceTest.Regression with Serializable with G
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
-  val oldopts = Seq(
+  val oldopts = Context(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
@@ -36,9 +32,9 @@ class RayTracerBench extends PerformanceTest.Regression with Serializable with G
 
   /* benchmarks */
 
-  performance of "RayTracer" config (opts: _*) in {
+  performance of "RayTracer" config (opts) in {
 
-    measure method "trace" config (opts: _*) in {
+    measure method "trace" config (opts) in {
 
       def scenes = Gen.enumeration("scene")(RayTracer.scenes.keySet.toSeq: _*)
       

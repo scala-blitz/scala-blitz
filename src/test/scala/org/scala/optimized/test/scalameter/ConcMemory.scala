@@ -4,16 +4,15 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ConcMemory extends PerformanceTest.Regression with Serializable {
+class ConcMemory extends OnlineRegressionReport with Serializable {
   import Scheduler.Config
 
   /* config */
 
   override def measurer = new Executor.Measurer.MemoryFootprint
-  def persistor = new SerializationPersistor
 
   /* generators */
 
@@ -34,7 +33,7 @@ class ConcMemory extends PerformanceTest.Regression with Serializable {
         var list: List[Unit] = Nil
         var i = 0
         while (i < sz) {
-          list ::= ()
+          list ::= (())
           i += 1
         }
         list
@@ -44,7 +43,7 @@ class ConcMemory extends PerformanceTest.Regression with Serializable {
         var v = collection.immutable.Vector[Unit]()
         var i = 0
         while (i < sz) {
-          v = v :+ ()
+          v = v :+ (())
           i += 1
         }
         v

@@ -12,6 +12,7 @@ import org.scalameter.api._
 import scala.collection.parallel._
 import java.awt.Color
 import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporter }
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 /**
  * Author: Dmitry Petrashko
@@ -20,11 +21,7 @@ import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporte
  * PageRank test
  */
 
-object PageRank extends PerformanceTest.Regression with Serializable with scalameter.Generators {
-
-  /* configuration */
-
-  lazy val persistor = new SerializationPersistor
+object PageRank extends OnlineRegressionReport with Serializable with scalameter.Generators {
 
   /* inputs */
 

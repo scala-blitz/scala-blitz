@@ -14,10 +14,10 @@ import org.scalameter.{ Reporter, Gen, PerformanceTest }
 import org.scalameter.persistence.SerializationPersistor
 import org.scalameter.api._
 import org.scalameter.reporting.{ ChartReporter, HtmlReporter, RegressionReporter }
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-object Mandelbrot extends PerformanceTest.Regression with Serializable {
+object Mandelbrot extends OnlineRegressionReport with Serializable {
 
   private def compute(xc: Double, yc: Double, threshold: Int): Int = {
     var i = 0
@@ -243,8 +243,6 @@ object Mandelbrot extends PerformanceTest.Regression with Serializable {
   override def main(args: Array[String]) {
     val frame = new MandelFrame
   }
-
-  lazy val persistor = new SerializationPersistor
 
   @volatile var dummy: Int = Int.MinValue;
 

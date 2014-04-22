@@ -6,19 +6,17 @@ import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
 import Scheduler.Config
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ParImmutableTreeSetBench extends PerformanceTest.Regression with Serializable with ParImmutableTreeSetSnippets with Generators {
+class ParImmutableTreeSetBench extends OnlineRegressionReport with Serializable with ParImmutableTreeSetSnippets with Generators {
 
 
   /* config */
 
-  def persistor = new SerializationPersistor
-
   val treesFrom = 6000
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 25,
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 48,
@@ -30,7 +28,7 @@ class ParImmutableTreeSetBench extends PerformanceTest.Regression with Serializa
 
   /* tests */
 
-  performance of "Par[immutable.TreeSet]" config(opts: _*) in { 
+  performance of "Par[immutable.TreeSet]" config(opts) in {
 
     measure method "aggregate" in {
       using(withSchedulers(immutableTreeSets(treesFrom))) curve("immutable.TreeSet") in { t => 

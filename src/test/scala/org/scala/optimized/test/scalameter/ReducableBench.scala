@@ -5,14 +5,14 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import org.scalameter.PerformanceTest.OnlineRegressionReport
+import org.scalameter.KeyValue
 
 
-
-class ReducableBench extends PerformanceTest.Regression with Serializable with ReducableSnippets with Generators {
+class ReducableBench extends OnlineRegressionReport with Serializable with ReducableSnippets with Generators {
 
   /* config */
 
-  def persistor = new SerializationPersistor
   val tiny =  60000
   val small = 600000
   val large = 1000000
@@ -21,7 +21,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
   /* generators */
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 25,
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 48,
@@ -30,7 +30,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
-  val oldopts = Seq(
+  val oldopts = Context(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
@@ -45,7 +45,7 @@ class ReducableBench extends PerformanceTest.Regression with Serializable with R
 
   /* benchmarks */
 
-  performance of "Reducables" config (opts: _*) in {
+  performance of "Reducables" config (opts) in {
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential

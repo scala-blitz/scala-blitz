@@ -5,21 +5,19 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ParHashTrieSetBench extends PerformanceTest.Regression with Serializable with ParHashTrieSetSnippets with Generators {
+class ParHashTrieSetBench extends OnlineRegressionReport with Serializable with ParHashTrieSetSnippets with Generators {
   import Scheduler.Config
 
   /* config */
-
-  def persistor = new SerializationPersistor
 
   val tiny = 12500
   val small = 25000
   val normal = 150000
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 30,
     exec.maxWarmupRuns -> 60,
     exec.benchRuns -> 40,
@@ -32,7 +30,7 @@ class ParHashTrieSetBench extends PerformanceTest.Regression with Serializable w
 
   /* tests */
 
-  performance of "Par[immutable.HashSet]" config(opts: _*) in { 
+  performance of "Par[immutable.HashSet]" config(opts) in {
 
     measure method "aggregate" in {
       using(hashTrieSets(normal)) curve("Sequential") in aggregateSequential
