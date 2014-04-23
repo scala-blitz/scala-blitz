@@ -60,7 +60,8 @@ package object optimizer {
 
     val t = BoxUnboxEliminating.transform(exp.tree)
     if (echoSplicedCode) println(t)
-    (c.untypecheck(t))
+    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
+    global.brutallyResetAttrs(t.asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
   }
   
 
@@ -248,7 +249,7 @@ package object optimizer {
       if (allTypesFound) q"optimize_postprocess{${addImports(t)}}"
       else addImports(q"optimize{$t}")
      debug(s"\n\n\n***********************************************************************************\nresult: $resultWithImports")
-
-    (c.untypecheck(resultWithImports))
+    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
+    global.brutallyResetAttrs(resultWithImports.asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
   }
 }
