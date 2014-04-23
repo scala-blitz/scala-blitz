@@ -3,7 +3,7 @@ scala:
   - "2.11.0"
 jdk:
   - oraclejdk7
-script: sbt ++${TRAVIS_SCALA_VERSION} testOnly org.scala.optimized.test.par.scalatest.*
+script: sbt ++${TRAVIS_SCALA_VERSION} "testOnly org.scala.optimized.test.par.scalatest.*"
 branches:
   only:
     - master
