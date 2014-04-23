@@ -4,15 +4,11 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ConcBench extends PerformanceTest.Regression with Serializable {
+class ConcBench extends OnlineRegressionReport with Serializable {
   import Scheduler.Config
-
-  /* config */
-
-  def persistor = new SerializationPersistor
 
   /* generators */
 
@@ -44,7 +40,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         var list: List[Unit] = Nil
         var i = 0
         while (i < sz) {
-          list ::= ()
+          list ::= (())
           i += 1
         }
       }
@@ -53,7 +49,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         var v = collection.immutable.Vector[Unit]()
         var i = 0
         while (i < sz) {
-          v = v :+ ()
+          v = v :+ (())
           i += 1
         }
       }
@@ -80,7 +76,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         val vb = new collection.immutable.VectorBuilder[Unit]()
         var i = 0
         while (i < sz) {
-          vb += ()
+          vb += (())
           i += 1
         }
       }
@@ -89,7 +85,7 @@ class ConcBench extends PerformanceTest.Regression with Serializable {
         val ab = new collection.mutable.ArrayBuffer[Unit]()
         var i = 0
         while (i < sz) {
-          ab += ()
+          ab += (())
           i += 1
         }
       }

@@ -4,14 +4,12 @@ package scalameter
 
 import scala.collection.par._
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ParRangeBench extends PerformanceTest.Regression with Serializable with ParRangeSnippets with Generators {
+class ParRangeBench extends OnlineRegressionReport with Serializable with ParRangeSnippets with Generators {
 
   /* config */
-
-  def persistor = new SerializationPersistor
 
   val tiny = 300000
   val small = 3000000
@@ -19,7 +17,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
 
   val single = Gen.single("sizes")(500000)
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 30,
@@ -27,7 +25,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
-  val pcopts = Seq(
+  val pcopts = Context(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
@@ -37,12 +35,12 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
   @volatile var global = 0
   /* benchmarks */
 
-  performance of "Par[Range]" config (opts: _*) in {
+  performance of "Par[Range]" config (opts) in {
 
     measure method "reduce" in {
       using(ranges(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
-      performance of "old" config (pcopts: _*) in {
+      performance of "old" config (pcopts) in {
         using(ranges(small)) curve ("pc") in { _.par.reduce(_ + _) }
       }
     }
@@ -184,7 +182,7 @@ class ParRangeBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "aggregate" in {
       using(ranges(large)) curve ("Sequential") in aggregateSequential
       using(withSchedulers(ranges(large))) curve ("Par") in { t => aggregateParallel(t._1)(t._2) }
-      performance of "old" config (pcopts: _*) in {
+      performance of "old" config (pcopts) in {
         using(ranges(small)) curve ("pc") in { r =>
           r.par.aggregate(0)(_ + _, _ + _)
         }

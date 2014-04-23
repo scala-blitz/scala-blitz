@@ -6,21 +6,20 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ParArrayBench extends PerformanceTest.Regression with Serializable with ParArraySnippets with Generators {
+class ParArrayBench extends OnlineRegressionReport with Serializable with ParArraySnippets with Generators {
 
   /* config */
 
-  def persistor = new SerializationPersistor
   val tiny = 100000
   val small = 1000000
   val large = 10000000
 
   /* generators */
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
@@ -29,7 +28,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
     exec.jvmflags -> "-server -Xms3072m -Xmx3072m -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseCondCardMark -XX:CompileThreshold=100 -Dscala.collection.parallel.range.manual_optimizations=false",
     reports.regression.noiseMagnitude -> 0.15)
 
-  val oldopts = Seq(
+  val oldopts = Context(
     exec.minWarmupRuns -> 2,
     exec.maxWarmupRuns -> 4,
     exec.benchRuns -> 4,
@@ -45,9 +44,9 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
   }
 
 
-  performance of "Par[Array]" config (opts: _*) in {
+  performance of "Par[Array]" config (opts) in {
 
-    measure method "NonContendedVolatileReads" config (opts: _*) in {
+    measure method "NonContendedVolatileReads" config (opts) in {
       def arraysInitV(from: Int) =
 	for (size <- sizes(from)) yield (0 until size).map(i=>new VolatileContainer).toArray
       def arraysInitNV(from: Int) =
@@ -71,14 +70,14 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
       }
 
     }
-    measure method "Boxing" config (opts: _*) in {
+    measure method "Boxing" config (opts) in {
       using(arrays(large)) curve ("Sequential") in { x => noboxing(x)(_ + _) }
       using(arrays(large)) curve ("SequentialBoxedOp") in { x => boxing(x)(_ + _) }
       using(arrays(large)) curve ("SequentialSpecialized") in { x => boxingSpec(x)(_ + _) }
       using(arraysBoxed(small)) curve ("SequentialBoxedOpBoxedData") in { x => boxingSpec(x)(_ + _) }
     }
 
-    measure method "Dispatch" config (opts: _*) in {
+    measure method "Dispatch" config (opts) in {
       val helpers = new Helpers
       import helpers._
 
@@ -101,7 +100,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
     measure method "reduce" in {
       using(arrays(large)) curve ("Sequential") in reduceSequential
       using(withSchedulers(arrays(large))) curve ("Par") in { t => reduceParallel(t._1)(t._2) }
-      performance of "old" config (oldopts: _*) in {
+      performance of "old" config (oldopts) in {
         using(arrays(small)) curve ("ParArray") in { _.par.reduce(_ + _) }
       }
     }
@@ -131,7 +130,7 @@ class ParArrayBench extends PerformanceTest.Regression with Serializable with Pa
       exec.maxWarmupRuns -> 160) in {
         using(arrays(small)) curve ("Sequential") in filterMod3Sequential
         using(withSchedulers(arrays(small))) curve ("Par") in { t => filterMod3Parallel(t._1)(t._2) }
-        performance of "old" config (oldopts: _*) in {
+        performance of "old" config (oldopts) in {
           using(arrays(tiny)) curve ("ParArray") in { _.par.filter(_ % 3 == 0) }
         }
       }

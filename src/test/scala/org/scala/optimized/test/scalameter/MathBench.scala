@@ -6,19 +6,20 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import org.scalameter.PerformanceTest.OnlineRegressionReport
+import org.scalameter.{Key, KeyValue}
 
 
 
-class MathBench extends PerformanceTest.Regression with Serializable with Generators {
+class MathBench extends OnlineRegressionReport with Serializable with Generators {
 
   /* config */
 
-  def persistor = new SerializationPersistor
   val tiny =  100000
 
   /* generators */
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
@@ -28,52 +29,56 @@ class MathBench extends PerformanceTest.Regression with Serializable with Genera
     reports.regression.noiseMagnitude -> 0.15)
 
 
-  performance of "Math" config (opts: _*) in {
-    measure method "Math" config (opts: _*) in {
-      using(ranges(tiny)) curve ("sin") in { x => 
-        var i = x.head
-        val to = x.end
-        var acc = 0.0
-	while(i<to) {
-          acc = acc + Math.sin(i)
-	  i = i + 1
-        }
-	acc
-      }
-      
-      using(ranges(tiny)) curve ("sqrt") in { x => 
-        var i = x.head
-        val to = x.end
-        var acc = 0.0
-	while(i<to) {
-          acc = acc + Math.sqrt(i)
-	  i = i + 1}
-	acc
+  performance of "Math" config (opts) in {
+    measure method "Math" config (opts) in {
+      using(ranges(tiny)) curve ("sin") in {
+        x =>
+          var i = x.head
+          val to = x.end
+          var acc = 0.0
+          while (i < to) {
+            acc = acc + Math.sin(i)
+            i = i + 1
+          }
+          acc
       }
 
-      using(ranges(tiny)) curve ("tan") in { x => 
-        var i = x.head
-        val to = x.end
-        var acc = 0.0
-	while(i<to) {
-          acc = acc + Math.tan(i)
-	  i = i + 1
-        }
-	acc
+      using(ranges(tiny)) curve ("sqrt") in {
+        x =>
+          var i = x.head
+          val to = x.end
+          var acc = 0.0
+          while (i < to) {
+            acc = acc + Math.sqrt(i)
+            i = i + 1
+          }
+          acc
       }
 
-      using(ranges(tiny)) curve ("baseline") in { x => 
-        var i = x.head
-        val to = x.end
-        var acc = 1.0
-	while(i<to) {
-          acc = acc + acc
-	  i = i + 1
-        }
-	acc
+      using(ranges(tiny)) curve ("tan") in {
+        x =>
+          var i = x.head
+          val to = x.end
+          var acc = 0.0
+          while (i < to) {
+            acc = acc + Math.tan(i)
+            i = i + 1
+          }
+          acc
       }
 
-      
+      using(ranges(tiny)) curve ("baseline") in {
+        x =>
+          var i = x.head
+          val to = x.end
+          var acc = 1.0
+          while (i < to) {
+            acc = acc + acc
+            i = i + 1
+          }
+          acc
+      }
+
 
     }
 

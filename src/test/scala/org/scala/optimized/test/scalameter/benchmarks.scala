@@ -3,14 +3,10 @@ package scalameter
 
 
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class benchmarks extends PerformanceTest.Regression with Serializable {
-
-  /* config */
-
-  def persistor = new SerializationPersistor
+class benchmarks extends OnlineRegressionReport with Serializable {
 
   /* tests */
 

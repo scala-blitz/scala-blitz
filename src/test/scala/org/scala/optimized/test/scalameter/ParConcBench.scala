@@ -5,19 +5,17 @@ package scalameter
 import scala.collection.par._
 import org.scalameter.api._
 import scala.reflect.ClassTag
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class ParConcBench extends PerformanceTest.Regression with Serializable with ParConcSnippets with Generators {
+class ParConcBench extends OnlineRegressionReport with Serializable with ParConcSnippets with Generators {
 
   /* config */
-
-  def persistor = new SerializationPersistor
 
   val concFrom = 300000
   val bufferFrom = 10000000
 
-  val opts = Seq(
+  val opts = Context(
     exec.minWarmupRuns -> 25,
     exec.maxWarmupRuns -> 50,
     exec.benchRuns -> 48,
@@ -29,7 +27,7 @@ class ParConcBench extends PerformanceTest.Regression with Serializable with Par
 
   /* tests */
 
-  performance of "Par[Conc]" config(opts: _*) in { 
+  performance of "Par[Conc]" config(opts) in {
 
     measure method "reduce" in {
       using(arrays(bufferFrom)) curve("Array") in reduceSequential
