@@ -4,16 +4,12 @@ package scalameter
 
 import scala.collection.optimizer._
 import org.scalameter.api._
+import org.scalameter.PerformanceTest.OnlineRegressionReport
 
 
-
-class OptimizedBlockBench extends PerformanceTest.Regression with Serializable with Generators {
+class OptimizedBlockBench extends OnlineRegressionReport with Serializable with Generators {
 
   /* config */
-
-  def persistor = new SerializationPersistor
-
-
 
   val opts = Context(
     exec.minWarmupRuns -> 50,
