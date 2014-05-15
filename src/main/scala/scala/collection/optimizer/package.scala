@@ -5,6 +5,7 @@ package scala.collection
 import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.macros.whitebox.Context
+import scala.reflect.macros.blackbox.{Context => BlackBoxContext}
 
 
 
@@ -12,6 +13,18 @@ package object optimizer {
   final val debugOutput = false
   final def debug(s: String) = if (debugOutput) println(s)
   final val echoSplicedCode = false
+
+  def zero(c: BlackBoxContext)(t:c.Type): c.Tree = {
+    import c.universe._
+    if (t <:< typeOf[Int]) q"0"
+    else if(t <:< typeOf[Byte]) q"0.toByte"
+    else if(t <:< typeOf[Long]) q"0L"
+    else if(t <:< typeOf[Short]) q"0.toShort"
+    else if (t <:< typeOf[Boolean]) q"false"
+    else if (t <:< typeOf[Double]) q"0.0d"
+    else if (t <:< typeOf[Float]) q"0.0f"
+    else q"null"
+  }
 
   def optimize[T](exp: T): Any = macro optimize_impl[T]
 

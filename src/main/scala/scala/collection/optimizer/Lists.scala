@@ -19,22 +19,22 @@ object Lists {
 
   class Ops[T](val list: Optimized[List[T]]) {
     def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S): S = macro internal.ListMacros.aggregate[T,S]
-   /* def accumulate[S](merger: Merger[T, S]): S = ???
-    def foreach[U >: T](action: U => Unit): Unit = ???
+   // def accumulate[S](merger: Merger[T, S]): S = ???
+    def foreach[U >: T](action: U => Unit): Unit = macro internal.ListMacros.foreach[T, U]
     def mapReduce[R](mapper: T => R)(reducer: (R, R) => R): R = ???
-    def reduce[U >: T](operator: (U, U) => U) = ???
-    def fold[U >: T](z: => U)(op: (U, U) => U): U = ???
-    def sum[U >: T](implicit num: Numeric[U]): U = ???
-    def product[U >: T](implicit num: Numeric[U]): U = ???
-    def min[U >: T](implicit ord: Ordering[U]): U = ???
-    def max[U >: T](implicit ord: Ordering[U]): U = ???
-    def find[U >: T](p: U => Boolean): Option[T] = ???
-    def exists[U >: T](p: U => Boolean): Boolean = ???
-    def forall[U >: T](p: U => Boolean): Boolean = ???
+    def reduce[U >: T](combop: (U, U) => U) = macro internal.ListMacros.reduce[T, U]
+    def fold[U >: T](z: => U)(op: (U, U) => U): U = macro internal.ListMacros.fold[T, U]
+    def sum[U >: T](implicit num: Numeric[U]): U = macro internal.ListMacros.sum[T, U]
+    def product[U >: T](implicit num: Numeric[U]): U = macro internal.ListMacros.product[T, U]
+    def min[U >: T](implicit ord: Ordering[U]): U = macro internal.ListMacros.min[T, U]
+    def max[U >: T](implicit ord: Ordering[U]): U = macro internal.ListMacros.max[T, U]
+    def find[U >: T](p: U => Boolean): Option[T] = macro internal.ListMacros.find[T, U]
+    def exists[U >: T](p: U => Boolean): Boolean = macro internal.ListMacros.exists[T, U]
+    def forall[U >: T](p: U => Boolean): Boolean = macro internal.ListMacros.forall[T, U]
     def count[U >: T](p: U => Boolean): Int = ???
-    def map[S, That](func: T => S)(implicit bf: CanBuildFrom[List[T], S, That]) = ???
-    def filter[That](pred: T => Boolean)(implicit bf: CanBuildFrom[List[T], T, That]) = ???
-    def flatMap[S, That](func: T => TraversableOnce[S])(implicit bf: CanBuildFrom[List[T], S, That]) = ???*/
+    def map[S,  U >: T](p: U => S) = macro internal.ListMacros.map[T, U, S]
+    def filter[That](pred: T => Boolean) = ???
+    def flatMap[S,  U >: T](p: U => TraversableOnce[S]) = macro internal.ListMacros.flatMap[T, U, S]
   }
 }
 
