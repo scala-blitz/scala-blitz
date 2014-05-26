@@ -6,10 +6,14 @@ import scala.language.experimental.macros
 import scala.reflect.macros._
 import scala.reflect.macros.whitebox.Context
 import scala.reflect.macros.blackbox.{Context => BlackBoxContext}
+import scala.collection.optimizer.Optimized.OptimizedOps
 
 
+package object optimizer extends Lists.Scope {
 
-package object optimizer {
+  implicit def seq2opt[Repr](seq: Repr) = new OptimizedOps(seq)
+
+
   final val debugOutput = false
   final def debug(s: String) = if (debugOutput) println(s)
   final val echoSplicedCode = false

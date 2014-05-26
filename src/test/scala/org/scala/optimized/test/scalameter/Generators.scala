@@ -16,6 +16,9 @@ trait Generators {
   def ranges(from: Int) = for (size <- sizes(from)) yield 0 until size
   def ranges(sizes: Gen[Int]) = for (size <- sizes) yield 0 until size
   def arrays(from: Int) = for (size <- sizes(from)) yield (0 until size).toArray
+
+  def lists(from: Int) = for (size <- sizes(from)) yield (0 until size).toList
+
   def arraysBoxed(from: Int) = for (size <- sizes(from)) yield {
     val r = new Array[java.lang.Integer](size)
     (0 until size).foreach { x => r(x) = x: java.lang.Integer }

@@ -23,13 +23,15 @@ object ListMacros {
     import c.universe._
 
     val (calleeExpressionv, calleeExpressiong) = c.nonFunctionToLocal[Lists.Ops[T]](c.Expr[Lists.Ops[T]](c.applyPrefix))
+    val (seqopv, seqopg) = c.nonFunctionToLocal(seqop)
     val t = // val comboop = $combop
       q"""
       $calleeExpressionv
+      $seqopv
       var zero = $z
-      var list = $calleeExpressiong.list.seq
-      while(list ne Nil) {
-        zero = $seqop(zero, list.head)
+      var list = $calleeExpressiong.list
+      while(!list.isEmpty) {
+        zero = $seqopg(zero, list.head)
         list = list.tail
       }
       zero
@@ -37,30 +39,31 @@ object ListMacros {
     t
   }
 
-  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(combop: c.Expr[(U, U) => U]): c.Expr[T] = {
+  def reduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(combop: c.Expr[(U, U) => U]): c.Expr[U] = {
 
     import c.universe._
 
     val (calleeExpressionv, calleeExpressiong) = c.nonFunctionToLocal[Lists.Ops[T]](c.Expr[Lists.Ops[T]](c.applyPrefix))
+    val tu = implicitly[WeakTypeTag[U]]
     val (comboopv, comboopg) = c.nonFunctionToLocal[(U, U) => U](combop)
     val t =
       q"""
       $calleeExpressionv
       $comboopv
-      if($calleeExpressiong.list.seq.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
-      var zero = $calleeExpressiong.list.seq.head
-      var list = $calleeExpressiong.list.seq.tail
-      while(list ne Nil) {
+      if($calleeExpressiong.list.isEmpty) throw new java.lang.UnsupportedOperationException("empty.reduce")
+      var zero: $tu = $calleeExpressiong.list.head
+      var list = $calleeExpressiong.list.tail
+      while(!list.isEmpty) {
         zero = $comboopg(zero, list.head)
         list = list.tail
       }
       zero
       """
-    c.Expr[T](c.untypecheck(t))
+    c.Expr[T](c.inlineAndReset(t))
   }
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S]): c.Expr[S] =
-    c.Expr[S](c.untypecheck(mkAggregate(c)(z)(combop)(seqop)))
+    c.Expr[S](c.inlineAndReset(mkAggregate(c)(z)(combop)(seqop)))
 
   def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U]): c.Expr[U] = {
     aggregate(c)(z)(op)(op)
@@ -76,7 +79,7 @@ object ListMacros {
       $numv
       ${mkAggregate(c)(zero)(op)(op)}
       """
-    c.Expr[U](c.untypecheck(t))
+    c.Expr[U](c.inlineAndReset(t))
   }
 
   def product[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]]): c.Expr[U] = {
@@ -89,7 +92,7 @@ object ListMacros {
       $numv
       ${mkAggregate(c)(zero)(op)(op)}
       """
-    c.Expr[U](c.untypecheck(t))
+    c.Expr[U](c.inlineAndReset(t))
   }
 
 
@@ -104,7 +107,7 @@ object ListMacros {
       $actionv
       ${mkAggregate(c)(zero)(fakeComboop)(seqoper)}
       """
-    c.Expr[Unit](c.untypecheck(t))
+    c.Expr[Unit](c.inlineAndReset(t))
   }
 
   def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[Int] = {
@@ -112,13 +115,14 @@ object ListMacros {
 
     val comboop = c.Expr[(Int, Int) => Int](q"(x: Int, a: Int)=> x + a")
     val (opv, opg) = c.nonFunctionToLocal[U => Boolean](p)
-    val seqoper = c.Expr[(Int, U) => Int](q"(x: Int, a: U)=> if($opg(a)) x + 1 else x")
+    val tu = implicitly[WeakTypeTag[U]]
+    val seqoper = c.Expr[(Int, U) => Int](q"(x: Int, a: $tu)=> if($opg(a)) x + 1 else x")
     val zero = c.Expr[Int](q"0")
     val t = q"""
       $opv
       ${mkAggregate(c)(zero)(comboop)(seqoper)}
       """
-    c.Expr[Int](c.untypecheck(t))
+    c.Expr[Int](c.inlineAndReset(t))
   }
 
   def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]]): c.Expr[T] = {
@@ -194,7 +198,7 @@ object ListMacros {
 
   def map[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, T2: c.WeakTypeTag](c: Context)(p: c.Expr[U => T2]): c.Expr[List[T2]] = {
     import c.universe._
-    val tt = implicitly[c.WeakTypeTag[T2]]
+    val tt = implicitly[c.WeakTypeTag[T]]
     val tt2 = implicitly[c.WeakTypeTag[T2]]
     val z = c.Expr[scala.collection.mutable.ListBuffer[T2]](q"new scala.collection.mutable.ListBuffer[$tt2]()")
     val (pv, pg) = c.nonFunctionToLocal[U => T2](p)
@@ -206,6 +210,25 @@ object ListMacros {
     )
     val mapper = mkAggregate[T, scala.collection.mutable.ListBuffer[T2]](c)(z)(fakeComboop)(op)
     c.Expr[List[T2]](q"""
+      $pv
+      $mapper.toList
+      """
+    )
+  }
+
+  def filter[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[List[T]] = {
+    import c.universe._
+    val tt = implicitly[c.WeakTypeTag[T]]
+    val z = c.Expr[scala.collection.mutable.ListBuffer[T]](q"new scala.collection.mutable.ListBuffer[$tt]()")
+    val (pv, pg) = c.nonFunctionToLocal[U => Boolean](p)
+    val op = c.Expr[(scala.collection.mutable.ListBuffer[T], T) => scala.collection.mutable.ListBuffer[T]](
+      q"(x: scala.collection.mutable.ListBuffer[$tt], y: $tt) => {if($pg(y)) {x += y;}; x}"
+    )
+    val fakeComboop = c.Expr[(scala.collection.mutable.ListBuffer[T], scala.collection.mutable.ListBuffer[T]) => scala.collection.mutable.ListBuffer[T]](
+      q"(x: scala.collection.mutable.ListBuffer[$tt], y:scala.collection.mutable.ListBuffer[$tt])=> x"
+    )
+    val mapper = mkAggregate[T, scala.collection.mutable.ListBuffer[T]](c)(z)(fakeComboop)(op)
+    c.Expr[List[T]](q"""
       $pv
       $mapper.toList
       """
