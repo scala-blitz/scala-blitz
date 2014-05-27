@@ -132,10 +132,13 @@ class Optimizer[C <: Context](val c: C) {
     
   }
 
-  def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] = {
+  def inlineAndReset[T](expr: c.Expr[T]): c.Expr[T] = c.Expr[T](inlineAndReset(expr.tree))
+
+
+  def inlineAndReset(expr: c.Tree): c.Tree = {
     val inliner = new Inlining.Optimization
     val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
-    c.Expr[T](global.brutallyResetAttrs(inliner.transform(expr.tree).asInstanceOf[global.Tree]).asInstanceOf[c.Tree])
+    global.brutallyResetAttrs(inliner.transform(expr).asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
   }
 
   /* fusion */
