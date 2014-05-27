@@ -110,20 +110,6 @@ object ListMacros {
     c.Expr[Unit](c.inlineAndReset(t))
   }
 
-  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[Int] = {
-    import c.universe._
-
-    val comboop = c.Expr[(Int, Int) => Int](q"(x: Int, a: Int)=> x + a")
-    val (opv, opg) = c.nonFunctionToLocal[U => Boolean](p)
-    val tu = implicitly[WeakTypeTag[U]]
-    val seqoper = c.Expr[(Int, U) => Int](q"(x: Int, a: $tu)=> if($opg(a)) x + 1 else x")
-    val zero = c.Expr[Int](q"0")
-    val t = q"""
-      $opv
-      ${mkAggregate(c)(zero)(comboop)(seqoper)}
-      """
-    c.Expr[Int](c.inlineAndReset(t))
-  }
 
   def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(ord: c.Expr[Ordering[U]]): c.Expr[T] = {
     import c.universe._
@@ -151,19 +137,38 @@ object ListMacros {
       """
     )
   }
+  /*
+  def count[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[Int] = {
+    import c.universe._
+
+    val comboop = c.Expr[(Unit, Unit) => Unit](q"(x: Unit, a: Unit)=> x")
+    val (opv, opg) = c.nonFunctionToLocal[U => Boolean](p)
+    val tu = implicitly[WeakTypeTag[U]]
+    val seqoper = c.Expr[(Unit, U) => Unit](q"(x: Unit, a: $tu)=> if($opg(a)) zz  += 1")
+    val zero = c.Expr[Unit](q"()")
+    val t = q"""
+      var zz = 0
+      $opv
+      ${mkAggregate(c)(zero)(comboop)(seqoper)}
+      zz
+      """
+    c.Expr[Int](c.inlineAndReset(t))
+  }
+
   def find[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[Option[T]] = {
     import c.universe._
     val tt = implicitly[c.WeakTypeTag[T]]
     val z = zero(c)(tt.tpe)
     val (pv, pg) = c.nonFunctionToLocal[U => Boolean](p)
-    val op = c.Expr[(Boolean, T) => Boolean](q"(x: Boolean, y: $tt) => x || {if ($pg(y)) {fndVal = y; true} else false}")
-    val fakeComboop = c.Expr[(Boolean, Boolean) => Boolean](q"(x: Boolean, y: Boolean)=> x || y")
-    val search = mkAggregate[T, Boolean](c)(c.Expr[Boolean](q"false"))(fakeComboop)(op)
+    val op = c.Expr[(Unit, T) => Unit](q"(x: Unit, y: $tt) => if (continue && $pg(y)) {fndVal = y; continue = false}")
+    val fakeComboop = c.Expr[(Unit, Unit) => Unit](q"(x: Unit, y: Unit)=> x")
+    val search = mkAggregate[T, Unit](c)(c.Expr[Unit](q"()"))(fakeComboop)(op)
     c.Expr[Option[T]](q"""
       $pv
       var fndVal = $z
-      val found = $search
-      if(found) Some(fndVal) else None
+      var continue = true
+      $search
+      if(!continue) Some(fndVal) else None
       """
     )
   }
@@ -219,18 +224,20 @@ object ListMacros {
   def filter[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(p: c.Expr[U => Boolean]): c.Expr[List[T]] = {
     import c.universe._
     val tt = implicitly[c.WeakTypeTag[T]]
-    val z = c.Expr[scala.collection.mutable.ListBuffer[T]](q"new scala.collection.mutable.ListBuffer[$tt]()")
+    val z = c.Expr[Unit](q"()")
     val (pv, pg) = c.nonFunctionToLocal[U => Boolean](p)
-    val op = c.Expr[(scala.collection.mutable.ListBuffer[T], T) => scala.collection.mutable.ListBuffer[T]](
-      q"(x: scala.collection.mutable.ListBuffer[$tt], y: $tt) => {if($pg(y)) {x += y;}; x}"
+    val op = c.Expr[(Unit, T) => Unit](
+      q"(x: Unit, y: $tt) => if($pg(y)) {zz += y;}"
     )
-    val fakeComboop = c.Expr[(scala.collection.mutable.ListBuffer[T], scala.collection.mutable.ListBuffer[T]) => scala.collection.mutable.ListBuffer[T]](
-      q"(x: scala.collection.mutable.ListBuffer[$tt], y:scala.collection.mutable.ListBuffer[$tt])=> x"
+    val fakeComboop = c.Expr[(Unit, Unit) => Unit](
+      q"(x: Unit, y: Unit)=> x"
     )
-    val mapper = mkAggregate[T, scala.collection.mutable.ListBuffer[T]](c)(z)(fakeComboop)(op)
+    val mapper = mkAggregate(c)(z)(fakeComboop)(op)
     c.Expr[List[T]](q"""
+      var zz = new scala.collection.mutable.ListBuffer[$tt]()
       $pv
-      $mapper.toList
+      $mapper
+      zz.toList
       """
     )
   }
@@ -253,5 +260,5 @@ object ListMacros {
       $mapper.toList
       """
     )
-  }
+  }*/
 }
