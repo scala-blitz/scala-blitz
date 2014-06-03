@@ -18,7 +18,7 @@ import scala.collection.par.workstealing.internal.Optimizer.c2opt
 
 object ListMacros {
 
-  def mkAggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S]): c.Tree = {
+  def mkAggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(seqop: c.Expr[(S, T) => S]): c.Tree = {
 
     import c.universe._
 
@@ -63,10 +63,14 @@ object ListMacros {
   }
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag](c: Context)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S]): c.Expr[S] =
-    c.Expr[S](c.inlineAndReset(mkAggregate(c)(z)(combop)(seqop)))
+    c.Expr[S](c.inlineAndReset(mkAggregate(c)(z)(seqop)))
 
   def fold[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(z: c.Expr[U])(op: c.Expr[(U, U) => U]): c.Expr[U] = {
     aggregate(c)(z)(op)(op)
+  }
+
+  def foldLeft[T: c.WeakTypeTag, B: c.WeakTypeTag](c: Context)(z: c.Expr[B])(f: c.Expr[(B, T) => B]): c.Expr[B] = {
+    c.Expr[B](c.inlineAndReset(mkAggregate(c)(z)(f)))
   }
 
   def sum[T: c.WeakTypeTag, U >: T: c.WeakTypeTag](c: Context)(num: c.Expr[Numeric[U]]): c.Expr[U] = {
@@ -77,7 +81,7 @@ object ListMacros {
     val zero = c.Expr[U](q"$numg.zero")
     val t = q"""
       $numv
-      ${mkAggregate(c)(zero)(op)(op)}
+      ${mkAggregate(c)(zero)(op)}
       """
     c.Expr[U](c.inlineAndReset(t))
   }
@@ -90,7 +94,7 @@ object ListMacros {
     val zero = c.Expr[U](q"$numg.one")
     val t = q"""
       $numv
-      ${mkAggregate(c)(zero)(op)(op)}
+      ${mkAggregate(c)(zero)(op)}
       """
     c.Expr[U](c.inlineAndReset(t))
   }
@@ -100,12 +104,11 @@ object ListMacros {
     import c.universe._
 
     val (actionv, actiong) = c.nonFunctionToLocal[U => Unit](action)
-    val fakeComboop = c.Expr[(Unit, Unit) => Unit](q"(x: Unit, a: Unit)=> x")
     val seqoper = c.Expr[(Unit, U) => Unit](q"(x: Unit, a: U)=> $actiong.apply(a)")
     val zero = c.Expr[Unit](q"()")
     val t = q"""
       $actionv
-      ${mkAggregate(c)(zero)(fakeComboop)(seqoper)}
+      ${mkAggregate(c)(zero)(seqoper)}
       """
     c.Expr[Unit](c.inlineAndReset(t))
   }
