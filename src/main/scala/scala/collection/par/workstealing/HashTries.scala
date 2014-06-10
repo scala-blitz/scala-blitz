@@ -115,11 +115,11 @@ object HashTries {
       s.rootInit()
       s
     }*/
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.aggregate[T, S]
-    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.mapReduce[T, T, M]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler): S = macro internal.HashTrieSetMacros.aggregate[T, S]
+    override def mapReduce[M](mp: T => M)(combop: (M, M) => M)(implicit ctx: Scheduler): M = macro internal.HashTrieSetMacros.mapReduce[T, T, M]
     override def min[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.min[T, U]
     override def max[U >: T](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.max[T, U]
-    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashTrieSetMacros.reduce[T, U]
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieSetMacros.reduce[T, U]
     override def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashTrieSetMacros.foreach[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieSetMacros.fold[T, U]
     override def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieSetMacros.sum[T, U]
@@ -146,11 +146,11 @@ object HashTries {
       s.rootInit()
       s
     }*/
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.aggregate[K, V, S]
-    override def mapReduce[M](mp: ((K, V)) => M)(combop: (M, M) => M)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.mapReduce[K, V, M]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler): S = macro internal.HashTrieMapMacros.aggregate[K, V, S]
+    override def mapReduce[M](mp: ((K, V)) => M)(combop: (M, M) => M)(implicit ctx: Scheduler): M = macro internal.HashTrieMapMacros.mapReduce[K, V, M]
     override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.min[K, V, U]
     override def max[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.max[K, V, U]
-    override def reduce[U >: (K, V)](operator: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashTrieMapMacros.reduce[K, V, U]
+    override def reduce[U >: (K, V)](operator: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieMapMacros.reduce[K, V, U]
     override def foreach[U >: (K, V)](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashTrieMapMacros.foreach[K, V, U]
     override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashTrieMapMacros.fold[K, V, U]
     override def sum[U >: (K, V)](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashTrieMapMacros.sum[K, V, U]

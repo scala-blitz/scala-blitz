@@ -60,10 +60,10 @@ object HashTables {
       val contents = hashmap.seq.hashTableContents
       new HashMapStealer(contents, 0, contents.table.length)
     }
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler) = macro internal.HashMapMacros.aggregate[K, V, S]
-    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashMapMacros.fold[K, V, U]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, (K, V)) => S)(implicit ctx: Scheduler): S = macro internal.HashMapMacros.aggregate[K, V, S]
+    override def fold[U >: (K, V)](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashMapMacros.fold[K, V, U]
     override def count[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.HashMapMacros.count[K, V, U]
-    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That], ctx: Scheduler) = macro internal.HashMapMacros.filter[K, V, That]
+    override def filter[That](pred: ((K, V)) => Boolean)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That], ctx: Scheduler): That = macro internal.HashMapMacros.filter[K, V, That]
     override def mapReduce[R](mapper: ((K, V)) => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.HashMapMacros.mapReduce[K, V, R]
     override def reduce[U >: (K, V)](op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashMapMacros.reduce[K, V, U]
     override def min[U >: (K, V)](implicit ord: Ordering[U], ctx: Scheduler): U = macro internal.HashMapMacros.min[K, V, U]
@@ -75,7 +75,7 @@ object HashTables {
     override def exists[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashMapMacros.exists[K, V, U]
     override def forall[U >: (K, V)](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashMapMacros.forall[K, V, U]
     override def map[T, That](mp: ((K, V)) => T)(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: Scheduler): That = macro internal.HashMapMacros.map[K, V, T, That]
-    override def flatMap[T, That](mp: ((K, V)) => TraversableOnce[T])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: Scheduler) = macro internal.HashMapMacros.flatMap[K, V, T, That]
+    override def flatMap[T, That](mp: ((K, V)) => TraversableOnce[T])(implicit cmf: CanMergeFrom[Par[HashMap[K, V]], T, That], ctx: Scheduler): That = macro internal.HashMapMacros.flatMap[K, V, T, That]
 
     def seq = hashmap
   }
@@ -85,10 +85,10 @@ object HashTables {
       val contents = hashset.seq.hashTableContents
       new HashSetStealer(contents, 0, contents.table.length)
     }
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.HashSetMacros.aggregate[T, S]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler): S = macro internal.HashSetMacros.aggregate[T, S]
     override def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.HashSetMacros.foreach[T, U]
     override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.HashSetMacros.mapReduce[T, R]
-    override def reduce[U >: T](op: (U, U) => U)(implicit ctx: Scheduler) = macro internal.HashSetMacros.reduce[T, U]
+    override def reduce[U >: T](op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashSetMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.HashSetMacros.fold[T, U]
     override def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashSetMacros.sum[T, U]
     override def product[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.HashSetMacros.product[T, U]
@@ -99,8 +99,8 @@ object HashTables {
     override def exists[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashSetMacros.exists[T, U]
     override def forall[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.HashSetMacros.forall[T, U]
 
-    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: Scheduler) = macro internal.HashSetMacros.filter[T, That]
-    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler) = macro internal.HashSetMacros.flatMap[T, S, That]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[HashSet[T]], T, That], ctx: Scheduler): That = macro internal.HashSetMacros.filter[T, That]
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler): That = macro internal.HashSetMacros.flatMap[T, S, That]
 
     override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[HashSet[T]], S, That], ctx: Scheduler): That = macro internal.HashSetMacros.map[T, S, That]
     def seq = hashset
