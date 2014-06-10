@@ -154,6 +154,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel =
@@ -194,6 +195,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       lv.splice
       mv.splice
@@ -303,7 +305,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
-
+      import scala.reflect.ClassTag
       import internal._
       lv.splice
       val callee = calleeExpression.splice
@@ -460,6 +462,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
@@ -471,6 +474,7 @@ object RangesMacros {
       new Ranges.CopyMapRangeKernel[S] {
         import scala.collection.par.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
+        import scala.reflect.ClassTag
 
         def resultArray = sarray
         def applyN(node: Node[T, Unit], from: Int, to: Int, stride: Int) = {
@@ -507,6 +511,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -607,6 +612,7 @@ object RangesMacros {
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
+
       lv.splice
       cv.splice
       cmfv.splice
@@ -633,6 +639,7 @@ object RangesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.{ Arrays, Ranges }
       import scala.collection.par.Scheduler

@@ -31,6 +31,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       val callee = calleeExpression.splice
       val stealer = callee.stealer
@@ -70,6 +71,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import internal._
 
@@ -210,6 +212,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import par.workstealing.ResultCell
 
@@ -261,6 +264,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -302,6 +306,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
@@ -332,6 +337,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
@@ -362,6 +368,7 @@ object HashTrieSetMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
@@ -393,6 +400,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       val callee = calleeExpression.splice
       val stealer = callee.stealer
@@ -424,6 +432,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import internal._
       predv.splice
@@ -482,6 +491,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import par.workstealing.ResultCell
 
@@ -530,6 +540,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -571,6 +582,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
@@ -682,6 +694,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
@@ -712,6 +725,7 @@ object HashTrieMapMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTries
       import scala.collection.par.Scheduler
