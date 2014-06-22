@@ -11,7 +11,7 @@ import scala.collection.par.generic._
 import scala.collection.par.Par
 import scala.collection.par.workstealing._
 import scala.reflect.ClassTag
-
+import scala.collection.mutable
 
 
 object Reducables {
@@ -36,7 +36,7 @@ object Reducables {
     def reduce[U >: T](op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.ReducablesMacros.reduce[T, U, Repr]
     def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.ReducablesMacros.mapReduce[T, T, R, Repr]
     def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.ReducablesMacros.fold[T, U, Repr]
-    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.ReducablesMacros.aggregate[T, S, Repr]
+    def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler): S = macro internal.ReducablesMacros.aggregate[T, S, Repr]
     def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.ReducablesMacros.foreach[T, U, Repr]
     def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.ReducablesMacros.sum[T, U, Repr]
     def product[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.ReducablesMacros.product[T, U, Repr]
@@ -47,10 +47,10 @@ object Reducables {
     def exists[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.ReducablesMacros.exists[T, U, Repr]
     def forall[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.ReducablesMacros.forall[T, U, Repr]
     def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Repr, S, That], ctx: Scheduler): That = macro internal.ReducablesMacros.map[T, S, That, Repr]
-    def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: Scheduler) = macro internal.ReducablesMacros.flatMap[T, S, That, Repr]
-    def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: Scheduler) = macro internal.ReducablesMacros.filter[T, That, Repr]
-    def groupMapAggregate[K, M](gr: T => K)(mp: T => M)(aggr: (M, M) => M)(implicit kClassTag: ClassTag[K], mClassTag: ClassTag[M], ctx: Scheduler) = macro internal.ReducablesMacros.groupMapAggregate[T, K, M, Repr]
-    def groupBy[K, That <: AnyRef](gr: T => K)(implicit kClassTag: ClassTag[K], tClassTag: ClassTag[T], ctx: Scheduler, cmf: CanMergeFrom[Repr, T, That]) = macro internal.ReducablesMacros.groupBy[T, K, Repr, That]
+    def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Repr, S, That], ctx: Scheduler): That = macro internal.ReducablesMacros.flatMap[T, S, That, Repr]
+    def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Repr, T, That], ctx: Scheduler): That = macro internal.ReducablesMacros.filter[T, That, Repr]
+    def groupMapAggregate[K, M](gr: T => K)(mp: T => M)(aggr: (M, M) => M)(implicit kClassTag: ClassTag[K], mClassTag: ClassTag[M], ctx: Scheduler): Par[mutable.HashMap[K,M]] = macro internal.ReducablesMacros.groupMapAggregate[T, K, M, Repr]
+    def groupBy[K, That <: AnyRef](gr: T => K)(implicit kClassTag: ClassTag[K], tClassTag: ClassTag[T], ctx: Scheduler, cmf: CanMergeFrom[Repr, T, That]): Par[mutable.HashMap[K,That]] = macro internal.ReducablesMacros.groupBy[T, K, Repr, That]
   }
 
   class Ops[T](val r: Reducable[T]) extends AnyVal with OpsLike[T, Reducable[T]] {

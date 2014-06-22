@@ -74,7 +74,7 @@ class Optimizer[C <: Context](val c: C) {
 
   object PureFunction {
     def isUnchecked(tpe: Type) = tpe match {
-      case tpe: AnnotatedType => tpe.annotations.exists(_.tpe == uncheckedTpe)
+      case tpe: AnnotatedType => tpe.annotations.exists(_.tree.tpe == uncheckedTpe)
       case _ => false
     }
     def unapply(tt: Tree): Option[Function] = tt match {

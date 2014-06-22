@@ -32,6 +32,8 @@ S])(seqop: c.Expr[(S, (K, V)) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
+
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel = new scala.collection.par.workstealing.HashTables.HashMapKernel[K, V, S] {
@@ -86,6 +88,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
       import par._
       import workstealing._
       import par.workstealing.ResultCell
+      import scala.reflect.ClassTag
 
       lv.splice
       mv.splice
@@ -262,6 +265,7 @@ c.Expr[HashTables.HashMapKernel[K, V, Merger[S, That]]] = {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -316,12 +320,11 @@ c.Expr[CanMergeFrom[Par[HashMap[K, V]], ((K, V)), That]], ctx: c.Expr[Scheduler]
       import collection.par
       import par._
       import workstealing._
-
-
       import scala.reflect.ClassTag
       import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
+
       pv.splice
       cv.splice
       cmfv.splice
@@ -583,6 +586,7 @@ c.Expr[HashTables.HashSetKernel[T, Merger[S, That]]] = {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -629,6 +633,7 @@ f.splice(elem) })
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
@@ -661,6 +666,7 @@ c.Expr[CanMergeFrom[Par[HashSet[T]], T, That]], ctx: c.Expr[Scheduler]): c.Expr[
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
@@ -694,7 +700,7 @@ f.splice(elem).foreach(x=> merger +=x) })
       import collection.par
       import par._
       import workstealing._
-
+      import scala.reflect.ClassTag
 
       import scala.collection.par.workstealing.HashTables
       import scala.collection.par.Scheduler
@@ -723,6 +729,7 @@ c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import par.workstealing.ResultCell
 

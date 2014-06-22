@@ -149,6 +149,8 @@ object ArraysMacros {
       import workstealing._
       import internal._
       import scala.collection.par
+      import scala.reflect.ClassTag
+
       lv.splice
       val callee = calleeExpr.splice
       val stealer = callee.stealer
@@ -224,6 +226,8 @@ object ArraysMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
+
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel =
@@ -262,6 +266,7 @@ object ArraysMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       lv.splice
       val callee = calleeExpression.splice
@@ -318,6 +323,7 @@ object ArraysMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
@@ -351,6 +357,7 @@ object ArraysMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -392,6 +399,7 @@ object ArraysMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -463,6 +471,8 @@ object ArraysMacros {
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
+      import scala.reflect.ClassTag
+
       pv.splice
       cv.splice
       cmfv.splice
@@ -496,6 +506,7 @@ object ArraysMacros {
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{Ref, Node}
       import scala.reflect.ClassTag
+
       lv.splice
       cv.splice
       cmfv.splice

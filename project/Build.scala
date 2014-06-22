@@ -9,15 +9,15 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     name := "scala-blitz",
     organization := "com.github.scala-blitz",
-    version := "1.0-M3",
-    scalaVersion := "2.11.0",
+    version := "1.1-SNAPSHOT",
+    scalaVersion := "2.11.1",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % "2.11.0"
+      "org.scala-lang" % "scala-reflect" % "2.11.1"
       , "com.github.axel22" %% "scalameter" % "0.5-M2" % "test"
       , "org.scalatest" %% "scalatest" % "2.1.5" % "test"
-      , "org.scala-lang" % "scala-compiler" % "2.11.0" % "provided",
+      , "org.scala-lang" % "scala-compiler" % "2.11.1" % "provided",
       "org.scalacheck" %% "scalacheck" % "1.11.4" % "test"
     ),
     testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),

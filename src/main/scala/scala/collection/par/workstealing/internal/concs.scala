@@ -30,6 +30,8 @@ object ConcsMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
+
       lv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
@@ -109,6 +111,8 @@ object ConcsMacros {
       import par._
       import workstealing._
       import scala.collection.par.Scheduler.{Ref, Node}
+      import scala.reflect.ClassTag
+
       val callee = calleeExpression.splice
       val array = arr.splice
       val startIndex = start.splice

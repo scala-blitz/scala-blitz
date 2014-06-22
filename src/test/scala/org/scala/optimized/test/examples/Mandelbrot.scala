@@ -303,9 +303,7 @@ object Mandelbrot extends OnlineRegressionReport with Serializable {
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 48,
-    exec.independentSamples -> 6,
-    exec.jvmcmd -> "java8"
-  ) in {
+    exec.independentSamples -> 6) in {
     measure method "time" in {
 
       using(Gen.single("size")(580)) curve ("par") in {

@@ -123,6 +123,8 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
+
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel =
@@ -159,6 +161,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import internal._
       lv.splice
@@ -222,6 +225,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       lv.splice
       mv.splice
@@ -306,6 +310,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.workstealing.ProgressStatus
@@ -340,6 +345,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -380,6 +386,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -431,6 +438,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
@@ -485,13 +493,13 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par._
       import scala.collection.par.workstealing.Arrays
       import scala.collection.par.workstealing.Reducables
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      import scala.reflect.ClassTag
       lv.splice
       cv.splice
       cmfv.splice
@@ -527,6 +535,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par._
       import scala.collection.par.workstealing.Reducables
@@ -559,6 +568,7 @@ object ReducablesMacros {
       import collection.par
       import par._
       import workstealing._
+      import scala.reflect.ClassTag
 
       import scala.collection.par._
       import scala.collection.par.workstealing.{ Arrays, Reducables }

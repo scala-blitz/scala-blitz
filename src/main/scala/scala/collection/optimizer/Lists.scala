@@ -23,6 +23,7 @@ object Lists {
     def mapReduce[R](mapper: T => R)(reducer: (R, R) => R): R = ???
     def reduce[U >: T](combop: (U, U) => U): U = macro internal.ListMacros.reduce[T, U]
     def fold[U >: T](z: => U)(op: (U, U) => U): U = macro internal.ListMacros.fold[T, U]
+    def foldLeft[B](z: B)(f: (B, T) => B): B = macro internal.ListMacros.foldLeft[T, B]
     def sum[U >: T](implicit num: Numeric[U]): U = macro internal.ListMacros.sum[T, U]
     def product[U >: T](implicit num: Numeric[U]): U = macro internal.ListMacros.product[T, U]
     def min[U >: T](implicit ord: Ordering[U]): U = macro internal.ListMacros.min[T, U]

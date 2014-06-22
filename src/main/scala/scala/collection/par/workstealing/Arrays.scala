@@ -27,11 +27,11 @@ object Arrays {
 
   class Ops[T](val array: Par[Array[T]]) extends AnyVal with Zippables.OpsLike[T, Par[Array[T]]] {
     def stealer: PreciseStealer[T] = new ArrayStealer(array.seq, 0, array.seq.length)
-    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler) = macro internal.ArraysMacros.aggregate[T, S]
+    override def aggregate[S](z: S)(combop: (S, S) => S)(seqop: (S, T) => S)(implicit ctx: Scheduler): S = macro internal.ArraysMacros.aggregate[T, S]
     def accumulate[S](merger: Merger[T, S])(implicit ctx: Scheduler): S = macro internal.ArraysMacros.accumulate[T, S]
     override def foreach[U >: T](action: U => Unit)(implicit ctx: Scheduler): Unit = macro internal.ArraysMacros.foreach[T, U]
     override def mapReduce[R](mapper: T => R)(reducer: (R, R) => R)(implicit ctx: Scheduler): R = macro internal.ArraysMacros.mapReduce[T, T, R]
-    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler) = macro internal.ArraysMacros.reduce[T, U]
+    override def reduce[U >: T](operator: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.ArraysMacros.reduce[T, U]
     override def fold[U >: T](z: => U)(op: (U, U) => U)(implicit ctx: Scheduler): U = macro internal.ArraysMacros.fold[T, U]
     override def sum[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.ArraysMacros.sum[T, U]
     override def product[U >: T](implicit num: Numeric[U], ctx: Scheduler): U = macro internal.ArraysMacros.product[T, U]
@@ -41,9 +41,9 @@ object Arrays {
     override def exists[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.ArraysMacros.exists[T, U]
     override def forall[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.ArraysMacros.forall[T, U]
     override def count[U >: T](p: U => Boolean)(implicit ctx: Scheduler): Int = macro internal.ArraysMacros.count[T, U]
-    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: Scheduler) = macro internal.ArraysMacros.map[T, S, That]
-    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[Array[T]], T, That], ctx: Scheduler) = macro internal.ArraysMacros.filter[T, That]
-    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: Scheduler) = macro internal.ArraysMacros.flatMap[T, S, That]
+    override def map[S, That](func: T => S)(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: Scheduler): That = macro internal.ArraysMacros.map[T, S, That]
+    override def filter[That](pred: T => Boolean)(implicit cmf: CanMergeFrom[Par[Array[T]], T, That], ctx: Scheduler): That = macro internal.ArraysMacros.filter[T, That]
+    override def flatMap[S, That](func: T => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Array[T]], S, That], ctx: Scheduler): That = macro internal.ArraysMacros.flatMap[T, S, That]
     def seq = array
   }
 

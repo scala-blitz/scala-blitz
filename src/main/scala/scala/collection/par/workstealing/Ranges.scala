@@ -48,12 +48,12 @@ CanMergeFrom[Par[T], Int, Par[Array[Int]]] {
     override def find[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Option[Int] = macro internal.RangesMacros.find[U]
     override def exists[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.exists[U]
     override def forall[U >: Int](p: U => Boolean)(implicit ctx: Scheduler): Boolean = macro internal.RangesMacros.forall[U]
-    override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler) = macro internal.RangesMacros.map[Int, S, That]
+    override def map[S, That](func: Int => S)(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler): That = macro internal.RangesMacros.map[Int, S, That]
     override def copyToArray[U >: Int](arr: Array[U], start: Int, len: Int)(implicit ctx:Scheduler): Unit = macro internal.RangesMacros.copyToArray[U]
     def copyToArray[U >: Int](arr: Array[U], start: Int)(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.copyToArray2[U]
     def copyToArray[U >: Int](arr: Array[U])(implicit ctx: Scheduler): Unit = macro internal.RangesMacros.copyToArray3[U]
-    override def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler) = macro internal.RangesMacros.flatMap[Int, S, That]
-    override def filter[That](pred: Int => Boolean)(implicit cmf: CanMergeFrom[Par[Range], Int, That], ctx: Scheduler) = macro internal.RangesMacros.filter[That]
+    override def flatMap[S, That](func: Int => TraversableOnce[S])(implicit cmf: CanMergeFrom[Par[Range], S, That], ctx: Scheduler): That = macro internal.RangesMacros.flatMap[Int, S, That]
+    override def filter[That](pred: Int => Boolean)(implicit cmf: CanMergeFrom[Par[Range], Int, That], ctx: Scheduler): That = macro internal.RangesMacros.filter[That]
     def seq = range
     def classTag = implicitly[ClassTag[Int]]
   }

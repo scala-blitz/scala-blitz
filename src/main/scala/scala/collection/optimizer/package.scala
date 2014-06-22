@@ -156,8 +156,7 @@ package object optimizer extends Lists.Scope {
           result 
         }
        
-        val typesWhiteList = Set(typeOf[List[_]].typeSymbol,
-          typeOf[Range].typeSymbol,
+        val typesWhiteList = Set(typeOf[Range].typeSymbol,
           typeOf[scala.collection.immutable.Range.Inclusive].typeSymbol,
           typeOf[scala.collection.immutable.HashMap[_, _]].typeSymbol,
           typeOf[scala.collection.immutable.HashSet[_]].typeSymbol,
@@ -169,25 +168,33 @@ package object optimizer extends Lists.Scope {
         )
 
         // TODO: fix broken newTermName("groupBy") 
-        val methodWhiteList: Set[Name] = Set(TermName("foreach"), TermName("map"), TermName("reduce"), TermName("exists"), TermName("filter"), TermName("find"), TermName("flatMap"), TermName("forall"), TermName("count"), TermName("fold"), TermName("sum"), TermName("product"), TermName("min"), TermName("max"))
+        val methodWhiteList: Set[Name] = Set("foreach", "map", "reduce", "exists", "filter", "find", "flatMap", "forall", "count", "fold", "sum", "product", "min", "max").map(TermName(_))
+        val listType = typeOf[List[_]].typeSymbol
+        val listMethodWhiteList: Set[Name] = Set("aggregate", "reduce", "fold", "foldLeft", "sum", "product", "min", "max").map(TermName(_))
         // methods that result in Par[collection] and thus require .seq invocation
-        val collectionMethods: Set[Name] = Set(TermName("map"), TermName("filter"), TermName("flatMap"))
+        val collectionMethods: Set[Name] = Set("map", "filter", "flatMap").map(TermName(_))
         // methods for which second argument list should be maintained
         val maintain2ArgumentList: Set[Name] = Set(TermName("fold"))
         // methods that already have an implicit argument list. we reuse it and add scheduler to it
-        val append2ArgumentList: Set[Name] = Set(TermName("sum"), TermName("product"), TermName("min"), TermName("max"))
-
+        val append2ArgumentList: Set[Name] = Set("sum", "product", "min", "max").map(TermName(_))
+        var rewrote = false
         tree match {
           case q"$seqOriginal.aggregate[$tag]($zeroOriginal)($seqopOriginal, $comboopOriginal)" =>
             val seqTransformed = transform(seqOriginal)
             val whiteListed = (seqTransformed.tpe ne null) && typesWhiteList.contains(seqTransformed.tpe.typeSymbol)
-
+            val isList = (seqTransformed.tpe ne null) && listType == seqTransformed.tpe.typeSymbol
             if (seqTransformed.tpe eq null) {
               allTypesFound = false
               debug(s"\n\ntype not found for seqTransformed \nnext op:aggregate")
             }
             val rewrite: Tree =
-              if (whiteListed) {
+              if(isList) {
+                val seqop = transform(seqopOriginal)
+                val comboop = transform(comboopOriginal)
+                val zero = transform(zeroOriginal)
+                progress = true
+                q"$seqTransformed.opt.aggregate($zero)($comboop)($seqop)"
+              } else if (whiteListed) {
                 val seq = unWrapArray(seqTransformed)
                 debug(s"\n\nAGGREGATEtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed")
                 val seqop = transform(seqopOriginal)
@@ -196,51 +203,56 @@ package object optimizer extends Lists.Scope {
                 progress = true
                 q"$seq.toPar.aggregate($zero)($comboop)($seqop)"
               } else super.transform(tree)
-            if (whiteListed) debug("quasiquote formed " + rewrite + "\n")
+            //if (whiteListed) debug("quasiquote formed " + rewrite + "\n")
             rewrite
           case q"$seqOriginal.$method[..$targs]($argsOriginal)($cbf)" => //map, fold
             
-            val seqTansformed = transform(seqOriginal)
-            val whiteListed = (seqTansformed.tpe ne null) && typesWhiteList.contains(seqTansformed.tpe.typeSymbol)
+            val seqTransformed = transform(seqOriginal)
+            val whiteListed = (seqTransformed.tpe ne null) && typesWhiteList.contains(seqTransformed.tpe.typeSymbol)
+            val isList = (seqTransformed.tpe ne null) && listType == seqTransformed.tpe.typeSymbol
+            val listMethodListed = listMethodWhiteList.contains(method)
             val methodListed = methodWhiteList.contains(method)
-            if (methodListed && (seqTansformed.tpe eq null)) {
+            if (methodListed && (seqTransformed.tpe eq null)) {
               allTypesFound = false
-              debug(s"\n\ntype not found for $seqTansformed \nnext op:$method")
+              debug(s"\n\ntype not found for $seqTransformed \nnext op:$method")
             }
-            val rewrite: Tree = 
-              if (whiteListed && methodListed) {
-                val seq = unWrapArray(seqTansformed)
+            val rewrite: Tree =
+              if(isList && listMethodListed) {
+                debug(s"\n\nMAPtransforming ${tree}\n seq type is ${seqTransformed.tpe}\n" +
+                  s" method is ${method}\nmethod is in listWhiteList: $listMethodListed")
+                val args = transform(argsOriginal)
+                progress = true
+                if (maintain2ArgumentList.contains(method))
+                  q"$seqTransformed.opt.$method($args)($cbf)"
+                else q"$seqTransformed.opt.$method($args)"
+              } else if (whiteListed && methodListed) {
+                val seq = unWrapArray(seqTransformed)
                 debug(s"\n\nMAPtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed\nmethod is ${method}\nmethod is in whiteList: $methodListed")
                 val args = transform(argsOriginal)
                 progress = true
                 if (maintain2ArgumentList.contains(method))
                   q"$seq.toPar.$method($args)($cbf).seq"
                 else q"$seq.toPar.$method($args).seq"
-              }
-              else if (methodListed && ! maintain2ArgumentList.contains(method))  //clean cbf, but not for fold
-                {
-                  val transformedSeq = transform(q"$seqOriginal")
-                  val transformedArgs = transform(q"$argsOriginal")
-                  if ((seqOriginal.toString != transformedSeq.toString) ||(transformedArgs.toString != argsOriginal.toString)) {
-                    debug("**************************************Removed cbf")
-                    debug("seq is $seqOriginal")
-                    debug("transformedSeq is $transformedSeq")
-                    q"$transformedSeq.$method($transformedArgs)"
-                  }
-                  else tree
-                }
-              else super.transform(tree)
-            if (whiteListed && methodListed) debug(s"quasiquote formed ${rewrite}")
+              } else super.transform(tree)
+            //if (whiteListed && methodListed) debug(s"quasiquote formed ${rewrite}")
             rewrite
           case q"$seqOriginal.$method[..$targs]($argsOriginal)" => //foreach, reduce, groupBy(broken?), exists, filter
             val seqTransformed = transform(seqOriginal)
             val whiteListed = (seqTransformed.tpe ne null) && typesWhiteList.contains(seqTransformed.tpe.typeSymbol)
             val methodListed = methodWhiteList.contains(method)
+            val isList = (seqTransformed.tpe ne null) && listType == seqTransformed.tpe.typeSymbol
+            val listMethodListed = listMethodWhiteList.contains(method)
             if (methodListed && (seqTransformed.tpe eq null)) {
               allTypesFound = false
               debug(s"\n\ntype not found for seqOriginal\n next op:$method")
             }
-            val rewrite: Tree = if (whiteListed && methodListed) {
+            val rewrite: Tree = if(isList && listMethodListed) {
+              val seq = unWrapArray(seqTransformed)
+              debug(s"\n\nFOREACHtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed\nmethod is ${method}\nmethod is in whiteList: $methodListed")
+              val args = transform(argsOriginal)
+              progress = true
+              q"$seq.opt.$method($args)"
+            } else if (whiteListed && methodListed) {
               val seq = unWrapArray(seqTransformed)
               debug(s"\n\nFOREACHtransforming ${tree}\n seq type is ${seq.tpe}\n type is in whiteList: $whiteListed\nmethod is ${method}\nmethod is in whiteList: $methodListed")
               val args = transform(argsOriginal)
@@ -251,7 +263,7 @@ package object optimizer extends Lists.Scope {
                 q"$seq.toPar.$method($args).seq"
               else q"$seq.toPar.$method($args)" // q"$seq.foreach[..$targs]($args)"
             } else super.transform(tree)
-            if (whiteListed && methodListed) debug(s"quasiquote formed ${rewrite}")
+            //if (whiteListed && methodListed) debug(s"quasiquote formed ${rewrite}")
             rewrite
           case _ =>
 //            debug(s"not transforming $tree") 
