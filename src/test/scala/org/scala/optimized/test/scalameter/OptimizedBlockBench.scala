@@ -265,7 +265,7 @@ class OptimizedBlockBench extends OnlineRegressionReport with Serializable with 
         optimize{x.foreach(x => count = count + 1) }
       }
     }
-    
+
     measure method "count" in {
       using(hashTrieSets(large)) curve ("collections") in { x =>
         x.count(_ > 0)

@@ -88,6 +88,31 @@ class Optimizer[C <: Context](val c: C) {
 
   object Inlining {
 
+    class Renamer extends Transformer {
+      val renamed = scala.collection.mutable.HashMap[Symbol, Name]()
+      override def transform(tree: Tree): Tree = {
+        tree match {
+          case ValDef(mods, name, tpt, rhs) if !tree.symbol.owner.isClass =>
+            if(tree.symbol != NoSymbol) {
+              val newName = c.freshName(name)
+              renamed += (tree.symbol -> newName)
+              val transformed = super.transform(tree).asInstanceOf[ValDef]
+              ValDef(transformed.mods, newName, transformed.tpt, transformed.rhs)
+            } else {
+              tree
+            }
+          case Ident(name) =>
+            renamed.get(tree.symbol) match {
+              case Some(newName) => Ident(newName)
+              case None =>
+                tree
+            }
+          case _ =>
+            super.transform(tree)
+        }
+      }
+    }
+
     class Optimization extends Transformer {
       object InlineablePattern {
         def unapply(tree: Tree): Option[(Tree, List[Tree])] = tree match {
@@ -137,8 +162,12 @@ class Optimizer[C <: Context](val c: C) {
 
   def inlineAndReset(expr: c.Tree): c.Tree = {
     val inliner = new Inlining.Optimization
+    val renamer = new Inlining.Renamer
     val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
-    global.brutallyResetAttrs(inliner.transform(expr).asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
+    val inlined = inliner.transform(expr)
+
+    val renamed = renamer.transform(inlined)
+    global.brutallyResetAttrs(renamed.asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
   }
 
   /* fusion */
