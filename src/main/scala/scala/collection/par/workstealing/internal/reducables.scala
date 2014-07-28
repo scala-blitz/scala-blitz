@@ -280,6 +280,71 @@ object ReducablesMacros {
     c.inlineAndReset(operation)
   }
 
+  def mapFilterReduce[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag]
+    (c: BlackboxContext)
+    (seqop: c.Expr[(U, ResultCell[R]) => ResultCell[R]], stopPredicate: c.Expr[(U, ResultCell[R]) => Boolean])
+    (reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler])
+    : c.Expr[ResultCell[R]] =
+  {
+    import c.universe._
+
+    val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
+    val (mv, mop) = c.nonFunctionToLocal[(U, ResultCell[R]) => ResultCell[R]](seqop)
+    val (stv, stpg) = c.nonFunctionToLocal[(U, ResultCell[R]) => Boolean](stopPredicate)
+    val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
+    val result = reify {
+      import scala._
+      import collection.par
+      import par._
+      import workstealing._
+
+      lv.splice
+      stv.splice
+      mv.splice
+
+      val callee = calleeExpression.splice
+      val stealer = callee.stealer
+
+      val kernel = new scala.collection.par.workstealing.Reducables.ReducableKernel[T, ResultCell[R]] {
+        override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[R]], node: Scheduler.Node[T, ResultCell[R]]) {
+          node.WRITE_INTERMEDIATE(new ResultCell[R])
+        }
+        def zero = new ResultCell[R]
+        def combine(a: ResultCell[R], b: ResultCell[R]) = {
+          if (a eq b) a
+          else if (a.isEmpty) b
+          else if (b.isEmpty) a
+          else {
+            val r = new ResultCell[R]
+            r.result = op.splice(a.result, b.result)
+            r
+          }
+        }
+        def apply(node: Node[T, ResultCell[R]], chunkSize: Int): ResultCell[R] = {
+          val stealer = node.stealer
+          var intermediate = node.READ_INTERMEDIATE
+          var stop = false
+          while (stealer.hasNext && !stop) {
+            val next = stealer.next
+            stop = stopPredicate.splice(next, intermediate)
+            intermediate = mop.splice(next, intermediate)
+          }
+          if (stop) setTerminationCause(ResultFound)
+          intermediate
+        }
+      }
+      val result = ctx.splice.invokeParallelOperation(stealer, kernel)
+      result
+    }
+
+    val operation = reify {
+      result.splice
+    }
+
+    c.inlineAndReset(operation)
+  }
+
+
   def min[T: c.WeakTypeTag, U >: T: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(ord: c.Expr[Ordering[U]], ctx: c.Expr[Scheduler]): c.Expr[T] = {
     import c.universe._
 
