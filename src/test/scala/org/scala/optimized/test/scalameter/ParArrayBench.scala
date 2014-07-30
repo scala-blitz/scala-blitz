@@ -47,29 +47,45 @@ class ParArrayBench extends OnlineRegressionReport with Serializable with ParArr
   performance of "Par[Array]" config (opts) in {
 
     measure method "NonContendedVolatileReads" config (opts) in {
+      // if these are Gens, they should go up to top-level with their Gen friends, under the generator comment
       def arraysInitV(from: Int) =
-	for (size <- sizes(from)) yield (0 until size).map(i=>new VolatileContainer).toArray
+        for (size <- sizes(from)) yield (0 until size).map(i=>new VolatileContainer).toArray
       def arraysInitNV(from: Int) =
-	for (size <- sizes(from)) yield (0 until size).map(i=>new NonVolatileContainer).toArray
+        for (size <- sizes(from)) yield (0 until size).map(i=>new NonVolatileContainer).toArray
 
-/*      using(arraysInitV(small)) curve ("volatile") in { x => (1 to 100).map{a: Int =>{ var i = 0
-	val to = x.size
-	var acc = 0
-	while(i<to) {acc = acc + x(i).m
-	  i = i + 1}
-	acc}
+      /* Why is this commented out? should it be removed altogether?
+      using(arraysInitV(small)) curve ("volatile") in { x =>
+        (1 to 100).map {
+          a: Int => {
+            var i = 0
+            val to = x.size
+            var acc = 0
+            while (i < to) {
+              acc = acc + x(i).m
+              i = i + 1
+            }
+            acc
+          }
+        }
       }
-      }*/
-      using(arraysInitNV(small)) curve ("nonVolatile") in { x => (1 to 100).map{a: Int =>{ var i = 0
-	val to = x.size
-	var acc = 0
-	while(i<to) {acc = acc + x(i).m
-	  i = i + 1}
-	acc}
+      */
+      
+      using(arraysInitNV(small)) curve ("nonVolatile") in { x =>
+        (1 to 100).map {
+          a: Int => {
+            var i = 0
+            val to = x.size
+            var acc = 0
+            while (i < to) {
+              acc = acc + x(i).m
+              i = i + 1
+            }
+            acc
+          }
+        }
       }
-      }
-
     }
+    
     measure method "Boxing" config (opts) in {
       using(arrays(large)) curve ("Sequential") in { x => noboxing(x)(_ + _) }
       using(arrays(large)) curve ("SequentialBoxedOp") in { x => boxing(x)(_ + _) }
