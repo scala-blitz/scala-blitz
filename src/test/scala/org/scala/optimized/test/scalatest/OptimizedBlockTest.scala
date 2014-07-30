@@ -14,6 +14,12 @@ class OptimizedBlockTest extends FunSuite {
 
   import scala.collection._
 
+  test("macro.nameClashes.compiles") {
+    def bla(x: Range) = optimize {
+      var sum = 0f; x.foreach { x => sum += x}
+    }
+  }
+
   test("Range.foreach") {
     val size = 200000
     val elems = 0 until size

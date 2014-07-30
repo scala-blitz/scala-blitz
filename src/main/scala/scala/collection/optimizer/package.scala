@@ -7,6 +7,7 @@ import scala.reflect.macros._
 import scala.reflect.macros.whitebox.Context
 import scala.reflect.macros.blackbox.{Context => BlackBoxContext}
 import scala.collection.optimizer.Optimized.OptimizedOps
+import scala.collection.par.workstealing.internal.Optimizer._
 
 
 package object optimizer extends Lists.Scope {
@@ -77,8 +78,7 @@ package object optimizer extends Lists.Scope {
 
     val t = BoxUnboxEliminating.transform(exp.tree)
     if (echoSplicedCode) println(t)
-    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
-    global.brutallyResetAttrs(t.asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
+    c.inlineAndReset(t).asInstanceOf[c.Tree]
   }
   
 
@@ -278,7 +278,6 @@ package object optimizer extends Lists.Scope {
       if (allTypesFound) q"optimize_postprocess{${addImports(t)}}"
       else addImports(q"optimize{$t}")
      debug(s"\n\n\n***********************************************************************************\nresult: $resultWithImports")
-    val global = c.universe.asInstanceOf[scala.tools.nsc.Global]
-    global.brutallyResetAttrs(resultWithImports.asInstanceOf[global.Tree]).asInstanceOf[c.Tree]
+    c.inlineAndReset(resultWithImports).asInstanceOf[c.Tree]
   }
 }
