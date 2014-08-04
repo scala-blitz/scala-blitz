@@ -15,7 +15,7 @@ object BuildSettings {
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % "2.11.1"
-      , "com.github.axel22" %% "scalameter" % "0.5-M2" % "test"
+      , "com.storm-enroute" %% "scalameter" % "0.6" % "test"
       , "org.scalatest" %% "scalatest" % "2.1.5" % "test"
       , "org.scala-lang" % "scala-compiler" % "2.11.1" % "provided",
       "org.scalacheck" %% "scalacheck" % "1.11.4" % "test"
