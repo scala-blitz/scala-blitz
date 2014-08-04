@@ -9,7 +9,7 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     name := "scala-blitz",
     organization := "com.github.scala-blitz",
-    version := "1.1-SNAPSHOT",
+    version := "1.2",
     scalaVersion := "2.11.1",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
