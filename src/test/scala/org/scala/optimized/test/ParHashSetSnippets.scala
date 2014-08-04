@@ -22,7 +22,7 @@ trait ParHashSetSnippets {
   }
 
   def aggregateParallel(hs: HashSet[Int])(implicit s: Scheduler) = hs.toPar.aggregate(0)(_ + _)(_ + _)
-  def aggregateReducable(hs: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducable(hs.toPar).aggregate(0)(_ + _)(_ + _)
+  def aggregateReducible(hs: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducible(hs.toPar).aggregate(0)(_ + _)(_ + _)
 
   def mapSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -39,11 +39,11 @@ trait ParHashSetSnippets {
 
   def reduceParallel(a: HashSet[Int])(implicit s: Scheduler) = a.toPar.reduce(_ + _)
 
-  def reduceReducable(a: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducable(a.toPar).reduce(_ + _)
+  def reduceReducible(a: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducible(a.toPar).reduce(_ + _)
 
   def mapReduceParallel(hm: HashSet[Int])(implicit s: Scheduler) = hm.toPar.mapReduce(_ + 1)(_ + _)
 
-  def mapReduceReducable(hm: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducable(hm.toPar).mapReduce(_ + 1)(_ + _)
+  def mapReduceReducible(hm: HashSet[Int])(implicit s: Scheduler) = hashSetIsReducible(hm.toPar).mapReduce(_ + 1)(_ + _)
 
   def mapReduceSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -125,15 +125,15 @@ trait ParHashSetSnippets {
     ai.get
   }
 
-  def foreachReducable(a: HashSet[Int])(implicit s: Scheduler) = {
+  def foreachReducible(a: HashSet[Int])(implicit s: Scheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
-    hashSetIsReducable(a.toPar).foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
+    hashSetIsReducible(a.toPar).foreach(x=> if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
   def findParallel(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = a.toPar.find(x => x == elem)
 
-  def findReducable(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashSetIsReducable(a.toPar).find(x => x == elem)
+  def findReducible(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashSetIsReducible(a.toPar).find(x => x == elem)
  
   def existsParallel(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = a.toPar.exists(x => x == elem)
 

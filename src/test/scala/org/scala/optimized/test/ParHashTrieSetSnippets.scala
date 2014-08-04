@@ -22,13 +22,13 @@ trait ParHashTrieSetSnippets {
 
   def aggregateParallel(hm: HashSet[Int])(implicit s: Scheduler) = hm.toPar.aggregate[Int](0){(x : Int, y : Int   ) => x + y}(_ + _)   
 
-  def aggregateReducable(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducable(hm.toPar).aggregate(0)(_ + _)(_ + _)
+  def aggregateReducible(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducible(hm.toPar).aggregate(0)(_ + _)(_ + _)
 
   def reduceSequential(a: HashSet[Int]) = aggregateSequential(a)
 
   def reduceParallel(a: HashSet[Int])(implicit s: Scheduler) = a.toPar.reduce(_ + _)
 
-  def reduceReducable(a: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducable(a.toPar).reduce(_ + _)
+  def reduceReducible(a: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducible(a.toPar).reduce(_ + _)
 
 
 
@@ -48,7 +48,7 @@ trait ParHashTrieSetSnippets {
   }
   
   def aggregateParallelUnion(hm: HashSet[Int])(implicit s: Scheduler) = hm.toPar.aggregate(new HashSet[Int])(_ ++ _)(_ + _)
-  def aggregateReducableUnion(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducable(hm.toPar).aggregate(new HashSet[Int])(_ ++ _)(_ + _)
+  def aggregateReducibleUnion(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducible(hm.toPar).aggregate(new HashSet[Int])(_ ++ _)(_ + _)
 
   def mapSequential(hm: HashSet[Int]) = {
     val it = hm.iterator
@@ -63,7 +63,7 @@ trait ParHashTrieSetSnippets {
   def mapParallel(hm: HashSet[Int])(implicit s: Scheduler) = hm.toPar.map(_ * 2)
 
 
-  def mapReducable(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducable(hm.toPar).map(_ * 2)
+  def mapReducible(hm: HashSet[Int])(implicit s: Scheduler) = hashTrieSetIsReducible(hm.toPar).map(_ * 2)
 
   def foldProductSequential(a: HashSet[Int]) = {
     val it = a.iterator
@@ -162,15 +162,15 @@ trait ParHashTrieSetSnippets {
   def findSinSequential(a: HashSet[Int]) = a.find(x => math.sin(x) == 2)
   def findSinParallel(a: HashSet[Int])(implicit s: Scheduler) = a.toPar.find(x => math.sin(x) == 2)
 
-  def findReducable(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducable(a.toPar).find(x => x == elem)
+  def findReducible(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducible(a.toPar).find(x => x == elem)
 
   def existsParallel(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = a.toPar.exists(x => x == elem)
 
-  def existsReducable(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducable(a.toPar).exists(x => x == elem)
+  def existsReducible(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducible(a.toPar).exists(x => x == elem)
 
   def forallSmallerParallel(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = a.toPar.forall(x => x < elem)
 
-  def forallSmallerReducable(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducable(a.toPar).forall(x => x < elem)
+  def forallSmallerReducible(a: HashSet[Int], elem: Int)(implicit s: Scheduler) = hashTrieSetIsReducible(a.toPar).forall(x => x < elem)
 
   val other = List(2, 3)
 

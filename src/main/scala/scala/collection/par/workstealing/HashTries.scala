@@ -89,14 +89,14 @@ object HashTries {
       def apply(from: Par[HashMap[_, _]]) = new HashMapMerger[K, V](ctx)
       def apply() = new HashMapMerger[K, V](ctx)
     }
-    implicit def hashTrieMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
-      def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)] {
+    implicit def hashTrieMapIsReducible[K, V] = new IsReducible[HashMap[K, V], (K, V)] {
+      def apply(pa: Par[HashMap[K, V]]) = new Reducible[(K, V)] {
         def iterator = pa.seq.iterator
         def stealer = pa.stealer
       }
     }
-    implicit def hashTrieSetIsReducable[T] = new IsReducable[HashSet[T], T] {
-      def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
+    implicit def hashTrieSetIsReducible[T] = new IsReducible[HashSet[T], T] {
+      def apply(pa: Par[HashSet[T]]) = new Reducible[T] {
         def iterator = pa.seq.iterator
         def stealer = pa.stealer
       }
@@ -104,7 +104,7 @@ object HashTries {
 
   }
 
-  class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[HashSet[T]]] {
+  class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducibles.OpsLike[T, Par[HashSet[T]]] {
     def stealer: Stealer[T] = {
       val s = new HashSetIndexedStealer(hashset.seq, 0, hashset.seq.size)
       s.setPos(0)
@@ -135,7 +135,7 @@ object HashTries {
     def seq = hashset
   }
 
-  class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducables.OpsLike[(K, V), Par[HashMap[K, V]]] {
+  class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducibles.OpsLike[(K, V), Par[HashMap[K, V]]] {
     def stealer: Stealer[(K, V)] = {
       val s = new HashMapIndexedStealer(hashmap.seq, 0, hashmap.seq.size)
       s.setPos(0)

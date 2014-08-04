@@ -11,5 +11,5 @@ with Concs.Scope
 with HashTables.Scope 
 with HashTries.Scope
 with BinaryTrees.Scope
-with Reducables.Scope {
+with Reducibles.Scope {
 }

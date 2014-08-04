@@ -6,7 +6,7 @@ import scala.collection.parallel.PreciseSplitter
 
 
 
-trait Zippable[@specialized T] extends Reducable[T] {
+trait Zippable[@specialized T] extends Reducible[T] {
 
   def iterator: Iterator[T]
 

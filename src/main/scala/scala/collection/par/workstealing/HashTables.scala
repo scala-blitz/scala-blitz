@@ -28,8 +28,8 @@ object HashTables {
       def apply(from: Par[HashMap[_, _]]) = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashMapDiscardingMerger[K, V](HashBuckets.DISCRIMINANT_BITS, HashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
-    implicit def hashMapIsReducable[K, V] = new IsReducable[HashMap[K, V], (K, V)] {
-      def apply(pa: Par[HashMap[K, V]]) = new Reducable[(K, V)] {
+    implicit def hashMapIsReducible[K, V] = new IsReducible[HashMap[K, V], (K, V)] {
+      def apply(pa: Par[HashMap[K, V]]) = new Reducible[(K, V)] {
         def iterator: Iterator[(K, V)] = pa.seq.iterator
 
 
@@ -45,8 +45,8 @@ object HashTables {
       def apply(from: Par[HashSet[_]]) = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
       def apply() = new HashSetMerger[Int](HashBuckets.DISCRIMINANT_BITS, FlatHashTable.defaultLoadFactor, HashBuckets.IRRELEVANT_BITS, ctx)
     }
-    implicit def hashSetIsReducable[T] = new IsReducable[HashSet[T], T] {
-      def apply(pa: Par[HashSet[T]]) = new Reducable[T] {
+    implicit def hashSetIsReducible[T] = new IsReducible[HashSet[T], T] {
+      def apply(pa: Par[HashSet[T]]) = new Reducible[T] {
         def iterator: Iterator[T] = pa.seq.iterator
 
 
@@ -55,7 +55,7 @@ object HashTables {
     }
   }
 
-  class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducables.OpsLike[(K, V), Par[HashMap[K, V]]] {
+  class HashMapOps[K, V](val hashmap: Par[HashMap[K, V]]) extends AnyVal with Reducibles.OpsLike[(K, V), Par[HashMap[K, V]]] {
     def stealer: Stealer[(K, V)] = {
       val contents = hashmap.seq.hashTableContents
       new HashMapStealer(contents, 0, contents.table.length)
@@ -80,7 +80,7 @@ object HashTables {
     def seq = hashmap
   }
 
-  class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[HashSet[T]]] {
+  class HashSetOps[T](val hashset: Par[HashSet[T]]) extends AnyVal with Reducibles.OpsLike[T, Par[HashSet[T]]] {
     def stealer: Stealer[T] = {
       val contents = hashset.seq.hashTableContents
       new HashSetStealer(contents, 0, contents.table.length)

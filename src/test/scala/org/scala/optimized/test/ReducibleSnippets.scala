@@ -8,7 +8,7 @@ import Scheduler.Config
 
 
 
-trait ReducableSnippets {
+trait ReducibleSnippets {
 
   def reduceSequential(r: Range) = {
     var i = r.head
@@ -32,9 +32,9 @@ trait ReducableSnippets {
     if (sum == 0) ???
   }
 
-  def reduceParallel(r: Reducable[Int])(implicit s: Scheduler) = r.reduce(_ + _)
+  def reduceParallel(r: Reducible[Int])(implicit s: Scheduler) = r.reduce(_ + _)
 
-  def mapReduceParallel(r: Reducable[Int])(implicit s: Scheduler) = r.mapReduce(_ + 1)(_ + _)
+  def mapReduceParallel(r: Reducible[Int])(implicit s: Scheduler) = r.mapReduce(_ + 1)(_ + _)
 
   def aggregateSequential(r: Range) = {
     var i = r.head
@@ -47,7 +47,7 @@ trait ReducableSnippets {
     sum
   }
 
-  def aggregateParallel(r: Reducable[Int])(implicit s: Scheduler) = r.aggregate(0)(_ + _)(_ + _)
+  def aggregateParallel(r: Reducible[Int])(implicit s: Scheduler) = r.aggregate(0)(_ + _)(_ + _)
 
   def foldSequential(r: Range) = {
     var i = r.head
@@ -60,7 +60,7 @@ trait ReducableSnippets {
     sum
   }
 
-  def foldParallel(r: Reducable[Int])(implicit s: Scheduler) = r.fold(0)(_ + _)
+  def foldParallel(r: Reducible[Int])(implicit s: Scheduler) = r.fold(0)(_ + _)
 
   def minSequential(r: Range) = {
     var i = r.head
@@ -73,9 +73,9 @@ trait ReducableSnippets {
     min
   }
 
-  def minParallel(r: Reducable[Int])(implicit s: Scheduler) = r.min
+  def minParallel(r: Reducible[Int])(implicit s: Scheduler) = r.min
 
-  def minParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: Scheduler) = r.min(ord, s)
+  def minParallel(r: Reducible[Int], ord: Ordering[Int])(implicit s: Scheduler) = r.min(ord, s)
 
   def maxSequential(r: Range) = {
     var i = r.head
@@ -88,9 +88,9 @@ trait ReducableSnippets {
     max
   }
 
-  def maxParallel(r: Reducable[Int])(implicit s: Scheduler) = r.max
+  def maxParallel(r: Reducible[Int])(implicit s: Scheduler) = r.max
 
-  def maxParallel(r: Reducable[Int], ord: Ordering[Int])(implicit s: Scheduler) = r.max(ord, s)
+  def maxParallel(r: Reducible[Int], ord: Ordering[Int])(implicit s: Scheduler) = r.max(ord, s)
 
   def sumSequential(r: Range) = {
     var i = r.head
@@ -104,9 +104,9 @@ trait ReducableSnippets {
     sum
   }
 
-  def sumParallel(r: Reducable[Int])(implicit s: Scheduler) = r.sum
+  def sumParallel(r: Reducible[Int])(implicit s: Scheduler) = r.sum
 
-  def sumParallel(r: Reducable[Int], customNum: Numeric[Int])(implicit s: Scheduler) = r.sum(customNum, s)
+  def sumParallel(r: Reducible[Int], customNum: Numeric[Int])(implicit s: Scheduler) = r.sum(customNum, s)
 
   def productSequential(r: Range) = {
     var i = r.head
@@ -120,9 +120,9 @@ trait ReducableSnippets {
     sum
   }
 
-  def productParallel(r: Reducable[Int])(implicit s: Scheduler) = r.product
+  def productParallel(r: Reducible[Int])(implicit s: Scheduler) = r.product
 
-  def productParallel(r: Reducable[Int], customNum: Numeric[Int])(implicit s: Scheduler) = r.product(customNum, s)
+  def productParallel(r: Reducible[Int], customNum: Numeric[Int])(implicit s: Scheduler) = r.product(customNum, s)
 
   def countSequential(r: Range) = {
     var i = r.head
@@ -135,7 +135,7 @@ trait ReducableSnippets {
     count
   }
 
-  def countParallel(r: Reducable[Int])(implicit s: Scheduler) = r.count(x => (x & 0x1) == 0)
+  def countParallel(r: Reducible[Int])(implicit s: Scheduler) = r.count(x => (x & 0x1) == 0)
 
   def findFirstSequential(r: Range) = {
     var i = r.head
@@ -167,11 +167,11 @@ trait ReducableSnippets {
     result
   }
 
-  def findFirstParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def findFirstParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     r.find(_ == 0)
   }
 
-  def findNotExistingParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def findNotExistingParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     r.find(_ == Int.MinValue)
   }
 
@@ -190,7 +190,7 @@ trait ReducableSnippets {
     result
   }
 
-  def findSinParallel(a: Reducable[Int])(implicit s: Scheduler) = a.find(x => math.sin(x) == 2.0)
+  def findSinParallel(a: Reducible[Int])(implicit s: Scheduler) = a.find(x => math.sin(x) == 2.0)
 
   def existsSequential(r: Range) = {
     var i = r.head
@@ -206,7 +206,7 @@ trait ReducableSnippets {
     else result
   }
 
-  def existsParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def existsParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     r.exists(_ == 0)
   }
 
@@ -222,7 +222,7 @@ trait ReducableSnippets {
     else result
   }
 
-  def forallParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def forallParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     r.forall(_ < Int.MaxValue)
   }
 
@@ -256,8 +256,8 @@ trait ReducableSnippets {
     dest
   }*/
 
-  def mapParallel(r: Reducable[Int])(implicit s: Scheduler): Par[Array[Int]] = r.map(_ + 1)
-  def mapParallel[Repr](r: Reducable[Int], customCmf: collection.par.generic.CanMergeFrom[Reducable[Int], Int, Par[Repr]])(implicit s: Scheduler) = r.map(_ + 1)(customCmf, s)
+  def mapParallel(r: Reducible[Int])(implicit s: Scheduler): Par[Array[Int]] = r.map(_ + 1)
+  def mapParallel[Repr](r: Reducible[Int], customCmf: collection.par.generic.CanMergeFrom[Reducible[Int], Int, Par[Repr]])(implicit s: Scheduler) = r.map(_ + 1)(customCmf, s)
 
   def filterMod3Sequential(r: Range) = {
     var i = r.head
@@ -277,13 +277,13 @@ trait ReducableSnippets {
     ai.get
   }
 
-  def foreachParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def foreachParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     val ai = new java.util.concurrent.atomic.AtomicLong(0)
     r.foreach(x => if (x % 500 == 0) ai.incrementAndGet())
     ai.get
   }
 
-  def filterMod3Parallel(r: Reducable[Int])(implicit s: Scheduler) = r.filter(_ % 3 == 0)
+  def filterMod3Parallel(r: Reducible[Int])(implicit s: Scheduler) = r.filter(_ % 3 == 0)
 
   def filterCosSequential(r: Range) = {
     var i = r.head
@@ -297,7 +297,7 @@ trait ReducableSnippets {
     ib.narr
   }
 
-  def filterCosParallel(r: Reducable[Int])(implicit s: Scheduler) = r.filter(x => math.cos(x) > 0.0)
+  def filterCosParallel(r: Reducible[Int])(implicit s: Scheduler) = r.filter(x => math.cos(x) > 0.0)
 
   val other = List(2, 3)
 
@@ -313,7 +313,7 @@ trait ReducableSnippets {
     ib.narr
   }
 
-  def flatMapParallel(r: Reducable[Int])(implicit s: Scheduler) = {
+  def flatMapParallel(r: Reducible[Int])(implicit s: Scheduler) = {
     val pr = r
     for {
       x <- pr
@@ -334,6 +334,6 @@ trait ReducableSnippets {
     narr
   }
 
-  def mapSqrtParallel(r: Reducable[Int])(implicit s: Scheduler) = r.map(x => math.sqrt(x).toInt)
+  def mapSqrtParallel(r: Reducible[Int])(implicit s: Scheduler) = r.map(x => math.sqrt(x).toInt)
 
 }

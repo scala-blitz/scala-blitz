@@ -15,8 +15,8 @@ object BinaryTrees {
 
     implicit def treeSetOps[T](ts: Par[TreeSet[T]]) = new TreeSetOps(ts)
 
-    implicit def immutableTreeSetIsReducable[T] = new IsReducable[TreeSet[T], T] {
-      def apply(pts: Par[TreeSet[T]]) = new Reducable[T] {
+    implicit def immutableTreeSetIsReducible[T] = new IsReducible[TreeSet[T], T] {
+      def apply(pts: Par[TreeSet[T]]) = new Reducible[T] {
         def iterator: Iterator[T] = pts.seq.iterator
         def splitter: Splitter[T] = ???
         def stealer: Stealer[T] = pts.stealer
@@ -25,7 +25,7 @@ object BinaryTrees {
 
   }
 
-  class TreeSetOps[T](val treeset: Par[TreeSet[T]]) extends AnyVal with Reducables.OpsLike[T, Par[TreeSet[T]]] {
+  class TreeSetOps[T](val treeset: Par[TreeSet[T]]) extends AnyVal with Reducibles.OpsLike[T, Par[TreeSet[T]]] {
     def stealer: Stealer[T] = {
       val root = scala.collection.immutable.RedBlackTreeStealer.redBlackRoot(treeset.seq)
       val binary = scala.collection.immutable.RedBlackTreeStealer.redBlackTreeSetIsBinary[T]

@@ -6,7 +6,7 @@ import scala.collection.par.generic._
 
 
 
-trait ReducableOps[+T, +Repr, Ctx] extends Any {
+trait ReducibleOps[+T, +Repr, Ctx] extends Any {
 
   def reduce[U >: T](op: (U, U) => U)(implicit ctx: Ctx): U
 

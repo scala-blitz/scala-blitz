@@ -7,7 +7,7 @@ import scala.collection.parallel.Splitter
 
 
 
-trait Reducable[@specialized T] {
+trait Reducible[@specialized T] {
 
   def iterator: Iterator[T]
 

@@ -2,10 +2,10 @@ package scala.collection.par.generic
 
 
 
-import scala.collection.par.{Par, Reducable}
+import scala.collection.par.{Par, Reducible}
 
 
 
-trait IsReducable[Repr, T] {
-  def apply(r: Par[Repr]): Reducable[T]
+trait IsReducible[Repr, T] {
+  def apply(r: Par[Repr]): Reducible[T]
 }

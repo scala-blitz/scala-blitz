@@ -94,13 +94,13 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  if(TEST_AS_REDUCABLE) test("Reducable.aggregate(union)") {
+  if(TEST_AS_REDUCABLE) test("Reducible.aggregate(union)") {
     val rt = (r: Range) => r.sorted.toList
     val ht = (h: HashSet[Int]) => {
       
       //collection.parallel.workstealing.TreeStealer.debug.clear()
       //collection.parallel.workstealing.TreeStealer.debug(hashSetPrettyString(h))
-      val r = aggregateReducableUnion(h)
+      val r = aggregateReducibleUnion(h)
       //println("-------------------------------")
       r.toList.sorted
     }
@@ -113,12 +113,12 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  if(TEST_AS_REDUCABLE) test("Reducable.aggregate") {
+  if(TEST_AS_REDUCABLE) test("Reducible.aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
     val ht = (h: HashSet[Int]) => {
       //printHashSet(h)
       //collection.parallel.workstealing.TreeStealer.debug.clear()
-      val r = aggregateReducable(h)
+      val r = aggregateReducible(h)
       //println("-------------------------------")
       r
     }
@@ -135,9 +135,9 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     val ht = (hs: HashSet[Int]) => mapParallel(hs)
     testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
   }
-  if(TEST_AS_REDUCABLE) test("Reducable.map") {
+  if(TEST_AS_REDUCABLE) test("Reducible.map") {
     val rt = (r: Range) => r.toSet.map((x: Int) => x * 2)
-    val ht = (hs: HashSet[Int]) => (HashSet() ++ mapReducable(hs).seq).toPar
+    val ht = (hs: HashSet[Int]) => (HashSet() ++ mapReducible(hs).seq).toPar
     testOperation(comparison = hashTrieSetComparison[Int])(rt)(ht)
  }
 
@@ -150,9 +150,9 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     testOperation(testEmpty = false)(rt)(at)
   }
 
-  if(TEST_AS_REDUCABLE) test("Reducable.reduce") {
+  if(TEST_AS_REDUCABLE) test("Reducible.reduce") {
     val rt = (r: Range) => r.reduce(_ + _)
-    val at = (a: HashSet[Int]) => reduceReducable(a)
+    val at = (a: HashSet[Int]) => reduceReducible(a)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(at)
     }
@@ -297,11 +297,11 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
   }
 
 
-  if(TEST_AS_REDUCABLE) test("Reducable.find") {
+  if(TEST_AS_REDUCABLE) test("Reducible.find") {
     testOperation() {
       r => None
     } {
-      a => findReducable(a, Int.MaxValue)
+      a => findReducible(a, Int.MaxValue)
     }
     testOperation() {
       r => Some(1)
@@ -309,7 +309,7 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
       a => 
 //      printHashSet(a)
       //collection.parallel.workstealing.TreeStealer.debug.clear()
-      val r = findReducable(a, 1)
+      val r = findReducible(a, 1)
       if(r.isEmpty) {
         printHashSet(a)
         //collection.parallel.workstealing.TreeStealer.debug.print()
@@ -333,16 +333,16 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
  
-  if(TEST_AS_REDUCABLE) test("Reducable.exists") {
+  if(TEST_AS_REDUCABLE) test("Reducible.exists") {
     testOperation() {
       r => createHashSet(r).exists(x => x == Int.MaxValue)
     } {
-      a => existsReducable(a, Int.MaxValue)
+      a => existsReducible(a, Int.MaxValue)
     }
     testOperation() {
       r => createHashSet(r).exists(x => x == 1)
     } {
-      a => existsReducable(a, 1)
+      a => existsReducible(a, 1)
     }
   }
 
@@ -360,16 +360,16 @@ class ParHashTrieSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]]
     }
   }
 
-  if(TEST_AS_REDUCABLE) test("Reducable.forall") {
+  if(TEST_AS_REDUCABLE) test("Reducible.forall") {
     testOperation() {
       r => r.forall(_ < Int.MaxValue)
     } {
-      a => forallSmallerReducable(a, Int.MaxValue)
+      a => forallSmallerReducible(a, Int.MaxValue)
     }
     testOperation() {
       r => r.forall(_ < r.last)
     } {
-      a => forallSmallerReducable(a, a.last)
+      a => forallSmallerReducible(a, a.last)
     }
   }
    

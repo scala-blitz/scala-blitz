@@ -7,7 +7,7 @@ import scala.reflect.macros._
 import scala.reflect.ClassTag
 import scala.collection.par.generic._
 import scala.collection.par.Par
-import scala.collection.par.Reducable
+import scala.collection.par.Reducible
 import scala.collection.par.Scheduler
 import scala.collection.par.workstealing._
 import scala.collection.par.Configuration
@@ -19,7 +19,7 @@ import scala.collection.par.Scheduler.Node
 import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 
 
-object ReducablesMacros {
+object ReduciblesMacros {
 
   def aggregate[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(z: c.Expr[S])(combop: c.Expr[(S, S) => S])(seqop: c.Expr[(S, T) => S])(ctx: c.Expr[Scheduler]): c.Expr[S] = {
     import c.universe._
@@ -99,7 +99,7 @@ object ReducablesMacros {
     invokeAggregateKernel[T, Int, Repr](c)(predicv, seqlv, comblv)(zero)(comboper)(aggregateN[T, Int](c)(init, seqoper))(ctx)
   }
 
-  def aggregateN[T: c.WeakTypeTag, R: c.WeakTypeTag](c: BlackboxContext)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (node: Node[T, R], chunkSize: Int, kernel: Reducables.ReducableKernel[T, R]) =>
+  def aggregateN[T: c.WeakTypeTag, R: c.WeakTypeTag](c: BlackboxContext)(init: c.Expr[T => R], oper: c.Expr[(R, T) => R]) = c.universe.reify { (node: Node[T, R], chunkSize: Int, kernel: Reducibles.ReducibleKernel[T, R]) =>
     {
       val stealer = node.stealer
       if (!stealer.hasNext) kernel.zero
@@ -114,10 +114,10 @@ object ReducablesMacros {
     }
   }
 
-  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducables.ReducableKernel[T, R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
+  def invokeAggregateKernel[T: c.WeakTypeTag, R: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(initializer: c.Expr[Unit]*)(z: c.Expr[R])(combiner: c.Expr[(R, R) => R])(applyerN: c.Expr[(Node[T, R], Int, Reducibles.ReducibleKernel[T, R]) => R])(ctx: c.Expr[Scheduler]): c.Expr[R] = {
     import c.universe._
 
-    val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
+    val calleeExpression = c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix)
     val resultWithoutInit = reify {
       import scala._
       import collection.par
@@ -128,7 +128,7 @@ object ReducablesMacros {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
       val kernel =
-        new scala.collection.par.workstealing.Reducables.ReducableKernel[T, R] {
+        new scala.collection.par.workstealing.Reducibles.ReducibleKernel[T, R] {
           def zero = z.splice
           def combine(a: R, b: R) = combiner.splice.apply(a, b)
           def apply(node: Node[T, R], chunkSize: Int): R = applyerN.splice.apply(node, chunkSize, this)
@@ -155,7 +155,7 @@ object ReducablesMacros {
 
     val (lv, pred) = c.nonFunctionToLocal[U => Boolean](p)
 
-    val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
+    val calleeExpression = c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -167,7 +167,7 @@ object ReducablesMacros {
       lv.splice
       val callee = calleeExpression.splice
       val stealer = callee.stealer
-      val kernel = new scala.collection.par.workstealing.Reducables.ReducableKernel[T, Option[T]] {
+      val kernel = new scala.collection.par.workstealing.Reducibles.ReducibleKernel[T, Option[T]] {
         def zero = None
         def combine(a: Option[T], b: Option[T]) = if (a.isDefined) a else b
         def apply(node: Node[T, Option[T]], chunkSize: Int) = {
@@ -219,7 +219,7 @@ object ReducablesMacros {
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
     val (mv, mop) = c.nonFunctionToLocal[U => R](mapper)
-    val calleeExpression = c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix)
+    val calleeExpression = c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix)
     val result = reify {
       import scala._
       import collection.par
@@ -233,7 +233,7 @@ object ReducablesMacros {
       val callee = calleeExpression.splice
       val stealer = callee.stealer
 
-      val kernel = new scala.collection.par.workstealing.Reducables.ReducableKernel[T, ResultCell[R]] {
+      val kernel = new scala.collection.par.workstealing.Reducibles.ReducibleKernel[T, ResultCell[R]] {
         override def beforeWorkOn(tree: Scheduler.Ref[T, ResultCell[R]], node: Scheduler.Node[T, ResultCell[R]]) {
           node.WRITE_INTERMEDIATE(new ResultCell[R])
         }
@@ -302,7 +302,7 @@ object ReducablesMacros {
     }
   }
 
-  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(f: c.Expr[T => S])(callee: c.Expr[Reducables.OpsLike[T, Repr]], ctx: c.Expr[Scheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
+  def invokeCopyMapKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(f: c.Expr[T => S])(callee: c.Expr[Reducibles.OpsLike[T, Repr]], ctx: c.Expr[Scheduler])(getTagForS: c.Expr[ClassTag[S]]) = {
     import c.universe._
 
     reify {
@@ -318,7 +318,7 @@ object ReducablesMacros {
       val rootStealer = callee.splice.stealer.asInstanceOf[PreciseStealer[T]]
       val len = rootStealer.totalElements
       val sarray = sTag.newArray(len)
-      val kernel = new Reducables.CopyMapReducableKernel[T, S] {
+      val kernel = new Reducibles.CopyMapReducibleKernel[T, S] {
         import scala.collection.par.Scheduler.{ Ref, Node }
         import scala.collection.par.workstealing.Arrays.CopyProgress
         def resultArray = sarray
@@ -337,7 +337,7 @@ object ReducablesMacros {
     }
   }
 
-  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[Reducables.OpsLike[T, Repr]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Reducables.ReducableKernel[T, Merger[S, That]]] = {
+  def transformerKernel[T: c.WeakTypeTag, S: c.WeakTypeTag, That: c.WeakTypeTag, Repr: c.WeakTypeTag](c: BlackboxContext)(callee: c.Expr[Reducibles.OpsLike[T, Repr]], mergerExpr: c.Expr[Merger[S, That]], applyer: c.Expr[(Merger[S, That], T) => Any]): c.Expr[Reducibles.ReducibleKernel[T, Merger[S, That]]] = {
     import c.universe._
 
     reify {
@@ -349,7 +349,7 @@ object ReducablesMacros {
 
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
-      new Reducables.ReducableKernel[T, Merger[S, That]] {
+      new Reducibles.ReducibleKernel[T, Merger[S, That]] {
         override def beforeWorkOn(tree: Ref[T, Merger[S, That]], node: Node[T, Merger[S, That]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -378,7 +378,7 @@ object ReducablesMacros {
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (mpv, mpg) = c.nonFunctionToLocal[T => M](mp)
     val (aggrv, aggrg) = c.nonFunctionToLocal[(M, M) => M](aggr)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix), "callee")
     val mergerExpr = reify { HashTables.newHashMapCombiningMerger[K, M](kClassTag.splice, mClassTag.splice, ctx.splice, aggrg.splice) }
 
     reify {
@@ -397,7 +397,7 @@ object ReducablesMacros {
       cv.splice
       
       val stealer = callee.splice.stealer
-      val kernel = new Reducables.ReducableKernel[T, HashMapCombiningMerger[K, M]] {
+      val kernel = new Reducibles.ReducibleKernel[T, HashMapCombiningMerger[K, M]] {
         override def beforeWorkOn(tree: Ref[T, HashMapCombiningMerger[K, M]], node: Node[T, HashMapCombiningMerger[K, M]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -430,7 +430,7 @@ object ReducablesMacros {
 
     val (grv, grg) = c.nonFunctionToLocal[T => K](gr)
     val (cmfv, cmfg) = c.nonFunctionToLocal[CanMergeFrom[Repr, T, That]](cmf)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix), "callee")
     val mergerExpr = reify { HashTables.newHashMapCollectingMerger[K, T, That, Repr](kClassTag.splice, tClassTag.splice, ctx.splice, cmfg.splice) }
 
     reify {
@@ -448,7 +448,7 @@ object ReducablesMacros {
       cmfv.splice
       
       val stealer = callee.splice.stealer
-      val kernel = new Reducables.ReducableKernel[T, HashMapCollectingMerger[K, T, That, Repr]] {
+      val kernel = new Reducibles.ReducibleKernel[T, HashMapCollectingMerger[K, T, That, Repr]] {
         override def beforeWorkOn(tree: Ref[T, HashMapCollectingMerger[K, T, That, Repr]], node: Node[T, HashMapCollectingMerger[K, T, That, Repr]]) {
           node.WRITE_INTERMEDIATE(mergerExpr.splice)
         }
@@ -480,7 +480,7 @@ object ReducablesMacros {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => S](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal(cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
     val (mv, merger) = c.nonFunctionToLocal(mergerExpr, "merger")
@@ -497,7 +497,7 @@ object ReducablesMacros {
 
       import scala.collection.par._
       import scala.collection.par.workstealing.Arrays
-      import scala.collection.par.workstealing.Reducables
+      import scala.collection.par.workstealing.Reducibles
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       lv.splice
@@ -522,7 +522,7 @@ object ReducablesMacros {
     import c.universe._
 
     val (lv, f) = c.nonFunctionToLocal[T => TraversableOnce[S]](func)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Repr, S, That]](cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
     val applyer = reify {
@@ -538,7 +538,7 @@ object ReducablesMacros {
       import scala.reflect.ClassTag
 
       import scala.collection.par._
-      import scala.collection.par.workstealing.Reducables
+      import scala.collection.par.workstealing.Reducibles
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       import scala.reflect.ClassTag
@@ -558,7 +558,7 @@ object ReducablesMacros {
     import c.universe._
 
     val (pv, p) = c.nonFunctionToLocal[T => Boolean](pred)
-    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducables.OpsLike[T, Repr]](c.applyPrefix), "callee")
+    val (cv, callee) = c.nonFunctionToLocal(c.Expr[Reducibles.OpsLike[T, Repr]](c.applyPrefix), "callee")
     val (cmfv, canmerge) = c.nonFunctionToLocal[CanMergeFrom[Repr, T, That]](cmf, "cmf")
     val mergerExpr = reify { canmerge.splice.apply(callee.splice.seq) }
     val tkernel = transformerKernel(c)(callee, mergerExpr, reify { (merger: Merger[T, That], elem: T) => if (p.splice(elem)) merger += elem })
@@ -571,7 +571,7 @@ object ReducablesMacros {
       import scala.reflect.ClassTag
 
       import scala.collection.par._
-      import scala.collection.par.workstealing.{ Arrays, Reducables }
+      import scala.collection.par.workstealing.{ Arrays, Reducibles }
       import scala.collection.par.Scheduler
       import scala.collection.par.Scheduler.{ Ref, Node }
       pv.splice

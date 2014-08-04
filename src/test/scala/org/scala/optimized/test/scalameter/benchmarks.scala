@@ -20,7 +20,7 @@ class benchmarks extends OnlineRegressionReport with Serializable {
   include[ParConcBench]
   include[ParArrayBench]
   include[ParHashMapBench]
-  include[ReducableBench]
+  include[ReducibleBench]
   include[ParHashTrieSetBench]
 }
 

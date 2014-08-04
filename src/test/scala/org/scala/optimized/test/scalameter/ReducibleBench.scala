@@ -9,7 +9,7 @@ import org.scalameter.PerformanceTest.OnlineRegressionReport
 import org.scalameter.KeyValue
 
 
-class ReducableBench extends OnlineRegressionReport with Serializable with ReducableSnippets with Generators {
+class ReducibleBench extends OnlineRegressionReport with Serializable with ReducibleSnippets with Generators {
 
   /* config */
 
@@ -37,15 +37,15 @@ class ReducableBench extends OnlineRegressionReport with Serializable with Reduc
     exec.independentSamples -> 1,
     reports.regression.noiseMagnitude -> 0.75)
 
-  implicit def range2Reducable(r: Range)(implicit ctx: Scheduler): Reducable[Int] = par2zippable(r.toPar)
-  implicit def array2Reducable(a: Array[Int])(implicit ctx: Scheduler): Reducable[Int] = par2zippable(a.toPar)
+  implicit def range2Reducible(r: Range)(implicit ctx: Scheduler): Reducible[Int] = par2zippable(r.toPar)
+  implicit def array2Reducible(a: Array[Int])(implicit ctx: Scheduler): Reducible[Int] = par2zippable(a.toPar)
 
-  implicit def hashTrieSet2Reducable(a: collection.immutable.HashSet[Int])(implicit ctx: Scheduler): Reducable[Int] = hashTrieSetIsReducable(a.toPar)
-  implicit def hashSet2Reducable(a: collection.mutable.HashSet[Int])(implicit ctx: Scheduler): Reducable[Int] = hashSetIsReducable(a.toPar)
+  implicit def hashTrieSet2Reducible(a: collection.immutable.HashSet[Int])(implicit ctx: Scheduler): Reducible[Int] = hashTrieSetIsReducible(a.toPar)
+  implicit def hashSet2Reducible(a: collection.mutable.HashSet[Int])(implicit ctx: Scheduler): Reducible[Int] = hashSetIsReducible(a.toPar)
 
   /* benchmarks */
 
-  performance of "Reducables" config (opts) in {
+  performance of "Reducibles" config (opts) in {
 
     measure method "mapReduce" in {
       using(ranges(large)) curve ("Sequential") in mapReduceSequential

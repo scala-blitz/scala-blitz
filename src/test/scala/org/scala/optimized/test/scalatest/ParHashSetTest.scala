@@ -52,9 +52,9 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     testOperation()(rt)(ht)
   }
 
-  test("Reducable.aggregate") {
+  test("Reducible.aggregate") {
     val rt = (r: Range) => r.aggregate(0)(_ + _, _ + _)
-    val ht = (h: HashSet[Int]) => aggregateReducable(h)
+    val ht = (h: HashSet[Int]) => aggregateReducible(h)
     testOperation()(rt)(ht)
   }
   test("map") {
@@ -71,9 +71,9 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     testOperation(testEmpty = false)(rt)(at)
   }
 
-  test("Reducable.reduce") {
+  test("Reducible.reduce") {
     val rt = (r: Range) => r.reduce(_ + _)
-    val at = (a: HashSet[Int]) => reduceReducable(a)
+    val at = (a: HashSet[Int]) => reduceReducible(a)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(at)
     }
@@ -158,11 +158,11 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     }
   }
 
-  test("Reducable.foreach") {
+  test("Reducible.foreach") {
     testOperation() {
       r => foreachSequential(createHashSet(r))
     } {
-      p => foreachReducable(p)
+      p => foreachReducible(p)
     }
   }
 
@@ -225,16 +225,16 @@ class ParHashSetTest extends FunSuite with Timeouts with Tests[HashSet[Int]] wit
     }
   }
 
-  test("Reducable.find") {
+  test("Reducible.find") {
     testOperation() {
       r => createHashSet(r).find(x => x == Int.MaxValue)
     } {
-      a => findReducable(a, Int.MaxValue)
+      a => findReducible(a, Int.MaxValue)
     }
     testOperation() {
       r => r.find(x => x == 1)
     } {
-      a => findReducable(a, 1)
+      a => findReducible(a, 1)
     }
   }
 

@@ -10,7 +10,7 @@ import scala.collection.par._
 
 
 
-class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] with ReducableSnippets {
+class ReducibleTest extends FunSuite with Timeouts with Tests[Reducible[Int]] with ReducibleSnippets {
 
   def testForSizes(method: Range => Unit) {
     for (i <- 1 to 1000) {
@@ -45,7 +45,7 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
 
   test("reduce") {
     val rt = (r: Range) => r.iterator.sum
-    val pt = (p: Reducable[Int]) => reduceParallel(p)
+    val pt = (p: Reducible[Int]) => reduceParallel(p)
     intercept[UnsupportedOperationException] {
       testOperationForSize(0 until 0)(rt)(pt)
     }
@@ -241,8 +241,8 @@ class ReducableTest extends FunSuite with Timeouts with Tests[Reducable[Int]] wi
   }
 
   test("mapCustomCanMergeFrom") {
-    object customCmf extends scala.collection.par.generic.CanMergeFrom[Reducable[Int], Int, Par[Conc[Int]]] {
-      def apply(from: Reducable[Int]) = new Conc.ConcMerger[Int]
+    object customCmf extends scala.collection.par.generic.CanMergeFrom[Reducible[Int], Int, Par[Conc[Int]]] {
+      def apply(from: Reducible[Int]) = new Conc.ConcMerger[Int]
       def apply() = new Conc.ConcMerger[Int]
     }
     testOperation(comparison = concComparison[Int]) {
