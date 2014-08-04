@@ -27,7 +27,7 @@ object BuildSettings {
 }
 
 
-object WorkstealingBuild extends Build {
+object ScalaBlitzBuild extends Build {
   
   def quote(s: Any) = {
     if (scala.util.Properties.isWin) "\"" + s.toString + "\""
