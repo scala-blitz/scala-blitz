@@ -284,8 +284,7 @@ object ReducablesMacros {
     (c: BlackboxContext)
     (seqop: c.Expr[(U, ResultCell[R]) => ResultCell[R]], stopPredicate: c.Expr[(U, ResultCell[R]) => Boolean])
     (reducer: c.Expr[(R, R) => R])(ctx: c.Expr[Scheduler])
-    : c.Expr[ResultCell[R]] =
-  {
+    : c.Expr[ResultCell[R]] = {
     import c.universe._
 
     val (lv, op) = c.nonFunctionToLocal[(R, R) => R](reducer)
